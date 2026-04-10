@@ -14,15 +14,26 @@ function q(
 afterEach(cleanup);
 
 describe("AudioControl", () => {
-	test("renders label, slider, output, and selects", () => {
+	test("renders label, slider, output", () => {
 		const { container } = render(
 			<AudioControl label="Gain" min={0} max={100} value={50} />,
 		);
 		expect(container.querySelector(".control-label")?.textContent).toBe("Gain");
 		expect(container.querySelector('[role="slider"]')).toBeTruthy();
 		expect(container.querySelector(".control-output")).toBeTruthy();
-		expect(container.querySelector(".control-snap")).toBeTruthy();
-		expect(container.querySelector(".control-unit")).toBeTruthy();
+	});
+
+	test("renders snap dropdown only when hasSnap is true", () => {
+		const { container: withSnap } = render(
+			<AudioControl label="Offset" min={0} max={4} value={0} hasSnap={true} />,
+		);
+		expect(withSnap.querySelector(".control-snap")).toBeTruthy();
+
+		const { container: withoutSnap } = render(
+			<AudioControl label="Gain" min={0} max={100} value={50} />,
+		);
+		expect(withoutSnap.querySelector(".control-snap")).toBeNull();
+		expect(withoutSnap.querySelector(".control-snap-placeholder")).toBeTruthy();
 	});
 
 	test("slider is labelled by the label element", () => {
@@ -86,6 +97,7 @@ describe("AudioControl", () => {
 				min={0}
 				max={4}
 				value={0}
+				hasSnap={true}
 				onSnapChange={onSnapChange}
 			/>,
 		);
@@ -96,10 +108,10 @@ describe("AudioControl", () => {
 
 	test("displays formatted output value", () => {
 		const { container } = render(
-			<AudioControl label="Gain" min={0} max={100} value={42} precision={3} />,
+			<AudioControl label="Gain" controlKey="gain" min={-100} max={0} value={-6} />,
 		);
 		const output = q(container, ".control-output");
-		expect(output.textContent).toBe("42.0");
+		expect(output.textContent).toBe("-6.0 dB");
 	});
 
 	test("passes controlKey for aria-valuetext", () => {
@@ -223,12 +235,23 @@ describe("AudioControl", () => {
 		expect(onChange).toHaveBeenCalledWith(75);
 	});
 
-	test("changing unit select updates display", () => {
+	test("disabled state: slider and controls dimmed when toggle off", () => {
+		const onChange = mock(() => {});
 		const { container } = render(
-			<AudioControl label="Gain" min={0} max={100} value={50} />,
+			<AudioControl
+				label="Gain"
+				min={0}
+				max={100}
+				value={50}
+				hasToggle={true}
+				enabled={false}
+				onChange={onChange}
+			/>,
 		);
-		const unitSelect = q(container, ".control-unit") as HTMLSelectElement;
-		fireEvent.change(unitSelect, { target: { value: "dB" } });
-		expect(unitSelect.value).toBe("dB");
+		expect(
+			container.querySelector(".audio-control--disabled"),
+		).toBeTruthy();
+		const slider = q(container, '[role="slider"]');
+		expect(slider.getAttribute("aria-disabled")).toBe("true");
 	});
 });

@@ -173,10 +173,20 @@ describe("ControlSection", () => {
 
 	test("onSnapChange is called when snap changes", () => {
 		const onSnapChange = mock(() => {});
+		const defsWithSnap: ControlDef[] = [
+			{
+				key: "offset",
+				label: "Offset",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasSnap: true,
+			},
+		];
 		const { container } = render(
 			<ControlSection
 				legend="Params"
-				defs={testDefs}
+				defs={defsWithSnap}
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}

@@ -28,47 +28,51 @@ export function TransportButtons({
 
 	return (
 		<section id="buttons">
-			<button
-				type="button"
-				onClick={onStart}
-				disabled={nodeState === "started"}
-				aria-disabled={nodeState === "started"}
-			>
-				Start
-			</button>
-			<button
-				type="button"
-				onClick={onStop}
-				disabled={cantStop}
-				aria-disabled={cantStop}
-			>
-				Stop
-			</button>
-			<button
-				type="button"
-				onClick={onPause}
-				disabled={nodeState !== "started"}
-				aria-disabled={nodeState !== "started"}
-			>
-				Pause
-			</button>
-			<button
-				type="button"
-				onClick={onResume}
-				disabled={nodeState !== "paused"}
-				aria-disabled={nodeState !== "paused"}
-			>
-				Resume
-			</button>
-			<button type="button" onClick={onDispose}>
-				Dispose
-			</button>
-			<button type="button" onClick={onLog}>
-				Log State
-			</button>
-			<button type="button" onClick={onLoadSound}>
-				Load Sound
-			</button>
+			<div className="btn-group-primary">
+				<button type="button" onClick={onLoadSound}>
+					Load Sound
+				</button>
+				<button
+					type="button"
+					onClick={onStart}
+					disabled={nodeState === "started"}
+					aria-disabled={nodeState === "started"}
+				>
+					Start
+				</button>
+				<button
+					type="button"
+					onClick={onStop}
+					disabled={cantStop}
+					aria-disabled={cantStop}
+				>
+					Stop
+				</button>
+				<button
+					type="button"
+					onClick={onPause}
+					disabled={nodeState !== "started"}
+					aria-disabled={nodeState !== "started"}
+				>
+					Pause
+				</button>
+				<button
+					type="button"
+					onClick={onResume}
+					disabled={nodeState !== "paused"}
+					aria-disabled={nodeState !== "paused"}
+				>
+					Resume
+				</button>
+			</div>
+			<div className="btn-group-secondary">
+				<button type="button" className="btn-secondary" onClick={onLog}>
+					Log State
+				</button>
+				<button type="button" className="btn-secondary" onClick={onDispose}>
+					Dispose
+				</button>
+			</div>
 		</section>
 	);
 }

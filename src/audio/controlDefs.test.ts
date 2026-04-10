@@ -10,9 +10,9 @@ import {
 describe("controlDefs", () => {
 	it("controlDefs has expected keys", () => {
 		const keys = controlDefs.map((d) => d.key);
-		expect(keys).toContain("playhead");
 		expect(keys).toContain("offset");
 		expect(keys).toContain("duration");
+		expect(keys).not.toContain("playhead");
 	});
 
 	it("loopControlDefs has loop-related keys", () => {
@@ -31,10 +31,12 @@ describe("controlDefs", () => {
 		expect(keys).toContain("highpass");
 	});
 
-	it("allDefs combines all definition arrays", () => {
+	it("allDefs combines all definition arrays plus playhead", () => {
 		expect(allDefs.length).toBe(
-			controlDefs.length + loopControlDefs.length + paramDefs.length,
+			1 + controlDefs.length + loopControlDefs.length + paramDefs.length,
 		);
+		const keys = allDefs.map((d) => d.key);
+		expect(keys).toContain("playhead");
 	});
 });
 

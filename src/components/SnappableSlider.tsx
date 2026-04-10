@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface SnappableSliderProps {
 	min: number;
@@ -9,6 +9,8 @@ export interface SnappableSliderProps {
 	defaultValue?: number;
 	enableSnap?: boolean;
 	snaps?: number[];
+	ticks?: number[];
+	disabled?: boolean;
 	labelId?: string;
 	valueText?: string;
 	onChange?: (value: number) => void;
@@ -23,6 +25,8 @@ export function SnappableSlider({
 	defaultValue,
 	enableSnap = false,
 	snaps = [],
+	ticks = [],
+	disabled = false,
 	labelId,
 	valueText,
 	onChange,
@@ -30,6 +34,7 @@ export function SnappableSlider({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isDragging = useRef(false);
 	const isOptionKeyHeld = useRef(false);
+	const [altHeld, setAltHeld] = useState(false);
 
 	const resolvedStep = step ?? (max - min) / 100;
 
@@ -93,6 +98,7 @@ export function SnappableSlider({
 
 	const startDrag = useCallback(
 		(clientX: number) => {
+			if (disabled) return;
 			isDragging.current = true;
 			updateFromClientX(clientX);
 
@@ -112,15 +118,18 @@ export function SnappableSlider({
 			document.addEventListener("touchmove", handleTouchMove);
 			document.addEventListener("touchend", handleUp);
 		},
-		[updateFromClientX],
+		[updateFromClientX, disabled],
 	);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
 			if (e.key === "Alt") {
 				isOptionKeyHeld.current = true;
+				setAltHeld(true);
 				return;
 			}
+
+			if (disabled) return;
 
 			let newValue = value;
 			const s = resolvedStep;
@@ -153,27 +162,32 @@ export function SnappableSlider({
 			e.preventDefault();
 			clampAndEmit(newValue);
 		},
-		[value, resolvedStep, min, max, clampAndEmit],
+		[value, resolvedStep, min, max, clampAndEmit, disabled],
 	);
 
 	const handleKeyUp = useCallback((e: React.KeyboardEvent) => {
-		if (e.key === "Alt") isOptionKeyHeld.current = false;
+		if (e.key === "Alt") {
+			isOptionKeyHeld.current = false;
+			setAltHeld(false);
+		}
 	}, []);
 
 	const handleDoubleClick = useCallback(() => {
+		if (disabled) return;
 		if (defaultValue !== undefined) {
 			onChange?.(defaultValue);
 		}
-	}, [defaultValue, onChange]);
+	}, [defaultValue, onChange, disabled]);
 
 	const handleWheel = useCallback(
 		(e: React.WheelEvent) => {
+			if (disabled) return;
 			e.preventDefault();
 			const s = e.shiftKey ? resolvedStep / 10 : resolvedStep;
 			const direction = e.deltaY < 0 ? 1 : -1;
 			clampAndEmit(value + direction * s);
 		},
-		[value, resolvedStep, clampAndEmit],
+		[value, resolvedStep, clampAndEmit, disabled],
 	);
 
 	const ratio = getRatioFromValue(value);
@@ -199,6 +213,34 @@ export function SnappableSlider({
 		});
 	}, [snaps, getRatioFromValue]);
 
+	const tickElements = useMemo(() => {
+		let prevRatio = -1;
+		return ticks.map((tick) => {
+			const r = getRatioFromValue(tick);
+			const show = prevRatio < 0 || r - prevRatio >= 0.05;
+			if (show) prevRatio = r;
+			return (
+				<span key={tick}>
+					<span className="slider-tick" style={{ left: `${r * 100}%` }} />
+					<span
+						className="slider-xval"
+						style={{ left: `${r * 100}%`, display: show ? "block" : "none" }}
+					>
+						{tick}
+					</span>
+				</span>
+			);
+		});
+	}, [ticks, getRatioFromValue]);
+
+	const sliderClass = [
+		"snappable-slider",
+		disabled ? "snappable-slider--disabled" : "",
+		altHeld ? "snappable-slider--fine" : "",
+	]
+		.filter(Boolean)
+		.join(" ");
+
 	return (
 		<div
 			role="slider"
@@ -207,9 +249,10 @@ export function SnappableSlider({
 			aria-valuenow={value}
 			aria-valuetext={valueText}
 			aria-labelledby={labelId}
-			tabIndex={0}
+			aria-disabled={disabled || undefined}
+			tabIndex={disabled ? -1 : 0}
 			ref={containerRef}
-			className="snappable-slider"
+			className={sliderClass}
 			onMouseDown={(e) => startDrag(e.clientX)}
 			onTouchStart={(e) => startDrag(e.touches[0].clientX)}
 			onKeyDown={handleKeyDown}
@@ -221,6 +264,7 @@ export function SnappableSlider({
 			<span className="slider-fill" style={{ width: pct }} />
 			<span className="slider-thumb" style={{ left: pct }} />
 			{snapElements}
+			{tickElements}
 		</div>
 	);
 }

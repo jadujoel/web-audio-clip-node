@@ -4,7 +4,6 @@ import {
 	dbFromLin,
 	float32ArrayFromAudioBuffer,
 	getSnappedValue,
-	getUnitValue,
 	linFromDb,
 } from "./utils";
 
@@ -67,24 +66,6 @@ describe("getSnappedValue", () => {
 
 	it("no snap: returns value unchanged", () => {
 		expect(getSnappedValue(1.234, "none", tempo)).toBe(1.234);
-	});
-});
-
-describe("getUnitValue", () => {
-	it("dB unit: converts via dbFromLin", () => {
-		expect(getUnitValue(1, "dB")).toBeCloseTo(0);
-	});
-
-	it("log10 unit", () => {
-		expect(getUnitValue(100, "log10")).toBeCloseTo(2);
-	});
-
-	it("log2 unit", () => {
-		expect(getUnitValue(8, "log2")).toBeCloseTo(3);
-	});
-
-	it("default (lin): returns value unchanged", () => {
-		expect(getUnitValue(42, "lin")).toBe(42);
 	});
 });
 

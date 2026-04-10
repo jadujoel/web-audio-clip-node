@@ -31,6 +31,7 @@ export interface ControlDef {
 	preset?: string;
 	title?: string;
 	hasToggle?: boolean;
+	hasSnap?: boolean;
 }
 
 export const TEMPO = 116;
@@ -38,22 +39,13 @@ export const SAMPLE_RATE = 48000;
 
 export const controlDefs: ControlDef[] = [
 	{
-		key: "playhead",
-		label: "Playhead",
-		min: 0,
-		max: 480000,
-		defaultValue: 0,
-		precision: 1,
-		snap: "int",
-		title: "Current sample position of buffer playback.",
-	},
-	{
 		key: "offset",
 		label: "Offset",
 		min: 0,
 		max: 4,
 		defaultValue: 0,
 		snap: "bar",
+		hasSnap: true,
 		title: "Start position in the buffer (seconds).",
 	},
 	{
@@ -62,6 +54,7 @@ export const controlDefs: ControlDef[] = [
 		min: -1,
 		max: 40,
 		defaultValue: -1,
+		hasSnap: true,
 		title:
 			"How long to play before auto-stopping (seconds). -1 for full length.",
 	},
@@ -72,6 +65,7 @@ export const controlDefs: ControlDef[] = [
 		max: 4,
 		defaultValue: 0,
 		snap: "beat",
+		hasSnap: true,
 		title: "Delay before starting (seconds).",
 	},
 	{
@@ -81,6 +75,7 @@ export const controlDefs: ControlDef[] = [
 		max: 4,
 		defaultValue: 0,
 		snap: "beat",
+		hasSnap: true,
 		title: "Delay before stopping (seconds).",
 	},
 	{
@@ -90,6 +85,7 @@ export const controlDefs: ControlDef[] = [
 		max: 4,
 		defaultValue: 0,
 		snap: "beat",
+		hasSnap: true,
 		hasToggle: true,
 		title: "Fade-in duration (seconds).",
 	},
@@ -100,6 +96,7 @@ export const controlDefs: ControlDef[] = [
 		max: 4,
 		defaultValue: 0,
 		snap: "beat",
+		hasSnap: true,
 		hasToggle: true,
 		title: "Fade-out duration (seconds).",
 	},
@@ -113,6 +110,7 @@ export const loopControlDefs: ControlDef[] = [
 		max: 1,
 		defaultValue: 0,
 		snap: "bar",
+		hasSnap: true,
 	},
 	{
 		key: "loopEnd",
@@ -121,6 +119,7 @@ export const loopControlDefs: ControlDef[] = [
 		max: 1,
 		defaultValue: 0,
 		snap: "bar",
+		hasSnap: true,
 	},
 	{
 		key: "loopCrossfade",
@@ -129,6 +128,7 @@ export const loopControlDefs: ControlDef[] = [
 		max: 1,
 		defaultValue: 0,
 		snap: "beat",
+		hasSnap: true,
 		hasToggle: true,
 	},
 ];
@@ -181,7 +181,7 @@ export const paramDefs: ControlDef[] = [
 		key: "lowpass",
 		label: "Lowpass",
 		min: 32,
-		max: 16385,
+		max: 16384,
 		defaultValue: 16384,
 		preset: "hertz",
 		hasToggle: true,
@@ -199,7 +199,24 @@ export const paramDefs: ControlDef[] = [
 	},
 ];
 
-export const allDefs = [...controlDefs, ...loopControlDefs, ...paramDefs];
+/** Internal-only definition for playhead (not shown in UI). */
+const playheadDef: ControlDef = {
+	key: "playhead",
+	label: "Playhead",
+	min: 0,
+	max: 480000,
+	defaultValue: 0,
+	precision: 1,
+	snap: "int",
+	title: "Current sample position of buffer playback.",
+};
+
+export const allDefs = [
+	playheadDef,
+	...controlDefs,
+	...loopControlDefs,
+	...paramDefs,
+];
 
 export function buildDefaults(): {
 	values: Record<ControlKey, number>;

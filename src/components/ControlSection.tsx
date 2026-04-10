@@ -42,6 +42,7 @@ export function ControlSection({
 					title={def.title}
 					enabled={enabled[def.key]}
 					hasToggle={def.hasToggle}
+					hasSnap={def.hasSnap}
 					onChange={(v) => onValueChange(def.key, v)}
 					onToggle={(on) => onToggle(def.key, on)}
 					onSnapChange={(s) => onSnapChange(def.key, s)}

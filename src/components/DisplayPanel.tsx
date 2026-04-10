@@ -28,18 +28,19 @@ export function DisplayPanel({
 			)}
 			<code>State:</code>
 			<output>{nodeState}</output>
-			<br />
-			<code>CurrentTime:</code>
+			<code>Time:</code>
 			<output>{currentTime}</output>
-			<code>CurrentFrame:</code>
-			<output>{currentFrame}</output>
-			<code>TimesLooped:</code>
+			<code>Loops:</code>
 			<output>{timesLooped}</output>
-			<br />
-			<code>Latency:</code>
-			<output>{latency}</output>
-			<code>TimeTaken:</code>
-			<output>{timeTaken}</output>
+			<details className="display-details">
+				<summary>Debug</summary>
+				<code>Frame:</code>
+				<output>{currentFrame}</output>
+				<code>Latency:</code>
+				<output>{latency}</output>
+				<code>TimeTaken:</code>
+				<output>{timeTaken}</output>
+			</details>
 		</section>
 	);
 }
