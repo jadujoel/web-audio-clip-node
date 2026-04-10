@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { dbFromLin, getSnappedValue, getUnitValue, linFromDb } from "./utils";
+import {
+	audioBufferFromFloat32Array,
+	dbFromLin,
+	float32ArrayFromAudioBuffer,
+	getSnappedValue,
+	getUnitValue,
+	linFromDb,
+} from "./utils";
 
 describe("dbFromLin / linFromDb", () => {
 	it("round-trip: linFromDb(dbFromLin(x)) ≈ x", () => {
@@ -78,5 +85,64 @@ describe("getUnitValue", () => {
 
 	it("default (lin): returns value unchanged", () => {
 		expect(getUnitValue(42, "lin")).toBe(42);
+	});
+});
+
+describe("float32ArrayFromAudioBuffer", () => {
+	it("returns single channel array for mono buffer", () => {
+		const ctx = new AudioContext();
+		const ab = ctx.createBuffer(1, 128, ctx.sampleRate);
+		const data = ab.getChannelData(0);
+		data[0] = 0.5;
+		const result = float32ArrayFromAudioBuffer(ab);
+		expect(result.length).toBe(1);
+		expect(result[0][0]).toBeCloseTo(0.5);
+		ctx.close();
+	});
+
+	it("returns two channel arrays for stereo buffer", () => {
+		const ctx = new AudioContext();
+		const ab = ctx.createBuffer(2, 128, ctx.sampleRate);
+		ab.getChannelData(0)[0] = 0.25;
+		ab.getChannelData(1)[0] = 0.75;
+		const result = float32ArrayFromAudioBuffer(ab);
+		expect(result.length).toBe(2);
+		expect(result[0][0]).toBeCloseTo(0.25);
+		expect(result[1][0]).toBeCloseTo(0.75);
+		ctx.close();
+	});
+});
+
+describe("audioBufferFromFloat32Array", () => {
+	it("returns undefined for undefined data", () => {
+		const ctx = new AudioContext();
+		expect(audioBufferFromFloat32Array(ctx, undefined)).toBeUndefined();
+		ctx.close();
+	});
+
+	it("returns undefined for empty array", () => {
+		const ctx = new AudioContext();
+		expect(audioBufferFromFloat32Array(ctx, [])).toBeUndefined();
+		ctx.close();
+	});
+
+	it("creates AudioBuffer from mono Float32Array data", () => {
+		const ctx = new AudioContext();
+		const data = [new Float32Array([0.1, 0.2, 0.3])];
+		const result = audioBufferFromFloat32Array(ctx, data);
+		expect(result).toBeDefined();
+		expect(result?.numberOfChannels).toBe(1);
+		expect(result?.length).toBe(3);
+		ctx.close();
+	});
+
+	it("creates AudioBuffer from stereo Float32Array data", () => {
+		const ctx = new AudioContext();
+		const data = [new Float32Array([0.1, 0.2]), new Float32Array([0.3, 0.4])];
+		const result = audioBufferFromFloat32Array(ctx, data);
+		expect(result).toBeDefined();
+		expect(result?.numberOfChannels).toBe(2);
+		expect(result?.length).toBe(2);
+		ctx.close();
 	});
 });

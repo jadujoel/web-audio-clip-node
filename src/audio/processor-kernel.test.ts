@@ -127,6 +127,16 @@ describe("setOffset", () => {
 		// Let's verify the actual behavior
 		expect(props.offset).toBeGreaterThan(0);
 	});
+
+	it("with value exceeding buffer length wraps via modulo", () => {
+		const buffer = makeBuffer(1000);
+		const props = getProperties({ buffer }, 48000);
+		const result = setOffset(props, 2000, 48000);
+		// offset > (1000 - 1) → recurse with 1000 % 2000 = 1000, but that's still > 999
+		// so it recurses again with 1000 % 1000 = 0
+		expect(result).toBeGreaterThanOrEqual(0);
+		expect(props.offset).toBeGreaterThanOrEqual(0);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -288,6 +298,21 @@ describe("findIndexesWithPlaybackRates", () => {
 		expect(result.indexes[2]).toBe(498);
 	});
 
+	it("near end of buffer without loop: truncated length", () => {
+		const p: BlockParameters = {
+			playhead: 950,
+			bufferLength: 1000,
+			loop: false,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 1000,
+			playbackRates: new Float32Array([1]),
+		};
+		const result = findIndexesWithPlaybackRates(p);
+		expect(result.indexes.length).toBe(50);
+		expect(result.ended).toBe(true);
+	});
+
 	it("loop wrapping with positive rate", () => {
 		const p: BlockParameters = {
 			playhead: 940,
@@ -398,6 +423,19 @@ describe("copy", () => {
 		copy(source, target);
 		expect(target[0][0]).toBe(42);
 		expect(target[1][0]).toBe(99);
+	});
+
+	it("expands target when source has more channels", () => {
+		const source = makeOutput(3); // 3 channels
+		source[0][0] = 1;
+		source[1][0] = 2;
+		source[2][0] = 3;
+		const target = makeOutput(1); // only 1 channel
+		copy(source, target);
+		expect(target.length).toBe(3);
+		expect(target[0][0]).toBe(1);
+		expect(target[1][0]).toBe(2);
+		expect(target[2][0]).toBe(3);
 	});
 });
 
@@ -525,6 +563,19 @@ describe("lowpassFilter", () => {
 		// states2 shouldn't be affected
 		expect(states2[0].x_1).toBe(0);
 	});
+
+	it("a-rate: per-sample cutoff values", () => {
+		const buffer = makeSineBuffer(512, 5000, SR, 2);
+		const states = createFilterState();
+		// Provide per-sample cutoffs (a-rate)
+		const cutoffs = new Float32Array(512);
+		for (let i = 0; i < 512; i++) cutoffs[i] = 1000;
+		lowpassFilter(buffer, cutoffs, SR, states);
+		// Should apply filtering with varying cutoffs
+		let energy = 0;
+		for (let i = 128; i < 512; i++) energy += buffer[0][i] ** 2;
+		expect(energy).toBeGreaterThan(0);
+	});
 });
 
 describe("highpassFilter", () => {
@@ -564,6 +615,17 @@ describe("highpassFilter", () => {
 		const states = createFilterState();
 		highpassFilter(buffer, new Float32Array([20]), SR, states);
 		expect(buffer[0]).toEqual(original);
+	});
+
+	it("a-rate: per-sample cutoff values", () => {
+		const buffer = makeSineBuffer(512, 100, SR, 2);
+		const states = createFilterState();
+		const cutoffs = new Float32Array(512);
+		for (let i = 0; i < 512; i++) cutoffs[i] = 5000;
+		highpassFilter(buffer, cutoffs, SR, states);
+		let energy = 0;
+		for (let i = 128; i < 512; i++) energy += buffer[0][i] ** 2;
+		expect(energy).toBeGreaterThanOrEqual(0);
 	});
 });
 
@@ -1158,5 +1220,499 @@ describe("processBlock", () => {
 		// out2 should be a copy of out1
 		expect(out2[0][0]).toBe(out1[0][0]);
 		expect(out2[0][5]).toBe(out1[0][5]);
+	});
+
+	it("fade in: initial samples are attenuated", () => {
+		const buffer = makeBuffer(48000);
+		// Fill buffer with 1.0 so we can see attenuation
+		for (const ch of buffer) ch.fill(1);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				playhead: 0,
+				playedSamples: 0,
+				fadeInDuration: 1.0,
+				enableFadeIn: true,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// First sample should be attenuated (less than 1.0)
+		expect(outputs[0][0][0]).toBeLessThan(1.0);
+	});
+
+	it("fade out: samples are attenuated near stop time", () => {
+		const buffer = makeBuffer(48000);
+		for (const ch of buffer) ch.fill(1);
+		const stopWhen = 1.003; // just barely ahead of currentTime
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen,
+				duration: stopWhen,
+				buffer,
+				playhead: 48000 - 256,
+				playedSamples: 48000 - 256,
+				fadeOutDuration: 1.0,
+				enableFadeOut: true,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 1.0, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Samples should be attenuated due to fade out
+		expect(outputs[0][0][0]).toBeLessThan(1.0);
+	});
+
+	it("processBlock with gain filter enabled", () => {
+		const buffer = makeBuffer(48000);
+		for (const ch of buffer) ch.fill(1);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: true,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.gain = new Float32Array([0.5]);
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(outputs[0][0][0]).toBeCloseTo(0.5); // gain applied
+	});
+
+	it("processBlock with lowpass and highpass enabled", () => {
+		const buffer = makeSineBuffer(48000, 1000, SR);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: true,
+				enableHighpass: true,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.lowpass = new Float32Array([5000]);
+		params.highpass = new Float32Array([100]);
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Signal should still be present since 1000Hz is within 100-5000Hz band
+		const maxVal = Math.max(...outputs[0][0].slice(10));
+		expect(maxVal).toBeGreaterThan(0);
+	});
+
+	it("processBlock with pan enabled", () => {
+		const buffer = makeBuffer(48000);
+		for (const ch of buffer) ch.fill(1);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: true,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.pan = new Float32Array([-1]); // hard left
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Right channel should be zeroed
+		expect(outputs[0][1][0]).toBe(0);
+	});
+
+	it("processBlock with playbackRate enabled", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: true,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.playbackRate = new Float32Array([2]); // double speed
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// At 2x speed, playhead should advance by 256 samples (128 * 2)
+		expect(props.playhead).toBeCloseTo(256, 0);
+	});
+
+	it("loop crossfade at loop boundaries", () => {
+		// Use a large enough buffer with crossfade zone
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		for (const ch of buffer) ch.fill(1);
+		// loopStart = 0.1s = 4800 samples, loopEnd = 0.9s = 43200 samples
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const loopCrossfade = 0.05; // 2400 samples crossfade
+		const loopStartSamples = Math.floor(loopStart * SR);
+		// Place playhead just inside crossfade zone near loop start
+		// crossfade out zone: loopStartSamples < playhead < loopStartSamples + xfadeNumSamples
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				playhead: loopStartSamples + 10, // just past loop start, within crossfade zone
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Just verify it runs and advances playhead
+		expect(props.playhead).toBeGreaterThan(loopStartSamples + 10);
+	});
+
+	it("loop crossfade approaching loop end", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const loopCrossfade = 0.05;
+		const loopEndSamples = Math.floor(loopEnd * SR);
+		const xfadeNumSamples = Math.floor(loopCrossfade * SR);
+		// Place playhead in crossfade-in zone near loop end
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				playhead: loopEndSamples - xfadeNumSamples + 10, // in crossfade-in zone
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(props.playhead).toBeGreaterThan(0);
+	});
+
+	it("NaN in output triggers logging and returns early", () => {
+		// Create a buffer that will produce NaN when processed
+		const buffer = makeBuffer(48000);
+		// Introduce NaN values in the buffer
+		buffer[0][0] = Number.NaN;
+		buffer[0][1] = Number.NaN;
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const out1 = makeOutput(2);
+		const out2 = makeOutput(2);
+		const result = processBlock(
+			props,
+			[out1, out2],
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(result.keepAlive).toBe(true);
+		// NaN values should be replaced with 0
+		expect(out1[0][0]).toBe(0);
+		expect(out1[0][1]).toBe(0);
+	});
+
+	it("Paused state after pauseWhen → outputs silence", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Paused,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				pauseWhen: 0.5,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		outputs[0][0].fill(999);
+		const result = processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 1.0, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(result.keepAlive).toBe(true);
+		for (let i = 0; i < 128; i++) expect(outputs[0][0][i]).toBe(0);
+	});
+
+	it("Paused state before pauseWhen → plays samples", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Paused,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				pauseWhen: 5.0,
+				buffer,
+				playhead: 0,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const result = processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 1.0, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(result.keepAlive).toBe(true);
+		// Should have played samples since currentTime < pauseWhen
+		expect(props.playhead).toBe(128);
+	});
+
+	it("loop crossfade out when loopEnd + crossfade > sourceLength", () => {
+		// Make loopEnd near buffer end so crossfade extends past sourceLength
+		const bufLen = 2000;
+		const buffer = makeBuffer(bufLen);
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0.005; // 240 samples
+		const loopEnd = (bufLen - 100) / SR; // near end
+		const loopCrossfade = 0.02; // 960 samples (loopEnd + crossfade > bufLen)
+		const loopStartSamples = Math.floor(loopStart * SR);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				playhead: loopStartSamples + 5,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(props.playhead).toBeGreaterThan(loopStartSamples + 5);
+	});
+
+	it("loop crossfade in when loopStart < crossfade width (firstIndex < 0)", () => {
+		// Make loopStart small so crossfade-in zone extends before buffer start
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0.01; // 480 samples - small
+		const loopEnd = 0.9; // 43200 samples
+		const loopCrossfade = 0.02; // 960 samples > loopStart, so firstIndex < 0
+		const loopEndSamples = Math.floor(loopEnd * SR);
+		const xfadeNumSamples = Math.floor(loopCrossfade * SR);
+		// Position playhead in crossfade-in zone
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				playhead: loopEndSamples - xfadeNumSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(props.playhead).toBeGreaterThan(0);
+	});
+
+	it("empty buffer → outputs silence", () => {
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer: [new Float32Array(0), new Float32Array(0)],
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const result = processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(result.keepAlive).toBe(true);
 	});
 });

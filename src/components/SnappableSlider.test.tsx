@@ -241,4 +241,220 @@ describe("SnappableSlider", () => {
 		const fill = q(container, ".slider-fill") as HTMLElement;
 		expect(fill.style.width).toBe("25%");
 	});
+
+	test("skew !== 1: fill width uses skewed ratio", () => {
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} skew={0.5} />,
+		);
+		const fill = q(container, ".slider-fill") as HTMLElement;
+		// With skew=0.5, ratio = (0.5)^0.5 = ~0.707
+		expect(fill.style.width).not.toBe("50%");
+	});
+
+	test("range === 0: fill width is 0%", () => {
+		const { container } = render(
+			<SnappableSlider min={50} max={50} value={50} />,
+		);
+		const fill = q(container, ".slider-fill") as HTMLElement;
+		expect(fill.style.width).toBe("0%");
+	});
+
+	test("enableSnap with snaps: value snaps to closest snap point", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={48}
+				step={1}
+				enableSnap={true}
+				snaps={[0, 25, 50, 75, 100]}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		fireEvent.keyDown(slider, { key: "ArrowRight" });
+		// 48 + 1 = 49, closest snap is 50
+		expect(onChange).toHaveBeenCalledWith(50);
+	});
+
+	test("mouseDown starts drag and updates value", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		// Mock getBoundingClientRect
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		fireEvent.mouseDown(slider, { clientX: 100 });
+		expect(onChange).toHaveBeenCalled();
+		// Clean up: trigger mouseup
+		fireEvent.mouseUp(document);
+	});
+
+	test("touchStart starts drag and updates value", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		fireEvent.touchStart(slider, { touches: [{ clientX: 150 }] });
+		expect(onChange).toHaveBeenCalled();
+		fireEvent.touchEnd(document);
+	});
+
+	test("Alt key sets isOptionKeyHeld and prevents snapping", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={48}
+				step={1}
+				enableSnap={true}
+				snaps={[0, 25, 50, 75, 100]}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		// Press Alt key
+		fireEvent.keyDown(slider, { key: "Alt" });
+		// Now arrow key should NOT snap
+		fireEvent.keyDown(slider, { key: "ArrowRight" });
+		// Without snap, 48 + 1 = 49 (not snapped to 50)
+		expect(onChange).toHaveBeenCalledWith(49);
+		// Release Alt
+		fireEvent.keyUp(slider, { key: "Alt" });
+	});
+
+	test("wheel up increases value", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={50}
+				step={1}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		fireEvent.wheel(slider, { deltaY: -1 });
+		expect(onChange).toHaveBeenCalledWith(51);
+	});
+
+	test("wheel down decreases value", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={50}
+				step={1}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		fireEvent.wheel(slider, { deltaY: 1 });
+		expect(onChange).toHaveBeenCalledWith(49);
+	});
+
+	test("wheel with shift uses finer step", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={50}
+				step={10}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		// fireEvent.wheel doesn't pass shiftKey through in happy-dom,
+		// so we create and dispatch a proper WheelEvent
+		const wheelEvent = document.createEvent("Event");
+		wheelEvent.initEvent("wheel", true, true);
+		Object.defineProperty(wheelEvent, "deltaY", { value: -1 });
+		Object.defineProperty(wheelEvent, "shiftKey", { value: true });
+		Object.defineProperty(wheelEvent, "preventDefault", { value: () => {} });
+		slider.dispatchEvent(wheelEvent);
+		// With shift, step = 10/10 = 1
+		expect(onChange).toHaveBeenCalledWith(51);
+	});
+
+	test("drag with mousemove and mouseup cleans up", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		fireEvent.mouseDown(slider, { clientX: 100 });
+		onChange.mockClear();
+		// Simulate mousemove on document
+		fireEvent.mouseMove(document, { clientX: 150 });
+		// Trigger mouseup on document to stop drag
+		fireEvent.mouseUp(document);
+	});
+
+	test("drag with touchmove and touchend cleans up", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		fireEvent.touchStart(slider, { touches: [{ clientX: 100 }] });
+		onChange.mockClear();
+		// Simulate touchmove on document
+		fireEvent.touchMove(document, { touches: [{ clientX: 150 }] });
+		// Trigger touchend on document to stop drag
+		fireEvent.touchEnd(document);
+	});
 });

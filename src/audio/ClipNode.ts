@@ -253,6 +253,7 @@ export class ClipNode extends AudioWorkletNode {
 	get fadeOut() {
 		return this._fadeOut;
 	}
+
 	set fadeOut(value: number) {
 		this._fadeOut = value;
 		this.port.postMessage({ type: "fadeOut", data: value });

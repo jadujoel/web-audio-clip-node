@@ -203,4 +203,32 @@ describe("AudioControl", () => {
 		fireEvent.keyDown(input, { key: "Enter" });
 		expect(onChange).toHaveBeenCalledWith(100);
 	});
+
+	test("editing: blur commits value", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<AudioControl
+				label="Gain"
+				min={0}
+				max={100}
+				value={50}
+				onChange={onChange}
+			/>,
+		);
+		const output = q(container, ".control-output");
+		fireEvent.click(output);
+		const input = q(container, "input.control-output") as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "75" } });
+		fireEvent.blur(input);
+		expect(onChange).toHaveBeenCalledWith(75);
+	});
+
+	test("changing unit select updates display", () => {
+		const { container } = render(
+			<AudioControl label="Gain" min={0} max={100} value={50} />,
+		);
+		const unitSelect = q(container, ".control-unit") as HTMLSelectElement;
+		fireEvent.change(unitSelect, { target: { value: "dB" } });
+		expect(unitSelect.value).toBe("dB");
+	});
 });

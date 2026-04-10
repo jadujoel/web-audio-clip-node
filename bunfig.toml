@@ -1,2 +1,3 @@
 [test]
 preload = ["./TestPreload.ts"]
+coverage = true
