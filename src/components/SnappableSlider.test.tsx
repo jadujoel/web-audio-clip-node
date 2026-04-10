@@ -457,4 +457,33 @@ describe("SnappableSlider", () => {
 		// Trigger touchend on document to stop drag
 		fireEvent.touchEnd(document);
 	});
+
+	test("formatTick formats snap and tick labels", () => {
+		const fmt = (v: number) => `${v.toFixed(1)} s`;
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={10}
+				value={5}
+				snaps={[0, 5, 10]}
+				formatTick={fmt}
+			/>,
+		);
+		const labels = container.querySelectorAll(".slider-xval");
+		const texts = Array.from(labels).map((el) => el.textContent);
+		expect(texts).toContain("0.0 s");
+		expect(texts).toContain("5.0 s");
+		expect(texts).toContain("10.0 s");
+	});
+
+	test("without formatTick, raw values are shown", () => {
+		const { container } = render(
+			<SnappableSlider min={0} max={10} value={5} snaps={[0, 5, 10]} />,
+		);
+		const labels = container.querySelectorAll(".slider-xval");
+		const texts = Array.from(labels).map((el) => el.textContent);
+		expect(texts).toContain("0");
+		expect(texts).toContain("5");
+		expect(texts).toContain("10");
+	});
 });

@@ -44,5 +44,9 @@ export function formatValueText(
 		return `${Math.round(beats)} beats`;
 	}
 
-	return value.toPrecision(4);
+	if (snap === "integer") {
+		return `${Math.round(value)} s`;
+	}
+
+	return `${value.toPrecision(4)} s`;
 }

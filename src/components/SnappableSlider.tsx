@@ -13,6 +13,7 @@ export interface SnappableSliderProps {
 	disabled?: boolean;
 	labelId?: string;
 	valueText?: string;
+	formatTick?: (value: number) => string;
 	onChange?: (value: number) => void;
 }
 
@@ -29,6 +30,7 @@ export function SnappableSlider({
 	disabled = false,
 	labelId,
 	valueText,
+	formatTick,
 	onChange,
 }: SnappableSliderProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -206,12 +208,12 @@ export function SnappableSlider({
 						className="slider-xval"
 						style={{ left: `${r * 100}%`, display: show ? "block" : "none" }}
 					>
-						{snap}
+						{formatTick ? formatTick(snap) : snap}
 					</span>
 				</span>
 			);
 		});
-	}, [snaps, getRatioFromValue]);
+	}, [snaps, getRatioFromValue, formatTick]);
 
 	const tickElements = useMemo(() => {
 		let prevRatio = -1;
@@ -226,12 +228,12 @@ export function SnappableSlider({
 						className="slider-xval"
 						style={{ left: `${r * 100}%`, display: show ? "block" : "none" }}
 					>
-						{tick}
+						{formatTick ? formatTick(tick) : tick}
 					</span>
 				</span>
 			);
 		});
-	}, [ticks, getRatioFromValue]);
+	}, [ticks, getRatioFromValue, formatTick]);
 
 	const sliderClass = [
 		"snappable-slider",

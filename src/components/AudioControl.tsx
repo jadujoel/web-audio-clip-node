@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { formatValueText } from "../audio/formatValueText";
 import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
 import { ContextMenu } from "./ContextMenu";
@@ -82,6 +82,11 @@ export function AudioControl({
 
 	const displayValue = formatValueText(value, controlKey, snap, tempo);
 
+	const tickFormatter = useMemo(() => {
+		if (preset || !controlKey) return undefined;
+		return (v: number) => formatValueText(v, controlKey, snap, tempo);
+	}, [preset, controlKey, snap, tempo]);
+
 	const startEditing = useCallback(() => {
 		setEditText(String(value));
 		setIsEditing(true);
@@ -157,6 +162,7 @@ export function AudioControl({
 				disabled={hasToggle && !enabled}
 				labelId={labelId}
 				valueText={displayValue}
+				formatTick={tickFormatter}
 				onChange={handleSliderChange}
 			/>
 			{isEditing ? (

@@ -84,7 +84,6 @@ export function PanControl({
 			<span className="control-label" id={labelId}>
 				Pan
 			</span>
-			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}
 				max={max}

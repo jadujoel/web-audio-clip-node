@@ -85,7 +85,6 @@ export function FilterControl({
 			<span className="control-label" id={labelId}>
 				{label}
 			</span>
-			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}
 				max={max}

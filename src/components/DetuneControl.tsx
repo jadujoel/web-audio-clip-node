@@ -78,7 +78,6 @@ export function DetuneControl({
 			<span className="control-label" id={labelId}>
 				Detune
 			</span>
-			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}
 				max={max}

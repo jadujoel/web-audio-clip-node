@@ -78,7 +78,6 @@ export function GainControl({
 			<span className="control-label" id={labelId}>
 				Gain
 			</span>
-			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}
 				max={max}

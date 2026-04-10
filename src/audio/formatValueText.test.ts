@@ -61,7 +61,12 @@ describe("formatValueText", () => {
 		expect(formatValueText(0.25, "offset", "16th", 120)).toBe("2 16ths");
 	});
 
-	it("default → toPrecision(4)", () => {
-		expect(formatValueText(Math.PI, "duration", "none", 120)).toBe("3.142");
+	it("integer snap → rounded seconds", () => {
+		expect(formatValueText(2.7, "offset", "integer", 120)).toBe("3 s");
+		expect(formatValueText(0.4, "duration", "integer", 120)).toBe("0 s");
+	});
+
+	it("default (no snap) → seconds with precision", () => {
+		expect(formatValueText(Math.PI, "duration", "none", 120)).toBe("3.142 s");
 	});
 });

@@ -78,7 +78,6 @@ export function PlaybackRateControl({
 			<span className="control-label" id={labelId}>
 				Rate
 			</span>
-			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}
 				max={max}
