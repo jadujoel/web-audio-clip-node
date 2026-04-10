@@ -42,14 +42,16 @@ export interface SliderPreset {
 	max?: number;
 	skew?: number;
 	step?: number;
+	logarithmic?: boolean;
 }
 
 export const presets: Record<string, SliderPreset> = {
 	hertz: {
+		snaps: [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384],
 		ticks: [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384],
 		min: 32,
 		max: 16384,
-		skew: 0.25,
+		logarithmic: true,
 	},
 	decibel: {
 		ticks: [-48, -24, -12, -6, -3, 0],
@@ -67,8 +69,8 @@ export const presets: Record<string, SliderPreset> = {
 	playbackRate: {
 		snaps: [-2, -1, -0.5, 0, 0.5, 1, 1.5, 2],
 		ticks: [-2, -1, 0, 1, 2],
-		min: -4,
-		max: 4,
+		min: -2,
+		max: 2,
 		skew: 1,
 	},
 	gain: {

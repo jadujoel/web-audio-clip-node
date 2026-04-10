@@ -113,7 +113,7 @@ export const controlDefs: ControlDef[] = [
 export const loopControlDefs: ControlDef[] = [
 	{
 		key: "loopStart",
-		label: "LoopStart",
+		label: "Start",
 		min: 0,
 		max: 60,
 		defaultValue: 0,
@@ -124,7 +124,7 @@ export const loopControlDefs: ControlDef[] = [
 	},
 	{
 		key: "loopEnd",
-		label: "LoopEnd",
+		label: "End",
 		min: 0,
 		max: 60,
 		defaultValue: 0,
@@ -135,7 +135,7 @@ export const loopControlDefs: ControlDef[] = [
 	},
 	{
 		key: "loopCrossfade",
-		label: "LoopCrossfade",
+		label: "Crossfade",
 		min: 0,
 		max: 1,
 		defaultValue: 0,

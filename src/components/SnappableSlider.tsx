@@ -10,6 +10,7 @@ export interface SnappableSliderProps {
 	enableSnap?: boolean;
 	snaps?: number[];
 	ticks?: number[];
+	logarithmic?: boolean;
 	disabled?: boolean;
 	labelId?: string;
 	valueText?: string;
@@ -27,6 +28,7 @@ export function SnappableSlider({
 	enableSnap = false,
 	snaps = [],
 	ticks = [],
+	logarithmic = false,
 	disabled = false,
 	labelId,
 	valueText,
@@ -42,20 +44,29 @@ export function SnappableSlider({
 
 	const getRatioFromValue = useCallback(
 		(v: number) => {
+			if (logarithmic) {
+				if (min <= 0 || max <= 0) return 0;
+				const clamped = Math.max(v, min);
+				return Math.log(clamped / min) / Math.log(max / min);
+			}
 			const range = max - min;
 			if (range === 0) return 0;
 			const normalized = (v - min) / range;
 			return skew === 1 ? normalized : Math.max(normalized, 0) ** skew;
 		},
-		[min, max, skew],
+		[min, max, skew, logarithmic],
 	);
 
 	const getValueFromRatio = useCallback(
 		(ratio: number) => {
+			if (logarithmic) {
+				if (min <= 0 || max <= 0) return min;
+				return min * (max / min) ** ratio;
+			}
 			const adjusted = skew === 1 ? ratio : ratio ** (1 / skew);
 			return adjusted * (max - min) + min;
 		},
-		[min, max, skew],
+		[min, max, skew, logarithmic],
 	);
 
 	const getSnapped = useCallback(

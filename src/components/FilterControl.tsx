@@ -89,8 +89,10 @@ export function FilterControl({
 				min={min}
 				max={max}
 				value={value}
-				skew={preset.skew ?? 0.25}
+				logarithmic
 				defaultValue={defaultValue}
+				enableSnap
+				snaps={preset.snaps ?? []}
 				ticks={preset.ticks ?? []}
 				disabled={disabled}
 				labelId={labelId}

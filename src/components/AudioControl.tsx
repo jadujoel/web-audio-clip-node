@@ -70,6 +70,7 @@ export function AudioControl({
 	const resolvedTicks = presetConfig?.ticks ?? [];
 	const resolvedSkew = presetConfig?.skew ?? 1;
 	const resolvedStep = step ?? presetConfig?.step;
+	const resolvedLogarithmic = presetConfig?.logarithmic ?? false;
 
 	const handleSliderChange = useCallback(
 		(rawValue: number) => {
@@ -159,6 +160,7 @@ export function AudioControl({
 				enableSnap={snap !== "none" || !!preset}
 				snaps={resolvedSnaps}
 				ticks={resolvedTicks}
+				logarithmic={resolvedLogarithmic}
 				disabled={hasToggle && !enabled}
 				labelId={labelId}
 				valueText={displayValue}
