@@ -43,6 +43,6 @@ export function serve(): Bun.Server<unknown> {
 }
 
 if (import.meta.main) {
-	const server = serve()
-  console.log("Server running at http://localhost:3000");
+	const _server = serve();
+	console.log("Server running at http://localhost:3000");
 }

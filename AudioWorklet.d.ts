@@ -5,27 +5,26 @@ declare interface AudioParamDescriptor {
 	 * The string which represents the name of the AudioParam.
 	 * Under this name the AudioParam will be available in the parameters property of the node,
 	 * and under this name the AudioWorkletProcessor.process method will acquire the calculated values of this AudioParam.
- 	 */
-	readonly name: string,
+	 */
+	readonly name: string;
 	/**
 	 * Either "a-rate", or "k-rate" string which represents an automation rate of this AudioParam.
 	 * Defaults to "a-rate".
-	*/
-	readonly automationRate?: 'a-rate' | 'k-rate'
+	 */
+	readonly automationRate?: "a-rate" | "k-rate";
 	/**
 	 * A float which represents minimum value of the AudioParam. Defaults to -3.4028235e38.
 	 */
-	readonly minValue?: number,
+	readonly minValue?: number;
 	/**
 	 * A float which represents maximum value of the AudioParam. Defaults to 3.4028235e38.
 	 */
-	readonly maxValue?: number,
+	readonly maxValue?: number;
 	/**
 	 * A float which represents initial value of the AudioParam. Defaults to 0.
 	 */
-	readonly defaultValue?: number,
+	readonly defaultValue?: number;
 }
-
 
 /**
  * An object containing string keys and Float32Array values.
@@ -42,7 +41,7 @@ declare interface AudioParamDescriptor {
  *
  * If the automation rate is "k-rate", the array will contain a single value, which is to be used for each of 128 frames.
  */
-type ProcessParameters<T extends string = string> = Record<T, Float32Array>
+type ProcessParameters<T extends string = string> = Record<T, Float32Array>;
 
 /**
  * An array of inputs connected to the node, each item of which is, in turn, an array of channels.
@@ -53,7 +52,7 @@ type ProcessParameters<T extends string = string> = Record<T, Float32Array>
  * If there is no active node connected to the n-th input of the node, inputs[n] will be an empty array (zero input channels available).
  * The number of channels in each input may vary, depending on channelCount and channelCountMode properties.
  */
-type ProcessInputs = Float32Array[][]
+type ProcessInputs = Float32Array[][];
 
 /**
  * An array of outputs that is similar to the inputs parameter in structure.
@@ -61,7 +60,7 @@ type ProcessInputs = Float32Array[][]
  * Each of the output channels is filled with zeros by default
  * — the processor will output silence unless the output arrays are modified.
  */
-type ProcessOutputs = Float32Array[][]
+type ProcessOutputs = Float32Array[][];
 
 /**
  * A Boolean value indicating whether or not to force the AudioWorkletNode
@@ -79,8 +78,7 @@ type ProcessOutputs = Float32Array[][]
  * if it is neither generating new audio data
  * nor receiving data through its inputs that it is processing.
  */
-type ProcessReturnValue = boolean
-
+type ProcessReturnValue = boolean;
 
 declare interface AudioWorkletProcessor {
 	/**
@@ -96,7 +94,11 @@ declare interface AudioWorkletProcessor {
 	 * and takes input and output arrays and calculated values of custom AudioParams (if they are defined) as parameters.
 	 * You can use inputs and audio parameter values to fill the outputs array, which by default holds silence.
 	 * */
-	readonly process(inputs: ProcessInputs, outputs: Float32Array[][], parameters: ProcessParameters): ProcessReturnValue;
+	process(
+		_inputs: ProcessInputs,
+		_outputs: Float32Array[][],
+		_parameters: ProcessParameters,
+	): ProcessReturnValue;
 	/**
 	 * Optionally, if you want custom AudioParams on your node,
 	 * you can supply a parameterDescriptors property as a static getter on the processor.
@@ -104,14 +106,16 @@ declare interface AudioWorkletProcessor {
 	 * The resulting AudioParams reside in the parameters property of the node and can be automated using standard methods such as linearRampToValueAtTime.
 	 * Their calculated values will be passed into the process() method of the processor for you to shape the node output accordingly.
 	 */
-	readonly static parameterDescriptors?: AudioParamDescriptor[] | readonly AudioParamDescriptor[]
+	parameterDescriptors?:
+		| AudioParamDescriptor[]
+		| readonly AudioParamDescriptor[];
 }
 
 // eslint-disable-next-line no-var
-declare var AudioWorkletProcessor:{
+declare var AudioWorkletProcessor: {
 	prototype: AudioWorkletProcessor;
-	new(options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
-}
+	new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
+};
 
 declare function registerProcessor(
 	/** A string representing the name under which the processor will be registered. */
@@ -122,27 +126,37 @@ declare function registerProcessor(
 	 * The name is to be referred to when creating an AudioWorkletNode based on the registered processor.
 	 * A new processor by the given name is internally created and associated with the new node.
 	 **/
-	processorCtor: (new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor) & { readonly parameterDescriptors?: readonly AudioParamDescriptor[]; }
-): void
-
+	processorCtor: (new (
+		options?: AudioWorkletNodeOptions,
+	) => AudioWorkletProcessor) & {
+		readonly parameterDescriptors?: readonly AudioParamDescriptor[];
+	},
+): void;
 
 declare interface ParameterDescriptors {
 	readonly parameterDescriptors?: readonly AudioParamDescriptor[];
 }
 
 // These are also available in the AudioWorkletGlobalScope.
-declare var currentFrame: number
-declare var currentTime: number
-declare var sampleRate: number
+declare var currentFrame: number;
+declare var currentTime: number;
+declare var sampleRate: number;
 
 declare type TypedAudioParamMap<TKeys extends string = string> = {
-	readonly entries(): IterableIterator<[TKeys, AudioParam]>,
-	readonly forEach(callbackfn: (value: AudioParam, key: TKeys, map: TypedAudioParamMap<TKeys>) => void, thisArg?: any): void,
-	readonly get(name: TKeys): AudioParam,
-	readonly has(name: string): boolean,
-	readonly keys(): IterableIterator<TKeys>,
-	readonly values(): IterableIterator<AudioParam>,
-	readonly size: number
-	readonly [Symbol.iterator()]: IterableIterator<[TKeys, AudioParam]>
-	readonly [Symbol.toStringTag]: "AudioParamMap"
-}
+	entries(): IterableIterator<[TKeys, AudioParam]>;
+	forEach(
+		_callbackfn: (
+			value: AudioParam,
+			key: TKeys,
+			map: TypedAudioParamMap<TKeys>,
+		) => void,
+		_thisArg?: unknown,
+	): void;
+	get(_name: TKeys): AudioParam;
+	has(_name: string): boolean;
+	keys(): IterableIterator<TKeys>;
+	values(): IterableIterator<AudioParam>;
+	readonly size: number;
+	readonly [Symbol.iterator()]: IterableIterator<[TKeys, AudioParam]>;
+	readonly [Symbol.toStringTag]: "AudioParamMap";
+};

@@ -429,7 +429,7 @@ class ClipProcessor extends AudioWorkletProcessor {
 			} = props;
 
 			const nc = Math.min(buffer.length, output0.length);
-			const ns = Math.min(buffer[0]?.length ?? 0, output0[0]?.length ?? 0);
+			const _ns = Math.min(buffer[0]?.length ?? 0, output0[0]?.length ?? 0);
 			const durationSamples = props.duration * sampleRate;
 
 			const loopCrossfadeSamples = Math.floor(sampleRate * loopCrossfade);
@@ -559,7 +559,7 @@ class ClipProcessor extends AudioWorkletProcessor {
 			}
 
 			// --- Fade out ---
-			if (enableFadeIn && fadeOutDuration > 0) {
+			if (enableFadeOut && fadeOutDuration > 0) {
 				const fadeOutSamples = Math.floor(fadeOutDuration * sampleRate);
 				const remainingDuration = stopWhen - currentTime;
 				const remainingSamples = Math.floor(sampleRate * remainingDuration);
@@ -755,7 +755,7 @@ function checkNans(output0: Float32Array[]): number {
 	let numNans = 0;
 	for (let ch = 0; ch < output0.length; ch++) {
 		for (let j = 0; j < output0[ch].length; j++) {
-			if (isNaN(output0[ch][j])) {
+			if (Number.isNaN(output0[ch][j])) {
 				numNans++;
 				output0[ch][j] = 0;
 			}

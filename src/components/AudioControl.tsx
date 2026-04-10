@@ -68,8 +68,11 @@ export function AudioControl({
 				/>
 			)}
 			{!hasToggle && <span className="control-toggle-placeholder" />}
-			<label className="control-label">{label}</label>
+			<label className="control-label" htmlFor={`control-snap-${label}`}>
+				{label}
+			</label>
 			<select
+				id={`control-snap-${label}`}
 				className="control-snap"
 				value={snap}
 				onChange={(e) => onSnapChange?.(e.target.value)}

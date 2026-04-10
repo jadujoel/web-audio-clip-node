@@ -108,7 +108,7 @@ export function SnappableSlider({
 			const show = i === 0 || r - prevRatio >= 0.05;
 			if (show) prevRatio = r;
 			return (
-				<span key={i}>
+				<span key={snap}>
 					<span className="slider-snap" style={{ left: `${r * 100}%` }} />
 					<span
 						className="slider-xval"
@@ -123,6 +123,11 @@ export function SnappableSlider({
 
 	return (
 		<div
+			role="slider"
+			aria-valuemin={min}
+			aria-valuemax={max}
+			aria-valuenow={value}
+			tabIndex={0}
 			ref={containerRef}
 			className="snappable-slider"
 			onMouseDown={(e) => {
