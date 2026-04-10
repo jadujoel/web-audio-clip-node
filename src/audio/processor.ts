@@ -13,28 +13,40 @@ declare class AudioWorkletProcessor {
 		parameters: Record<string, Float32Array>,
 	): boolean;
 }
+
 declare function registerProcessor(
 	name: string,
 	ctor: new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor,
 ): void;
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
+export interface ClipProcessorOnmessageEvent {
+	readonly data: ClipProcessorMessageRx;
+}
 
-const State = {
-	Initial: 0,
-	Started: 1,
-	Stopped: 2,
-	Paused: 3,
-	Scheduled: 4,
-	Ended: 5,
-	Disposed: 6,
-} as const;
+export type ClipProcessorOnmessage = (ev: ClipProcessorOnmessageEvent) => void;
 
-type ClipProcessorState = (typeof State)[keyof typeof State];
+export interface ProcessorWorkletOptions extends AudioWorkletNodeOptions {
+	readonly processorOptions?: ClipProcessorOptions;
+}
 
-interface ClipProcessorOptions {
+export interface ClipProcessorStateMap {
+	readonly Initial: 0;
+	readonly Started: 1;
+	readonly Stopped: 2;
+	readonly Paused: 3;
+	readonly Scheduled: 4;
+	readonly Ended: 5;
+	readonly Disposed: 6;
+}
+
+export type ClipProcessorState =
+	ClipProcessorStateMap[keyof ClipProcessorStateMap];
+
+export interface ClipWorkletOptions extends AudioWorkletNodeOptions {
+	readonly processorOptions?: ClipProcessorOptions;
+}
+
+export interface ClipProcessorOptions {
 	buffer?: Float32Array[];
 	loop?: boolean;
 	loopStart?: number;
@@ -63,26 +75,162 @@ interface ClipProcessorOptions {
 	enablePlaybackRate?: boolean;
 }
 
-interface ProcessorWorkletOptions extends AudioWorkletNodeOptions {
-	processorOptions?: ClipProcessorOptions;
-}
-
-interface BlockParameters {
+export interface BlockParameters {
 	readonly playhead: number;
-	readonly bufferLength: number;
+	readonly durationSamples: number;
 	readonly loop: boolean;
 	readonly loopStartSamples: number;
 	readonly loopEndSamples: number;
-	readonly durationSamples: number;
+	readonly bufferLength: number;
 	readonly playbackRates: Float32Array;
 }
 
-interface BlockReturnState {
+export interface BlockReturnState {
 	readonly playhead: number;
 	readonly ended: boolean;
 	readonly looped: boolean;
 	readonly indexes: number[];
 }
+
+export type ClipProcessorMessageRx =
+	| ClipProcessorBufferMessageRx
+	| ClipProcessorStartMessageRx
+	| ClipProcessorStopMessageRx
+	| ClipProcessorPauseMessageRx
+	| ClipProcessorResumeMessageRx
+	| ClipProcessorDisposeMessageRx
+	| ClipProcessorLoopMessageRx
+	| ClipProcessorLoopStartMessageRx
+	| ClipProcessorLoopEndMessageRx
+	| ClipProcessorPlayheadMessageRx
+	| ClipProcessorFadeInMessageRx
+	| ClipProcessorFadeOutMessageRx
+	| ClipProcessorLoopCrossfadeMessageRx
+	| ClipProcessorToggleMessageRx
+	| ClipProcessorLogStateMessageRx;
+
+export type ClipProcessorMessageType =
+	| "buffer"
+	| "start"
+	| "stop"
+	| "pause"
+	| "resume"
+	| "dispose"
+	| "loop"
+	| "loopStart"
+	| "loopEnd"
+	| "playhead"
+	| "playbackRate"
+	| "offset"
+	| "fadeIn"
+	| "fadeOut"
+	| "loopCrossfade"
+	| ClipProcessorToggleMessageType
+	| "logState";
+
+export type ClipProcessorToggleMessageType =
+	| "toggleFadeIn"
+	| "toggleFadeOut"
+	| "toggleLoopCrossfade"
+	| "toggleGain"
+	| "togglePan"
+	| "toggleHighpass"
+	| "toggleLowpass"
+	| "toggleDetune"
+	| "togglePlaybackRate";
+
+export interface ClipProcessorLogStateMessageRx {
+	readonly type: "logState";
+	readonly data?: never;
+}
+
+export interface ClipProcessorToggleMessageRx {
+	readonly type: ClipProcessorToggleMessageType;
+	readonly data?: boolean;
+}
+
+export interface ClipProcessorBufferMessageRx {
+	readonly type: "buffer";
+	readonly data: Float32Array[];
+}
+
+export interface ClipProcessorStartMessageRx {
+	readonly type: "start";
+	readonly data?: {
+		readonly duration?: number;
+		readonly offset?: number;
+		readonly when?: number;
+	};
+}
+
+export interface ClipProcessorStopMessageRx {
+	readonly type: "stop";
+	readonly data?: number;
+}
+
+export interface ClipProcessorPauseMessageRx {
+	readonly type: "pause";
+	readonly data?: number;
+}
+
+export interface ClipProcessorResumeMessageRx {
+	readonly type: "resume";
+	readonly data?: number;
+}
+
+export interface ClipProcessorDisposeMessageRx {
+	readonly type: "dispose";
+	readonly data?: never;
+}
+
+export interface ClipProcessorLoopMessageRx {
+	readonly type: "loop";
+	readonly data: boolean;
+}
+
+export interface ClipProcessorLoopStartMessageRx {
+	readonly type: "loopStart";
+	readonly data: number;
+}
+
+export interface ClipProcessorLoopEndMessageRx {
+	readonly type: "loopEnd";
+	readonly data: number;
+}
+
+export interface ClipProcessorPlayheadMessageRx {
+	readonly type: "playhead";
+	readonly data: number;
+}
+
+export interface ClipProcessorFadeInMessageRx {
+	readonly type: "fadeIn";
+	readonly data: number;
+}
+
+export interface ClipProcessorFadeOutMessageRx {
+	readonly type: "fadeOut";
+	readonly data: number;
+}
+
+export interface ClipProcessorLoopCrossfadeMessageRx {
+	readonly type: "loopCrossfade";
+	readonly data: number;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+export const State = {
+	Initial: 0,
+	Started: 1,
+	Stopped: 2,
+	Paused: 3,
+	Scheduled: 4,
+	Ended: 5,
+	Disposed: 6,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Default properties
