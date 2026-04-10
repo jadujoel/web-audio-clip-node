@@ -5,14 +5,16 @@ export interface ContextMenuProps {
 	x: number;
 	y: number;
 	snap: string;
+	snapMode?: "tempo" | "preset";
 	min: number;
 	max: number;
-	maxLocked: boolean;
+	maxLocked?: boolean;
+	showMaxLock?: boolean;
 	audioDuration: number | null;
 	onSnapChange: (snap: string) => void;
 	onMinChange: (val: number) => void;
 	onMaxChange: (val: number) => void;
-	onMaxLockedChange: (locked: boolean) => void;
+	onMaxLockedChange?: (locked: boolean) => void;
 	onClose: () => void;
 }
 
@@ -29,9 +31,11 @@ export function ContextMenu({
 	x,
 	y,
 	snap,
+	snapMode = "tempo",
 	min,
 	max,
-	maxLocked,
+	maxLocked = false,
+	showMaxLock = true,
 	audioDuration,
 	onSnapChange,
 	onMinChange,
@@ -131,21 +135,33 @@ export function ContextMenu({
 			role="menu"
 		>
 			<div className="context-menu__section-label">Snap</div>
-			{SNAP_OPTIONS.map((opt) => (
-				<button
-					key={opt.value}
-					type="button"
-					className={`context-menu__item${snap === opt.value ? " context-menu__item--active" : ""}`}
-					role="menuitemradio"
-					aria-checked={snap === opt.value}
-					onClick={() => handleSnapClick(opt.value)}
-				>
-					<span className="context-menu__radio">
-						{snap === opt.value ? "●" : "○"}
-					</span>
-					{opt.label}
-				</button>
-			))}
+			{snapMode === "preset" ? (
+				<label className="context-menu__field">
+					<input
+						type="checkbox"
+						className="control-toggle"
+						checked={snap !== "none"}
+						onChange={(e) => onSnapChange(e.target.checked ? "preset" : "none")}
+					/>
+					Enable snap
+				</label>
+			) : (
+				SNAP_OPTIONS.map((opt) => (
+					<button
+						key={opt.value}
+						type="button"
+						className={`context-menu__item${snap === opt.value ? " context-menu__item--active" : ""}`}
+						role="menuitemradio"
+						aria-checked={snap === opt.value}
+						onClick={() => handleSnapClick(opt.value)}
+					>
+						<span className="context-menu__radio">
+							{snap === opt.value ? "●" : "○"}
+						</span>
+						{opt.label}
+					</button>
+				))
+			)}
 			<div className="context-menu__divider" />
 			<div className="context-menu__section-label">Range</div>
 			<label className="context-menu__field">
@@ -171,15 +187,17 @@ export function ContextMenu({
 					onKeyDown={handleInputKeyDown(handleMaxCommit)}
 				/>
 			</label>
-			<label className="context-menu__field">
-				<input
-					type="checkbox"
-					className="control-toggle"
-					checked={maxLocked}
-					onChange={(e) => onMaxLockedChange(e.target.checked)}
-				/>
-				Max = file length
-			</label>
+			{showMaxLock && (
+				<label className="context-menu__field">
+					<input
+						type="checkbox"
+						className="control-toggle"
+						checked={maxLocked}
+						onChange={(e) => onMaxLockedChange?.(e.target.checked)}
+					/>
+					Max = file length
+				</label>
+			)}
 		</div>,
 		document.body,
 	);

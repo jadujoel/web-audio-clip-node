@@ -282,7 +282,10 @@ export function SnappableSlider({
 			tabIndex={disabled ? -1 : 0}
 			ref={containerRef}
 			className={sliderClass}
-			onMouseDown={(e) => startDrag(e.clientX, e.altKey)}
+			onMouseDown={(e) => {
+				if (e.button !== 0) return;
+				startDrag(e.clientX, e.altKey);
+			}}
 			onTouchStart={(e) => startDrag(e.touches[0].clientX, false)}
 			onKeyDown={handleKeyDown}
 			onKeyUp={handleKeyUp}

@@ -19,6 +19,7 @@ export interface AudioControlProps {
 	enabled?: boolean;
 	hasToggle?: boolean;
 	hasSnap?: boolean;
+	hasMaxLock?: boolean;
 	audioDuration?: number | null;
 	maxLocked?: boolean;
 	onChange?: (value: number) => void;
@@ -44,6 +45,7 @@ export function AudioControl({
 	enabled = true,
 	hasToggle = false,
 	hasSnap = false,
+	hasMaxLock = false,
 	audioDuration,
 	maxLocked = false,
 	onChange,
@@ -157,7 +159,7 @@ export function AudioControl({
 				skew={resolvedSkew}
 				step={resolvedStep}
 				defaultValue={defaultValue}
-				enableSnap={snap !== "none" || !!preset}
+				enableSnap={snap !== "none"}
 				snaps={resolvedSnaps}
 				ticks={resolvedTicks}
 				logarithmic={resolvedLogarithmic}
@@ -187,9 +189,11 @@ export function AudioControl({
 					x={ctxMenu.x}
 					y={ctxMenu.y}
 					snap={snap}
+					snapMode={preset ? "preset" : "tempo"}
 					min={propMin}
 					max={propMax}
 					maxLocked={maxLocked}
+					showMaxLock={hasMaxLock}
 					audioDuration={audioDuration ?? null}
 					onSnapChange={(s) => {
 						onSnapChange?.(s);

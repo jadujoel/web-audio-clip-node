@@ -60,6 +60,7 @@ export const presets: Record<string, SliderPreset> = {
 		skew: 1,
 	},
 	cents: {
+		snaps: Array.from({ length: 49 }, (_, i) => (i - 24) * 100), // semitones: -2400..2400 by 100
 		ticks: [-2400, -1200, 0, 1200, 2400],
 		min: -2400,
 		max: 2400,
@@ -74,12 +75,14 @@ export const presets: Record<string, SliderPreset> = {
 		skew: 1,
 	},
 	gain: {
+		snaps: [-60, -48, -36, -24, -18, -12, -9, -6, -3, -1, 0],
 		ticks: [-48, -24, -12, -6, -3, 0],
 		min: -100,
 		max: 0,
 		skew: 6,
 	},
 	pan: {
+		snaps: [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1],
 		ticks: [-1, -0.5, 0, 0.5, 1],
 		min: -1,
 		max: 1,

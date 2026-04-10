@@ -127,4 +127,66 @@ describe("ContextMenu", () => {
 		fireEvent.mouseDown(document.body);
 		expect(props.onClose).toHaveBeenCalled();
 	});
+
+	test("snapMode=preset shows Enable snap checkbox instead of radio buttons", () => {
+		renderMenu({ snapMode: "preset", snap: "preset" });
+		const radios = document.querySelectorAll('[role="menuitemradio"]');
+		expect(radios.length).toBe(0);
+		const checkbox = document.querySelector<HTMLInputElement>(
+			'.context-menu__field input[type="checkbox"]',
+		);
+		expect(checkbox).toBeTruthy();
+		expect(checkbox?.checked).toBe(true);
+	});
+
+	test("snapMode=preset with snap=none shows unchecked Enable snap", () => {
+		renderMenu({ snapMode: "preset", snap: "none" });
+		const checkbox = document.querySelector<HTMLInputElement>(
+			'.context-menu__field input[type="checkbox"]',
+		);
+		expect(checkbox?.checked).toBe(false);
+	});
+
+	test("snapMode=preset enable snap checkbox calls onSnapChange with 'preset'", () => {
+		const { props } = renderMenu({ snapMode: "preset", snap: "none" });
+		const checkbox = document.querySelector<HTMLInputElement>(
+			'.context-menu__field input[type="checkbox"]',
+		);
+		if (!checkbox) throw new Error("checkbox not found");
+		fireEvent.click(checkbox);
+		expect(props.onSnapChange).toHaveBeenCalledWith("preset");
+	});
+
+	test("snapMode=preset disable snap checkbox calls onSnapChange with 'none'", () => {
+		const { props } = renderMenu({ snapMode: "preset", snap: "preset" });
+		const checkbox = document.querySelector<HTMLInputElement>(
+			'.context-menu__field input[type="checkbox"]',
+		);
+		if (!checkbox) throw new Error("checkbox not found");
+		fireEvent.click(checkbox);
+		expect(props.onSnapChange).toHaveBeenCalledWith("none");
+	});
+
+	test("showMaxLock=false hides the Max = file length row", () => {
+		renderMenu({ showMaxLock: false });
+		const checkboxes = document.querySelectorAll<HTMLInputElement>(
+			'.context-menu__field input[type="checkbox"]',
+		);
+		// No maxLocked checkbox when showMaxLock is false
+		const labels = document.querySelectorAll(".context-menu__field");
+		const hasMaxLabel = Array.from(labels).some((el) =>
+			el.textContent?.includes("Max = file length"),
+		);
+		expect(hasMaxLabel).toBe(false);
+		expect(checkboxes.length).toBe(0);
+	});
+
+	test("showMaxLock=true (default) shows the Max = file length row", () => {
+		renderMenu({ showMaxLock: true });
+		const labels = document.querySelectorAll(".context-menu__field");
+		const hasMaxLabel = Array.from(labels).some((el) =>
+			el.textContent?.includes("Max = file length"),
+		);
+		expect(hasMaxLabel).toBe(true);
+	});
 });
