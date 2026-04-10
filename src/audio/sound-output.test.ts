@@ -5292,3 +5292,867 @@ describe("Sound output: loop crossfade deep tests", () => {
 		}
 	}
 });
+
+// ===========================================================================
+// 14. Crossfade Update While Playing (regression tests)
+// ===========================================================================
+
+describe("Sound output: crossfade update while playing", () => {
+	// 14.1 — Increase crossfade so crossfade-out zone extends past buffer end
+	it("14.01 — loopEnd near buffer end, increase crossfade: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440); // 96000 samples
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 1.95, // very close to buffer end (93600 of 96000)
+			loopCrossfade: 0.01, // start small
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.5]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			// Gradually increase crossfade while playing
+			if (b === 50)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.1 },
+					0.2,
+					SR,
+				);
+			if (b === 100)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					0.4,
+					SR,
+				);
+			if (b === 150)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.5 },
+					0.6,
+					SR,
+				);
+			if (b === 200)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.8 },
+					0.8,
+					SR,
+				);
+			if (b === 250)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 1.0 },
+					1.0,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.2 — loopEnd at exact buffer end, increase crossfade
+	it("14.02 — loopEnd at buffer end, increase crossfade: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 2.0, // exactly at buffer end
+			loopCrossfade: 0.01,
+			enableLoopCrossfade: true,
+			enableLoopEnd: true,
+			playhead: 0,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.3]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			if (b === 50)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.2 },
+					0.2,
+					SR,
+				);
+			if (b === 150)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.5 },
+					0.5,
+					SR,
+				);
+			if (b === 300)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 1.0 },
+					1.0,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.3 — loopStart=0, large crossfade (firstIndex goes negative)
+	it("14.03 — loopStart=0, increase crossfade to very large: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 1.5,
+			loopCrossfade: 0.01,
+			enableLoopCrossfade: true,
+			enableLoopEnd: true,
+			playhead: 0,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.5]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			if (b === 30)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.5 },
+					0.1,
+					SR,
+				);
+			if (b === 100)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 1.0 },
+					0.3,
+					SR,
+				);
+			if (b === 200)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 1.5 },
+					0.6,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.4 — Decrease crossfade while playhead is in crossfade zone
+	it("14.04 — decrease crossfade while in crossfade zone: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.2,
+			loopEnd: 1.8,
+			loopCrossfade: 0.5, // start large
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.2 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.3]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			// Shrink crossfade — may leave playhead in zone that no longer exists
+			if (b === 50)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.2 },
+					0.2,
+					SR,
+				);
+			if (b === 100)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.05 },
+					0.4,
+					SR,
+				);
+			if (b === 150)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.01 },
+					0.6,
+					SR,
+				);
+			if (b === 200)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.001 },
+					0.8,
+					SR,
+				);
+			// Then re-grow
+			if (b === 250)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					1.0,
+					SR,
+				);
+			if (b === 350)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.8 },
+					1.2,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.5 — Rapid crossfade changes (simulating slider drag)
+	it("14.05 — rapid crossfade slider drag simulation: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 1.9,
+			loopCrossfade: 0.0,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.5]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 1000; b++) {
+			// Change crossfade every ~5 blocks (simulates slider drag)
+			if (b % 5 === 0) {
+				const t = b / 1000;
+				const xfade = 0.5 * (1 + Math.sin(2 * Math.PI * t * 3)); // oscillates 0-1
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: xfade },
+					b * (BLOCK / SR),
+					SR,
+				);
+			}
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.6 — Crossfade update + filters (NaN cascade)
+	it("14.06 — crossfade update + lowpass + highpass: no NaN cascade", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 1.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: true,
+			enablePan: false,
+			enableLowpass: true,
+			enableHighpass: true,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({
+			playbackRate: new Float32Array([1.5]),
+			gain: new Float32Array([0.8]),
+			lowpass: new Float32Array([5000]),
+			highpass: new Float32Array([100]),
+		});
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			if (b === 30)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.2 },
+					0.1,
+					SR,
+				);
+			if (b === 80)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.5 },
+					0.3,
+					SR,
+				);
+			if (b === 130)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.1 },
+					0.4,
+					SR,
+				);
+			if (b === 180)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.8 },
+					0.6,
+					SR,
+				);
+			if (b === 250)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.01 },
+					0.8,
+					SR,
+				);
+			if (b === 350)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					1.0,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.7 — Crossfade where numSamples calculation triggers inverted subtraction
+	it("14.07 — crossfade-out zone extends past sourceLength: no NaN or bad index", () => {
+		const buffer = makeSine(SR, 440); // 1 second = 48000 samples
+		// loopEnd at 0.95s = 45600 samples, so only 2400 samples after loopEnd
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.95,
+			loopCrossfade: 0.1, // 4800 samples > 2400 available after loopEnd
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const result = processBlocksDetailed(
+			props,
+			500,
+			defaultParams({
+				playbackRate: new Float32Array([1.3]),
+			}),
+		);
+		expect(result.totalNans).toBe(0);
+		expect(result.soundBlocks).toBe(500);
+	});
+
+	// 14.8 — Change loopEnd closer to buffer end with existing crossfade
+	it("14.08 — move loopEnd closer to buffer end with crossfade active: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 1.0, // safe initial position
+			loopCrossfade: 0.2,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.5]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			// Move loopEnd progressively closer to buffer end
+			if (b === 50)
+				handleProcessorMessage(props, { type: "loopEnd", data: 1.5 }, 0.2, SR);
+			if (b === 100)
+				handleProcessorMessage(props, { type: "loopEnd", data: 1.8 }, 0.4, SR);
+			if (b === 200)
+				handleProcessorMessage(props, { type: "loopEnd", data: 1.95 }, 0.6, SR);
+			if (b === 300)
+				handleProcessorMessage(props, { type: "loopEnd", data: 2.0 }, 0.8, SR);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.9 — Crossfade larger than loop length
+	it("14.09 — crossfade grows larger than loop length: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.5,
+			loopEnd: 1.0, // 0.5s loop = 24000 samples
+			loopCrossfade: 0.1,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.5 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.3]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			// Crossfade grows beyond loop length
+			if (b === 50)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					0.2,
+					SR,
+				);
+			if (b === 100)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.6 },
+					0.4,
+					SR,
+				);
+			if (b === 150)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 1.0 },
+					0.6,
+					SR,
+				);
+			if (b === 200)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 2.0 },
+					0.8,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.10 — Simultaneously change crossfade and loop bounds
+	it("14.10 — change crossfade + loop bounds simultaneously: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.2,
+			loopEnd: 1.8,
+			loopCrossfade: 0.1,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.2 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams({ playbackRate: new Float32Array([1.5]) });
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			if (b === 50) {
+				handleProcessorMessage(
+					props,
+					{ type: "loopStart", data: 0.0 },
+					0.2,
+					SR,
+				);
+				handleProcessorMessage(props, { type: "loopEnd", data: 2.0 }, 0.2, SR);
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.5 },
+					0.2,
+					SR,
+				);
+			}
+			if (b === 150) {
+				handleProcessorMessage(
+					props,
+					{ type: "loopStart", data: 0.5 },
+					0.5,
+					SR,
+				);
+				handleProcessorMessage(props, { type: "loopEnd", data: 1.0 }, 0.5, SR);
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					0.5,
+					SR,
+				);
+			}
+			if (b === 300) {
+				handleProcessorMessage(
+					props,
+					{ type: "loopStart", data: 0.1 },
+					0.9,
+					SR,
+				);
+				handleProcessorMessage(props, { type: "loopEnd", data: 1.95 }, 0.9, SR);
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.8 },
+					0.9,
+					SR,
+				);
+			}
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.11 — Rate=1 (integer playhead) with crossfade update
+	it("14.11 — rate=1 + crossfade update near buffer end: no NaN", () => {
+		const buffer = makeSine(SR * 2, 440);
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 1.95,
+			loopCrossfade: 0.01,
+			enableLoopCrossfade: true,
+			enableLoopStart: true,
+			enableLoopEnd: true,
+			playhead: Math.floor(0.1 * SR),
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: false,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const params = defaultParams();
+		const fs = defaultFilterState();
+		let totalNans = 0;
+		for (let b = 0; b < 500; b++) {
+			if (b === 50)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.3 },
+					0.2,
+					SR,
+				);
+			if (b === 200)
+				handleProcessorMessage(
+					props,
+					{ type: "loopCrossfade", data: 0.8 },
+					0.6,
+					SR,
+				);
+			const out = [makeOutput(2)];
+			processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + b * (BLOCK / SR),
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				fs,
+			);
+			totalNans += checkNans(out[0]);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	// 14.12 — Verify crossfade-out actually contributes audio near loopStart
+	// (Regression: old code silently disabled crossfade-out when loopEnd was near buffer end)
+	it("14.12 — crossfade-out produces audio near loopStart (loopEnd=buffer end)", () => {
+		// Use two distinct constant buffers per channel to distinguish crossfade content
+		const len = SR * 2; // 96000 samples
+		const ch0 = new Float32Array(len);
+		const ch1 = new Float32Array(len);
+		// Fill buffer: loopStart region with 0.5, loopEnd region with -0.5
+		// This makes it easy to detect if crossfade-out is adding end-of-loop content
+		const loopStartSec = 0;
+		const loopEndSec = 2.0; // buffer end
+		const loopStartSamp = Math.floor(loopStartSec * SR);
+		const loopEndSamp = Math.floor(loopEndSec * SR);
+		const xfadeSec = 0.1;
+		const xfadeSamp = Math.floor(xfadeSec * SR);
+		// Fill start of loop with 0.3
+		for (let i = loopStartSamp; i < loopStartSamp + xfadeSamp; i++) {
+			ch0[i] = 0.3;
+			ch1[i] = 0.3;
+		}
+		// Fill end of loop with 0.7
+		for (let i = loopEndSamp - xfadeSamp; i < loopEndSamp; i++) {
+			ch0[i] = 0.7;
+			ch1[i] = 0.7;
+		}
+		const buffer = [ch0, ch1];
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: loopStartSec,
+			loopEnd: loopEndSec,
+			loopCrossfade: xfadeSec,
+			enableLoopCrossfade: true,
+			enableLoopEnd: true,
+			enableLoopStart: false,
+			// Start playhead just past loopStart (in crossfade-out zone)
+			playhead: loopStartSamp + 1,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: false,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const out = [makeOutput(2)];
+		processBlock(
+			props,
+			out,
+			defaultParams(),
+			{
+				currentTime: 0.001,
+				currentFrame: 0,
+				sampleRate: SR,
+			},
+			defaultFilterState(),
+		);
+		// The fill() puts loopStart content (0.3) in output.
+		// Crossfade-out should ADD loopEnd content (0.7 * gain).
+		// So output should be > 0.3 — proving crossfade-out is active.
+		let maxVal = 0;
+		for (let i = 0; i < out[0][0].length; i++) {
+			maxVal = Math.max(maxVal, Math.abs(out[0][0][i]));
+		}
+		expect(maxVal).toBeGreaterThan(0.3);
+		expect(checkNans(out[0])).toBe(0);
+	});
+
+	// 14.13 — Verify crossfade-in produces audio near loopEnd (loopStart=0)
+	it("14.13 — crossfade-in produces audio near loopEnd (loopStart=0)", () => {
+		const len = SR * 2;
+		const ch0 = new Float32Array(len);
+		const ch1 = new Float32Array(len);
+		const loopStartSamp = 0;
+		const loopEndSamp = len;
+		const xfadeSec = 0.1;
+		const xfadeSamp = Math.floor(xfadeSec * SR);
+		// Fill start of loop with 0.7
+		for (let i = loopStartSamp; i < loopStartSamp + xfadeSamp; i++) {
+			ch0[i] = 0.7;
+			ch1[i] = 0.7;
+		}
+		// Fill end of loop with 0.3
+		for (let i = loopEndSamp - xfadeSamp; i < loopEndSamp; i++) {
+			ch0[i] = 0.3;
+			ch1[i] = 0.3;
+		}
+		const buffer = [ch0, ch1];
+		const props = makeStartedProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 2.0,
+			loopCrossfade: xfadeSec,
+			enableLoopCrossfade: true,
+			enableLoopEnd: true,
+			enableLoopStart: false,
+			// Start playhead near loopEnd (in crossfade-in zone)
+			playhead: loopEndSamp - xfadeSamp + 1,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: false,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const out = [makeOutput(2)];
+		processBlock(
+			props,
+			out,
+			defaultParams(),
+			{
+				currentTime: 0.001,
+				currentFrame: 0,
+				sampleRate: SR,
+			},
+			defaultFilterState(),
+		);
+		// The fill() puts loopEnd content (0.3) in output.
+		// Crossfade-in should ADD loopStart content (0.7 * gain).
+		// So output should be > 0.3.
+		let maxVal = 0;
+		for (let i = 0; i < out[0][0].length; i++) {
+			maxVal = Math.max(maxVal, Math.abs(out[0][0][i]));
+		}
+		expect(maxVal).toBeGreaterThan(0.3);
+		expect(checkNans(out[0])).toBe(0);
+	});
+});

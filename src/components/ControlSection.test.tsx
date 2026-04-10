@@ -257,6 +257,130 @@ describe("ControlSection", () => {
 		expect(onToggle).toHaveBeenCalled();
 	});
 
+	test("uses audioDuration as max when maxLocked is true", () => {
+		const defs: ControlDef[] = [
+			{
+				key: "offset",
+				label: "Offset",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasSnap: true,
+			},
+		];
+		const maxs = makeMaxs();
+		maxs.offset = 4; // default max
+		const maxLocked = makeMaxLocked();
+		maxLocked.offset = true;
+		const audioDuration = 10;
+
+		const { container } = render(
+			<ControlSection
+				legend="Transport"
+				defs={defs}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={maxs}
+				maxLocked={maxLocked}
+				audioDuration={audioDuration}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+		const slider = container.querySelector('[role="slider"]');
+		expect(slider).toBeTruthy();
+		// aria-valuemax should reflect audioDuration, not the default maxs value
+		expect(slider?.getAttribute("aria-valuemax")).toBe(String(audioDuration));
+	});
+
+	test("falls back to maxs when maxLocked is false", () => {
+		const defs: ControlDef[] = [
+			{
+				key: "offset",
+				label: "Offset",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasSnap: true,
+			},
+		];
+		const maxs = makeMaxs();
+		maxs.offset = 8;
+		const maxLocked = makeMaxLocked();
+		maxLocked.offset = false;
+
+		const { container } = render(
+			<ControlSection
+				legend="Transport"
+				defs={defs}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={maxs}
+				maxLocked={maxLocked}
+				audioDuration={10}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+		const slider = container.querySelector('[role="slider"]');
+		expect(slider).toBeTruthy();
+		// Should use maxs value, not audioDuration
+		expect(slider?.getAttribute("aria-valuemax")).toBe("8");
+	});
+
+	test("falls back to maxs when audioDuration is null", () => {
+		const defs: ControlDef[] = [
+			{
+				key: "offset",
+				label: "Offset",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasSnap: true,
+			},
+		];
+		const maxs = makeMaxs();
+		maxs.offset = 4;
+		const maxLocked = makeMaxLocked();
+		maxLocked.offset = true;
+
+		const { container } = render(
+			<ControlSection
+				legend="Transport"
+				defs={defs}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={maxs}
+				maxLocked={maxLocked}
+				audioDuration={null}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+		const slider = container.querySelector('[role="slider"]');
+		expect(slider).toBeTruthy();
+		// Should use maxs value since no audio is loaded
+		expect(slider?.getAttribute("aria-valuemax")).toBe("4");
+	});
+
 	test("onSnapChange is called via context menu", () => {
 		const onSnapChange = mock(() => {});
 		const defsWithSnap: ControlDef[] = [

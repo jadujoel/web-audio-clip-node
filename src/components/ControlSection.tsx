@@ -46,7 +46,11 @@ export function ControlSection({
 					label={def.label}
 					controlKey={def.key}
 					min={mins[def.key] ?? def.min}
-					max={maxs[def.key] ?? def.max}
+					max={
+						maxLocked[def.key] && audioDuration != null
+							? audioDuration
+							: (maxs[def.key] ?? def.max)
+					}
 					value={values[def.key]}
 					defaultValue={def.defaultValue}
 					tempo={TEMPO}

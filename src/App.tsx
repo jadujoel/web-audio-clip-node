@@ -10,8 +10,8 @@ import { PanControl } from "./components/PanControl";
 import { PlaybackRateControl } from "./components/PlaybackRateControl";
 import { PlayheadSlider } from "./components/PlayheadSlider";
 import { TransportButtons } from "./components/TransportButtons";
-import { useClipControls } from "./hooks/useClipControls";
 import { useClipNode } from "./hooks/useClipNode";
+import { useClipControls } from "./store/clipStore";
 
 export function App() {
 	const controls = useClipControls();
@@ -22,7 +22,7 @@ export function App() {
 		setValue: controls.setValue,
 	});
 
-	// Auto-update max for locked controls when audioDuration changes
+	// Persist audioDuration into maxs state for locked controls (for localStorage persistence)
 	useEffect(() => {
 		if (node.audioDuration == null) return;
 		for (const key of Object.keys(controls.maxLocked) as ControlKey[]) {

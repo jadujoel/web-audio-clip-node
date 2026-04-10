@@ -747,63 +747,53 @@ export function processBlock(
 		sourceLength > SAMPLE_BLOCK_SIZE;
 
 	if (isWithinLoopRange && needsCrossfade) {
-		// Crossfade out at loop start
+		// Crossfade out at loop start: fade out tail of previous loop iteration.
+		// Source: reads from END of loop (loopEnd - xfade to loopEnd).
 		{
-			let endIndex = Math.min(
-				loopStartSamples + xfadeNumSamples,
-				loopEndSamples,
-			);
-			let numSamples = endIndex - loopStartSamples;
-			if (loopEndSamples + numSamples > sourceLength) {
-				numSamples = loopEndSamples - sourceLength;
-				endIndex = loopStartSamples + numSamples;
-			}
-			if (numSamples > 0) {
-				const isWithin = playhead > loopStartSamples && playhead < endIndex;
-				if (isWithin) {
-					let remaining = endIndex - playhead;
-					let index = Math.floor(loopEndSamples + numSamples - remaining);
-					const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
-					for (let i = 0; i < n; i++) {
-						index++;
-						remaining--;
-						const position = (numSamples - remaining) / numSamples;
-						const g = Math.cos((Math.PI * position) / 2);
-						if (index >= 0 && index < sourceLength) {
-							for (let ch = 0; ch < nc; ch++) {
-								output0[ch][i] += buffer[ch][index] * g;
-							}
+			const endIndex = loopStartSamples + xfadeNumSamples;
+			if (
+				xfadeNumSamples > 0 &&
+				playhead > loopStartSamples &&
+				playhead < endIndex
+			) {
+				const elapsed = playhead - loopStartSamples;
+				const n = Math.min(Math.floor(endIndex - playhead), SAMPLE_BLOCK_SIZE);
+				for (let i = 0; i < n; i++) {
+					const position = (elapsed + i) / xfadeNumSamples;
+					const g = Math.cos((Math.PI * position) / 2);
+					const srcIdx = Math.floor(
+						loopEndSamples - xfadeNumSamples + elapsed + i,
+					);
+					if (srcIdx >= 0 && srcIdx < sourceLength) {
+						for (let ch = 0; ch < nc; ch++) {
+							output0[ch][i] += buffer[ch][srcIdx] * g;
 						}
 					}
 				}
 			}
 		}
 
-		// Crossfade in approaching loop end
+		// Crossfade in approaching loop end: fade in head of next loop iteration.
+		// Source: reads from START of loop (loopStart to loopStart + xfade).
 		{
-			let startIndex = Math.max(
-				loopEndSamples - xfadeNumSamples,
-				loopStartSamples,
-			);
-			let numSamples = loopEndSamples - startIndex;
-			let firstIndex = loopStartSamples - numSamples;
-			if (firstIndex < 0) {
-				numSamples += firstIndex;
-				startIndex = loopEndSamples - numSamples;
-				firstIndex = 0;
-			}
-			if (numSamples > 0 && playhead > startIndex) {
-				let remaining = loopEndSamples - playhead;
-				let index = Math.floor(firstIndex + numSamples - remaining);
-				const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
+			const startIndex = loopEndSamples - xfadeNumSamples;
+			if (
+				xfadeNumSamples > 0 &&
+				playhead > startIndex &&
+				playhead < loopEndSamples
+			) {
+				const elapsed = playhead - startIndex;
+				const n = Math.min(
+					Math.floor(loopEndSamples - playhead),
+					SAMPLE_BLOCK_SIZE,
+				);
 				for (let i = 0; i < n; i++) {
-					index++;
-					remaining--;
-					const position = (numSamples - remaining) / numSamples;
+					const position = (elapsed + i) / xfadeNumSamples;
 					const g = Math.sin((Math.PI * position) / 2);
-					if (index >= 0 && index < sourceLength) {
+					const srcIdx = Math.floor(loopStartSamples + elapsed + i);
+					if (srcIdx >= 0 && srcIdx < sourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
-							output0[ch][i] += buffer[ch][index] * g;
+							output0[ch][i] += buffer[ch][srcIdx] * g;
 						}
 					}
 				}

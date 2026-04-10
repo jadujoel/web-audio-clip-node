@@ -81,12 +81,20 @@ describe("ContextMenu", () => {
 		expect(props.onMaxChange).toHaveBeenCalledWith(8);
 	});
 
-	test("max input is disabled when maxLocked", () => {
-		renderMenu({ maxLocked: true });
+	test("max input is disabled when maxLocked and audioDuration set", () => {
+		renderMenu({ maxLocked: true, audioDuration: 10 });
 		const inputs = document.querySelectorAll<HTMLInputElement>(
 			".context-menu__input",
 		);
 		expect(inputs[1].disabled).toBe(true);
+	});
+
+	test("max input is editable when maxLocked but no audioDuration", () => {
+		renderMenu({ maxLocked: true, audioDuration: null });
+		const inputs = document.querySelectorAll<HTMLInputElement>(
+			".context-menu__input",
+		);
+		expect(inputs[1].disabled).toBe(false);
 	});
 
 	test("maxLocked checkbox calls onMaxLockedChange", () => {
@@ -100,12 +108,12 @@ describe("ContextMenu", () => {
 		expect(props.onMaxLockedChange).toHaveBeenCalledWith(true);
 	});
 
-	test("maxLocked checkbox hidden when no audioDuration", () => {
+	test("maxLocked checkbox visible even when no audioDuration", () => {
 		renderMenu({ audioDuration: null });
 		const checkbox = document.querySelector(
 			".context-menu__field .control-toggle",
 		);
-		expect(checkbox).toBeNull();
+		expect(checkbox).toBeTruthy();
 	});
 
 	test("Escape closes menu", () => {

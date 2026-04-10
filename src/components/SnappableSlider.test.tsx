@@ -350,6 +350,74 @@ describe("SnappableSlider", () => {
 		fireEvent.keyUp(slider, { key: "Alt" });
 	});
 
+	test("Alt+mouseDown bypasses snap during drag", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={50}
+				enableSnap={true}
+				snaps={[0, 25, 50, 75, 100]}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		// Click at 60% (value=60) with Alt held — should NOT snap to 50 or 75
+		fireEvent.mouseDown(slider, { clientX: 120, altKey: true });
+		expect(onChange).toHaveBeenCalledWith(60);
+		fireEvent.mouseUp(document);
+	});
+
+	test("mouseDown without Alt snaps during drag", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={0}
+				max={100}
+				value={50}
+				enableSnap={true}
+				snaps={[0, 25, 50, 75, 100]}
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLElement;
+		slider.getBoundingClientRect = () =>
+			({
+				left: 0,
+				width: 200,
+				top: 0,
+				right: 200,
+				bottom: 20,
+				height: 20,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			}) as DOMRect;
+		// Click at 60% (value=60) without Alt — should snap to nearest (50 or 75)
+		fireEvent.mouseDown(slider, { clientX: 120 });
+		// 60 is closer to 50 than 75, so snaps to 50... wait 60-50=10, 75-60=15, so 50
+		// Actually let's pick a value closer to 75: clientX=140 => 70%
+		onChange.mockClear();
+		fireEvent.mouseUp(document);
+		fireEvent.mouseDown(slider, { clientX: 140 });
+		// value=70, closest snap: 75 (distance 5) vs 50 (distance 20)
+		expect(onChange).toHaveBeenCalledWith(75);
+		fireEvent.mouseUp(document);
+	});
+
 	test("wheel up increases value", () => {
 		const onChange = mock(() => {});
 		const { container } = render(

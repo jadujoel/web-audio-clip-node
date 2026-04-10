@@ -3,6 +3,7 @@ import { ClipNode } from "../audio/ClipNode";
 import { loadFromCache } from "../audio/cache";
 import type { ControlKey } from "../audio/controlDefs";
 import { SAMPLE_RATE } from "../audio/controlDefs";
+import { loadUploadedFile, saveUploadedFile } from "../audio/fileStore";
 import type { ClipNodeState, FrameData } from "../audio/types";
 import { float32ArrayFromAudioBuffer, linFromDb } from "../audio/utils";
 
@@ -297,6 +298,31 @@ export function useClipNode({
 		nodeRef.current?.logState();
 	}, []);
 
+	const loadFromArrayBuffer = useCallback(
+		async (ab: ArrayBuffer, name: string) => {
+			const buf = await decodeAudio(ab);
+			bufferRef.current = buf;
+			setSoundName(name);
+			setValue("playhead", 0);
+		},
+		[decodeAudio, setValue],
+	);
+
+	// Auto-load last uploaded file from IndexedDB on mount
+	useEffect(() => {
+		loadUploadedFile()
+			.then((stored) => {
+				if (stored) {
+					loadFromArrayBuffer(stored.arrayBuffer, stored.name).catch((err) =>
+						console.error("[fileStore] Failed to restore file:", err),
+					);
+				}
+			})
+			.catch((err) =>
+				console.error("[fileStore] Failed to load from IndexedDB:", err),
+			);
+	}, [loadFromArrayBuffer]);
+
 	const loadSound = useCallback(() => {
 		const input = document.createElement("input");
 		input.type = "file";
@@ -305,13 +331,13 @@ export function useClipNode({
 			const file = input.files?.[0];
 			if (!file) return;
 			const ab = await file.arrayBuffer();
-			const buf = await decodeAudio(ab);
-			bufferRef.current = buf;
-			setSoundName(file.name);
-			setValue("playhead", 0);
+			await loadFromArrayBuffer(ab, file.name);
+			saveUploadedFile(file.name, ab).catch((err) =>
+				console.error("[fileStore] Failed to save to IndexedDB:", err),
+			);
 		};
 		input.click();
-	}, [decodeAudio, setValue]);
+	}, [loadFromArrayBuffer]);
 
 	const applyValueToNode = useCallback(
 		(key: ControlKey, val: number) => {

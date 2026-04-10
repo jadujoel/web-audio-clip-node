@@ -99,16 +99,24 @@ export function SnappableSlider({
 	}, []);
 
 	const startDrag = useCallback(
-		(clientX: number) => {
+		(clientX: number, altKey: boolean) => {
 			if (disabled) return;
 			isDragging.current = true;
+			isOptionKeyHeld.current = altKey;
+			setAltHeld(altKey);
 			updateFromClientX(clientX);
 
-			const handleMove = (e: MouseEvent) => updateFromClientX(e.clientX);
+			const handleMove = (e: MouseEvent) => {
+				isOptionKeyHeld.current = e.altKey;
+				setAltHeld(e.altKey);
+				updateFromClientX(e.clientX);
+			};
 			const handleTouchMove = (e: TouchEvent) =>
 				updateFromClientX(e.touches[0].clientX);
 			const handleUp = () => {
 				isDragging.current = false;
+				isOptionKeyHeld.current = false;
+				setAltHeld(false);
 				document.removeEventListener("mousemove", handleMove);
 				document.removeEventListener("mouseup", handleUp);
 				document.removeEventListener("touchmove", handleTouchMove);
@@ -263,8 +271,8 @@ export function SnappableSlider({
 			tabIndex={disabled ? -1 : 0}
 			ref={containerRef}
 			className={sliderClass}
-			onMouseDown={(e) => startDrag(e.clientX)}
-			onTouchStart={(e) => startDrag(e.touches[0].clientX)}
+			onMouseDown={(e) => startDrag(e.clientX, e.altKey)}
+			onTouchStart={(e) => startDrag(e.touches[0].clientX, false)}
 			onKeyDown={handleKeyDown}
 			onKeyUp={handleKeyUp}
 			onDoubleClick={handleDoubleClick}

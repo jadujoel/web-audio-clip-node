@@ -166,22 +166,20 @@ export function ContextMenu({
 					className="context-menu__input"
 					defaultValue={max}
 					step="any"
-					disabled={maxLocked}
+					disabled={maxLocked && audioDuration != null}
 					onBlur={handleMaxCommit}
 					onKeyDown={handleInputKeyDown(handleMaxCommit)}
 				/>
 			</label>
-			{audioDuration != null && (
-				<label className="context-menu__field">
-					<input
-						type="checkbox"
-						className="control-toggle"
-						checked={maxLocked}
-						onChange={(e) => onMaxLockedChange(e.target.checked)}
-					/>
-					Max = file length
-				</label>
-			)}
+			<label className="context-menu__field">
+				<input
+					type="checkbox"
+					className="control-toggle"
+					checked={maxLocked}
+					onChange={(e) => onMaxLockedChange(e.target.checked)}
+				/>
+				Max = file length
+			</label>
 		</div>,
 		document.body,
 	);
