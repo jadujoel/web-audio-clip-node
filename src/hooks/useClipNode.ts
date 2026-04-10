@@ -331,8 +331,9 @@ export function useClipNode({
 			const file = input.files?.[0];
 			if (!file) return;
 			const ab = await file.arrayBuffer();
+			const copy = ab.slice(0);
 			await loadFromArrayBuffer(ab, file.name);
-			saveUploadedFile(file.name, ab).catch((err) =>
+			saveUploadedFile(file.name, copy).catch((err) =>
 				console.error("[fileStore] Failed to save to IndexedDB:", err),
 			);
 		};

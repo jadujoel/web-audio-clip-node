@@ -49,7 +49,7 @@ describe("buildDefaults", () => {
 			expect(enabled[def.key]).toBe(true);
 			expect(mins[def.key]).toBe(def.min);
 			expect(maxs[def.key]).toBe(def.max);
-			expect(maxLocked[def.key]).toBe(true);
+			expect(maxLocked[def.key]).toBe(def.maxLockedByDefault ?? false);
 		}
 	});
 });

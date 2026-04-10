@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { buildDefaults, type ControlKey } from "../audio/controlDefs";
+import {
+	buildDefaults,
+	type ControlKey,
+	DEFAULT_TEMPO,
+} from "../audio/controlDefs";
 
 const STORAGE_KEY = "clip-node-state";
 
@@ -12,6 +16,7 @@ export interface ClipControlsState {
 	maxs: Record<ControlKey, number>;
 	maxLocked: Record<ControlKey, boolean>;
 	loop: boolean;
+	tempo: number;
 
 	setValue: (key: ControlKey, val: number) => void;
 	setSnap: (key: ControlKey, snap: string) => void;
@@ -20,6 +25,7 @@ export interface ClipControlsState {
 	setMax: (key: ControlKey, val: number) => void;
 	setMaxLocked: (key: ControlKey, locked: boolean) => void;
 	setLoop: (checked: boolean) => void;
+	setTempo: (tempo: number) => void;
 	setValues: (values: Record<ControlKey, number>) => void;
 }
 
@@ -37,6 +43,7 @@ export const useClipControls = create<ClipControlsState>()(
 		? (set) => ({
 				...defaults,
 				loop: false,
+				tempo: DEFAULT_TEMPO,
 				setValue: (key, val) =>
 					set((s) => ({ values: { ...s.values, [key]: val } })),
 				setSnap: (key, snap) =>
@@ -48,12 +55,14 @@ export const useClipControls = create<ClipControlsState>()(
 				setMaxLocked: (key, locked) =>
 					set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
 				setLoop: (checked) => set({ loop: checked }),
+				setTempo: (tempo) => set({ tempo }),
 				setValues: (values) => set({ values }),
 			})
 		: persist(
 				(set) => ({
 					...defaults,
 					loop: false,
+					tempo: DEFAULT_TEMPO,
 					setValue: (key, val) =>
 						set((s) => ({ values: { ...s.values, [key]: val } })),
 					setSnap: (key, snap) =>
@@ -67,6 +76,7 @@ export const useClipControls = create<ClipControlsState>()(
 					setMaxLocked: (key, locked) =>
 						set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
 					setLoop: (checked) => set({ loop: checked }),
+					setTempo: (tempo) => set({ tempo }),
 					setValues: (values) => set({ values }),
 				}),
 				{
@@ -79,6 +89,7 @@ export const useClipControls = create<ClipControlsState>()(
 						maxs: state.maxs,
 						maxLocked: state.maxLocked,
 						loop: state.loop,
+						tempo: state.tempo,
 					}),
 				},
 			),

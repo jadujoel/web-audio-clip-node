@@ -90,6 +90,24 @@ export function App() {
 				onLoadSound={node.loadSound}
 			/>
 			<hr />
+			<fieldset className="control-group">
+				<legend>Tempo</legend>
+				<label htmlFor="tempo">BPM</label>
+				<input
+					id="tempo"
+					type="number"
+					min={20}
+					max={999}
+					step={1}
+					value={controls.tempo}
+					onChange={(e) => {
+						const v = Number(e.target.value);
+						if (Number.isFinite(v) && v > 0) controls.setTempo(v);
+					}}
+					style={{ width: 60 }}
+				/>
+			</fieldset>
+			<hr />
 			<PlayheadSlider
 				value={controls.values.playhead}
 				audioDuration={node.audioDuration}
@@ -107,6 +125,7 @@ export function App() {
 					mins={controls.mins}
 					maxs={controls.maxs}
 					maxLocked={controls.maxLocked}
+					tempo={controls.tempo}
 					audioDuration={node.audioDuration}
 					onValueChange={handleValueChange}
 					onToggle={handleToggle}
@@ -136,6 +155,7 @@ export function App() {
 							mins={controls.mins}
 							maxs={controls.maxs}
 							maxLocked={controls.maxLocked}
+							tempo={controls.tempo}
 							audioDuration={node.audioDuration}
 							onValueChange={handleValueChange}
 							onToggle={handleToggle}

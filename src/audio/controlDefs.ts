@@ -32,9 +32,11 @@ export interface ControlDef {
 	title?: string;
 	hasToggle?: boolean;
 	hasSnap?: boolean;
+	/** When true, max defaults to audio file duration. */
+	maxLockedByDefault?: boolean;
 }
 
-export const TEMPO = 116;
+export const DEFAULT_TEMPO = 120;
 export const SAMPLE_RATE = 48000;
 
 export const controlDefs: ControlDef[] = [
@@ -42,21 +44,23 @@ export const controlDefs: ControlDef[] = [
 		key: "offset",
 		label: "Offset",
 		min: 0,
-		max: 4,
+		max: 60,
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		maxLockedByDefault: true,
 		title: "Start position in the buffer (seconds).",
 	},
 	{
 		key: "duration",
 		label: "Duration",
 		min: -1,
-		max: 40,
+		max: 60,
 		defaultValue: -1,
 		hasSnap: true,
 		hasToggle: true,
+		maxLockedByDefault: true,
 		title:
 			"How long to play before auto-stopping (seconds). -1 for full length.",
 	},
@@ -111,21 +115,23 @@ export const loopControlDefs: ControlDef[] = [
 		key: "loopStart",
 		label: "LoopStart",
 		min: 0,
-		max: 1,
+		max: 60,
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		maxLockedByDefault: true,
 	},
 	{
 		key: "loopEnd",
 		label: "LoopEnd",
 		min: 0,
-		max: 1,
+		max: 60,
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		maxLockedByDefault: true,
 	},
 	{
 		key: "loopCrossfade",
@@ -244,7 +250,7 @@ export function buildDefaults(): {
 		enabled[d.key] = true;
 		mins[d.key] = d.min;
 		maxs[d.key] = d.max;
-		maxLocked[d.key] = true;
+		maxLocked[d.key] = d.maxLockedByDefault ?? false;
 	}
 	return { values, snaps, enabled, mins, maxs, maxLocked };
 }

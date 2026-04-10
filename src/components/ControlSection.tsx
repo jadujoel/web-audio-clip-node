@@ -1,5 +1,4 @@
 import type { ControlDef, ControlKey } from "../audio/controlDefs";
-import { TEMPO } from "../audio/controlDefs";
 import { AudioControl } from "./AudioControl";
 
 interface ControlSectionProps {
@@ -11,6 +10,7 @@ interface ControlSectionProps {
 	mins: Record<ControlKey, number>;
 	maxs: Record<ControlKey, number>;
 	maxLocked: Record<ControlKey, boolean>;
+	tempo: number;
 	audioDuration?: number | null;
 	onValueChange: (key: ControlKey, val: number) => void;
 	onToggle: (key: ControlKey, on: boolean) => void;
@@ -29,6 +29,7 @@ export function ControlSection({
 	mins,
 	maxs,
 	maxLocked,
+	tempo,
 	audioDuration,
 	onValueChange,
 	onToggle,
@@ -53,7 +54,7 @@ export function ControlSection({
 					}
 					value={values[def.key]}
 					defaultValue={def.defaultValue}
-					tempo={TEMPO}
+					tempo={tempo}
 					snap={snaps[def.key]}
 					preset={def.preset}
 					title={def.title}

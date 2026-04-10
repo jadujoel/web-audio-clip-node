@@ -164,6 +164,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={makeMaxs()}
 				maxLocked={makeMaxLocked()}
+				tempo={120}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
@@ -187,6 +188,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={makeMaxs()}
 				maxLocked={makeMaxLocked()}
+				tempo={120}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
@@ -213,6 +215,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={makeMaxs()}
 				maxLocked={makeMaxLocked()}
+				tempo={120}
 				onValueChange={onValueChange}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
@@ -242,6 +245,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={makeMaxs()}
 				maxLocked={makeMaxLocked()}
+				tempo={120}
 				onValueChange={() => {}}
 				onToggle={onToggle}
 				onSnapChange={() => {}}
@@ -284,6 +288,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={maxs}
 				maxLocked={maxLocked}
+				tempo={120}
 				audioDuration={audioDuration}
 				onValueChange={() => {}}
 				onToggle={() => {}}
@@ -325,6 +330,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={maxs}
 				maxLocked={maxLocked}
+				tempo={120}
 				audioDuration={10}
 				onValueChange={() => {}}
 				onToggle={() => {}}
@@ -366,6 +372,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={maxs}
 				maxLocked={maxLocked}
+				tempo={120}
 				audioDuration={null}
 				onValueChange={() => {}}
 				onToggle={() => {}}
@@ -403,6 +410,7 @@ describe("ControlSection", () => {
 				mins={makeMins()}
 				maxs={makeMaxs()}
 				maxLocked={makeMaxLocked()}
+				tempo={120}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={onSnapChange}
