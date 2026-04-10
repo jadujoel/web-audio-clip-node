@@ -67,6 +67,8 @@ describe("getProperties", () => {
 		expect(props.duration).toBe(-1);
 		expect(props.fadeInDuration).toBe(0);
 		expect(props.enableFadeIn).toBe(false);
+		expect(props.enableLoopStart).toBe(true);
+		expect(props.enableLoopEnd).toBe(true);
 	});
 
 	it("respects provided options", () => {
@@ -884,6 +886,32 @@ describe("handleProcessorMessage", () => {
 		expect(props.enableLoopCrossfade).toBe(true);
 	});
 
+	it("toggleLoopStart", () => {
+		const props = getProperties({ enableLoopStart: true }, SR);
+		handleProcessorMessage(props, { type: "toggleLoopStart" }, CT, SR);
+		expect(props.enableLoopStart).toBe(false);
+		handleProcessorMessage(
+			props,
+			{ type: "toggleLoopStart", data: true },
+			CT,
+			SR,
+		);
+		expect(props.enableLoopStart).toBe(true);
+	});
+
+	it("toggleLoopEnd", () => {
+		const props = getProperties({ enableLoopEnd: true }, SR);
+		handleProcessorMessage(props, { type: "toggleLoopEnd" }, CT, SR);
+		expect(props.enableLoopEnd).toBe(false);
+		handleProcessorMessage(
+			props,
+			{ type: "toggleLoopEnd", data: true },
+			CT,
+			SR,
+		);
+		expect(props.enableLoopEnd).toBe(true);
+	});
+
 	it("logState returns empty array", () => {
 		const props = getProperties({}, SR);
 		const msgs = handleProcessorMessage(props, { type: "logState" }, CT, SR);
@@ -1254,8 +1282,49 @@ describe("processBlock", () => {
 			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
 			makeFilterState(),
 		);
-		// First sample should be attenuated (less than 1.0)
-		expect(outputs[0][0][0]).toBeLessThan(1.0);
+		// First sample should be near zero (cubic: 0^3 = 0)
+		expect(outputs[0][0][0]).toBeCloseTo(0, 3);
+		// Last sample should still be attenuated but greater than first
+		expect(outputs[0][0][127]).toBeGreaterThan(outputs[0][0][0]);
+		// Gain should monotonically increase across the block
+		for (let i = 1; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeGreaterThanOrEqual(outputs[0][0][i - 1]);
+		}
+	});
+
+	it("fade in: cubic curve stays quiet early in long fade", () => {
+		const buffer = makeBuffer(48000 * 10);
+		for (const ch of buffer) ch.fill(1);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				playhead: 0,
+				playedSamples: 0,
+				fadeInDuration: 10.0, // 10-second fade
+				enableFadeIn: true,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// At 128 samples into a 480000-sample fade, t = 128/480000 ≈ 0.000267
+		// g = t^3 ≈ 1.9e-11, essentially silent
+		expect(outputs[0][0][127]).toBeLessThan(0.001);
 	});
 
 	it("fade out: samples are attenuated near stop time", () => {
@@ -1291,6 +1360,100 @@ describe("processBlock", () => {
 		);
 		// Samples should be attenuated due to fade out
 		expect(outputs[0][0][0]).toBeLessThan(1.0);
+		// Last sample (closest to stopWhen) should be quieter than first
+		expect(Math.abs(outputs[0][0][127])).toBeLessThan(
+			Math.abs(outputs[0][0][0]),
+		);
+	});
+
+	it("fade out: monotonically decreasing gain", () => {
+		const buffer = makeBuffer(48000 * 2);
+		for (const ch of buffer) ch.fill(1);
+		// Place ourselves 0.5s before stopWhen, with a 1s fadeOut
+		// so we're in the middle of the fade zone
+		const stopWhen = 2.0;
+		const currentTime = 1.5;
+		const fadeOutDuration = 1.0;
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen,
+				duration: stopWhen,
+				buffer,
+				playhead: Math.floor(currentTime * SR),
+				playedSamples: Math.floor(currentTime * SR),
+				fadeOutDuration,
+				enableFadeOut: true,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Gain should monotonically decrease across the block
+		for (let i = 1; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeLessThanOrEqual(outputs[0][0][i - 1]);
+		}
+		// First sample should be louder than last sample
+		expect(outputs[0][0][0]).toBeGreaterThan(outputs[0][0][127]);
+	});
+
+	it("fade out: multi-block fade produces decreasing RMS", () => {
+		const buffer = makeBuffer(48000 * 2);
+		for (const ch of buffer) ch.fill(1);
+		const stopWhen = 2.0;
+		const fadeOutDuration = 1.0;
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen,
+				duration: stopWhen,
+				buffer,
+				playhead: Math.floor(1.0 * SR),
+				playedSamples: Math.floor(1.0 * SR),
+				fadeOutDuration,
+				enableFadeOut: true,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+
+		const rmsValues: number[] = [];
+		// Process multiple blocks through the fade-out zone
+		for (let block = 0; block < 10; block++) {
+			const outputs = [makeOutput(2)];
+			const ct = 1.0 + (block * 128) / SR;
+			processBlock(
+				props,
+				outputs,
+				makeProcessParams(),
+				{ currentTime: ct, currentFrame: 0, sampleRate: SR },
+				makeFilterState(),
+			);
+			let sum = 0;
+			for (let i = 0; i < 128; i++) sum += outputs[0][0][i] ** 2;
+			rmsValues.push(Math.sqrt(sum / 128));
+		}
+		// RMS should decrease over successive blocks
+		for (let i = 1; i < rmsValues.length; i++) {
+			expect(rmsValues[i]).toBeLessThanOrEqual(rmsValues[i - 1] + 0.001);
+		}
 	});
 
 	it("processBlock with gain filter enabled", () => {
@@ -1505,6 +1668,83 @@ describe("processBlock", () => {
 			makeFilterState(),
 		);
 		expect(props.playhead).toBeGreaterThan(0);
+	});
+
+	it("enableLoopStart=false uses 0 for loopStart", () => {
+		const buffer = makeBuffer(4800);
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0.05; // 2400 samples at 48kHz
+		const loopEnd = 4800 / SR;
+		// Place playhead near the custom loopStart boundary
+		// With enableLoopStart=false, loop wraps at 0 not at 2400
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				enableLoopStart: false,
+				playhead: 4700, // near end of buffer, will loop
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// When loopStart disabled, playhead should wrap to 0 (not 2400)
+		expect(props.playhead).toBeLessThan(2400);
+	});
+
+	it("enableLoopEnd=false uses sourceLength for loopEnd", () => {
+		const buffer = makeBuffer(4800);
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0;
+		const loopEnd = 0.05; // 2400 samples — normally would loop here
+		// With enableLoopEnd=false, loop uses full buffer length
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				loop: true,
+				loopStart,
+				loopEnd,
+				enableLoopEnd: false,
+				playhead: 2400, // past the custom loopEnd
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Playhead should advance past 2400 since loopEnd is effectively full buffer
+		expect(props.playhead).toBeGreaterThan(2400);
 	});
 
 	it("NaN in output triggers logging and returns early", () => {

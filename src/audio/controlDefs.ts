@@ -86,7 +86,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeIn",
 		label: "FadeIn",
 		min: 0,
-		max: 4,
+		max: 60,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -97,7 +97,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeOut",
 		label: "FadeOut",
 		min: 0,
-		max: 4,
+		max: 60,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -115,6 +115,7 @@ export const loopControlDefs: ControlDef[] = [
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
+		hasToggle: true,
 	},
 	{
 		key: "loopEnd",
@@ -124,6 +125,7 @@ export const loopControlDefs: ControlDef[] = [
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
+		hasToggle: true,
 	},
 	{
 		key: "loopCrossfade",

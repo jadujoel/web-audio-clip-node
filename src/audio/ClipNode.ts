@@ -127,6 +127,12 @@ export class ClipNode extends AudioWorkletNode {
 	toggleLoopCrossfade(value = true) {
 		this.port.postMessage({ type: "toggleLoopCrossfade", data: value });
 	}
+	toggleLoopStart(value = true) {
+		this.port.postMessage({ type: "toggleLoopStart", data: value });
+	}
+	toggleLoopEnd(value = true) {
+		this.port.postMessage({ type: "toggleLoopEnd", data: value });
+	}
 	logState() {
 		this.port.postMessage({ type: "logState" });
 	}

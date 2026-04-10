@@ -42,6 +42,8 @@ export function getProperties(
 		fadeOutDuration = 0,
 		enableFadeIn = fadeInDuration > 0,
 		enableFadeOut = fadeOutDuration > 0,
+		enableLoopStart = true,
+		enableLoopEnd = true,
 		enableLoopCrossfade = loopCrossfade > 0,
 		enableHighpass = true,
 		enableLowpass = true,
@@ -71,6 +73,8 @@ export function getProperties(
 		fadeOutDuration,
 		enableFadeIn,
 		enableFadeOut,
+		enableLoopStart,
+		enableLoopEnd,
 		enableHighpass,
 		enableLowpass,
 		enableGain,
@@ -562,6 +566,14 @@ export function handleProcessorMessage(
 			properties.enableFadeOut =
 				(data as boolean | undefined) ?? !properties.enableFadeOut;
 			return [];
+		case "toggleLoopStart":
+			properties.enableLoopStart =
+				(data as boolean | undefined) ?? !properties.enableLoopStart;
+			return [];
+		case "toggleLoopEnd":
+			properties.enableLoopEnd =
+				(data as boolean | undefined) ?? !properties.enableLoopEnd;
+			return [];
 		case "toggleLoopCrossfade":
 			properties.enableLoopCrossfade =
 				(data as boolean | undefined) ?? !properties.enableLoopCrossfade;
@@ -659,6 +671,8 @@ export function processBlock(
 		enableDetune,
 		enableFadeOut,
 		enableFadeIn,
+		enableLoopStart,
+		enableLoopEnd,
 		enableLoopCrossfade,
 		playhead,
 		fadeInDuration,
@@ -669,14 +683,15 @@ export function processBlock(
 	const durationSamples = props.duration * ctx.sampleRate;
 
 	const loopCrossfadeSamples = Math.floor(ctx.sampleRate * loopCrossfade);
-	const loopStartSamples = Math.min(
-		Math.floor(loopStart * ctx.sampleRate),
-		sourceLength - SAMPLE_BLOCK_SIZE,
-	);
-	const loopEndSamples = Math.min(
-		Math.floor(loopEnd * ctx.sampleRate),
-		sourceLength,
-	);
+	const loopStartSamples = enableLoopStart
+		? Math.min(
+				Math.floor(loopStart * ctx.sampleRate),
+				sourceLength - SAMPLE_BLOCK_SIZE,
+			)
+		: 0;
+	const loopEndSamples = enableLoopEnd
+		? Math.min(Math.floor(loopEnd * ctx.sampleRate), sourceLength)
+		: sourceLength;
 	const loopLengthSamples = loopEndSamples - loopStartSamples;
 
 	// Apply detune to playback rates: effectiveRate = rate * 2^(detune/1200)
@@ -801,9 +816,9 @@ export function processBlock(
 		const remaining = fadeInSamples - playedSamples;
 		if (remaining > 0) {
 			const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
-			const doubleFadeInSamples = fadeInSamples * 2;
 			for (let i = 0; i < n; i++) {
-				const g = Math.cos((Math.PI * (remaining - i)) / doubleFadeInSamples);
+				const t = (playedSamples + i) / fadeInSamples;
+				const g = t * t * t; // cubic: slow start, fast finish
 				for (let ch = 0; ch < nc; ch++) {
 					output0[ch][i] *= g;
 				}
@@ -814,14 +829,15 @@ export function processBlock(
 	// --- Fade out ---
 	if (enableFadeOut && fadeOutDuration > 0) {
 		const fadeOutSamples = Math.floor(fadeOutDuration * ctx.sampleRate);
-		const remainingDuration = stopWhen - ctx.currentTime;
-		const remainingSamples = Math.floor(ctx.sampleRate * remainingDuration);
-		if (remainingSamples < fadeOutSamples) {
-			const remaining = fadeOutSamples - remainingSamples;
-			const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
-			const doubleFadeOutSamples = fadeOutSamples * 2;
-			for (let i = 0; i < n; i++) {
-				const g = Math.sin((Math.PI * (remaining - i)) / doubleFadeOutSamples);
+		const remainingSamples = Math.floor(
+			ctx.sampleRate * (stopWhen - ctx.currentTime),
+		);
+		if (remainingSamples < fadeOutSamples + SAMPLE_BLOCK_SIZE) {
+			for (let i = 0; i < SAMPLE_BLOCK_SIZE; i++) {
+				const sampleRemaining = remainingSamples - i;
+				if (sampleRemaining >= fadeOutSamples) continue; // not yet in fade zone
+				const t = sampleRemaining <= 0 ? 0 : sampleRemaining / fadeOutSamples;
+				const g = t * t * t; // cubic fade-out: fast drop, slow tail
 				for (let ch = 0; ch < nc; ch++) {
 					output0[ch][i] *= g;
 				}

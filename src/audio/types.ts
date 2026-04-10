@@ -30,6 +30,8 @@ export interface ClipProcessorOptions {
 	fadeOutDuration?: number;
 	enableFadeIn?: boolean;
 	enableFadeOut?: boolean;
+	enableLoopStart?: boolean;
+	enableLoopEnd?: boolean;
 	enableLoopCrossfade?: boolean;
 	enableGain?: boolean;
 	enablePan?: boolean;
@@ -63,6 +65,8 @@ export type FrameData = readonly [
 export type ClipProcessorToggleMessageType =
 	| "toggleFadeIn"
 	| "toggleFadeOut"
+	| "toggleLoopStart"
+	| "toggleLoopEnd"
 	| "toggleLoopCrossfade"
 	| "toggleGain"
 	| "togglePan"

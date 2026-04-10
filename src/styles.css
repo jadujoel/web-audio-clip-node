@@ -470,6 +470,40 @@ button:focus-visible {
 }
 
 /* ---------------------------------------------------------------------------
+   PlayheadSlider
+   --------------------------------------------------------------------------- */
+
+.playhead-slider {
+	display: flex;
+	align-items: center;
+	gap: 0.75em;
+	padding: 0.5em 1em;
+}
+
+.playhead-label {
+	font-size: var(--font-size-sm);
+	color: #aaa;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	flex-shrink: 0;
+	width: 80px;
+}
+
+.playhead-slider .snappable-slider {
+	flex: 1;
+	margin: 0;
+}
+
+.playhead-time {
+	font-family: "SF Mono", "Menlo", "Consolas", monospace;
+	font-size: var(--font-size-sm);
+	color: var(--color-text);
+	flex-shrink: 0;
+	min-width: 130px;
+	text-align: right;
+}
+
+/* ---------------------------------------------------------------------------
    Responsive
    --------------------------------------------------------------------------- */
 

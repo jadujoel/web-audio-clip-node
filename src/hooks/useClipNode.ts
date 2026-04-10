@@ -67,6 +67,12 @@ function applyToggle(node: ClipNode, key: ControlKey, on: boolean) {
 		case "loopCrossfade":
 			node.toggleLoopCrossfade(on);
 			break;
+		case "loopStart":
+			node.toggleLoopStart(on);
+			break;
+		case "loopEnd":
+			node.toggleLoopEnd(on);
+			break;
 		case "playbackRate":
 			node.togglePlaybackRate(on);
 			break;
@@ -189,6 +195,8 @@ export function useClipNode({
 					enableLowpass: enabled.lowpass,
 					enablePan: enabled.pan,
 					enablePlaybackRate: enabled.playbackRate,
+					enableLoopStart: enabled.loopStart,
+					enableLoopEnd: enabled.loopEnd,
 					enableLoopCrossfade: enabled.loopCrossfade,
 				},
 			});

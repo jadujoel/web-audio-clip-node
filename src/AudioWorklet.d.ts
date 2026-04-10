@@ -63,7 +63,7 @@ type ProcessInputs = Float32Array[][];
  * Each of the output channels is filled with zeros by default
  * — the processor will output silence unless the output arrays are modified.
  */
-type ProcessOutputs = Float32Array[][];
+type _ProcessOutputs = Float32Array[][];
 
 /**
  * A Boolean value indicating whether or not to force the AudioWorkletNode

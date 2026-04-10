@@ -8,6 +8,7 @@ import { FilterControl } from "./components/FilterControl";
 import { GainControl } from "./components/GainControl";
 import { PanControl } from "./components/PanControl";
 import { PlaybackRateControl } from "./components/PlaybackRateControl";
+import { PlayheadSlider } from "./components/PlayheadSlider";
 import { TransportButtons } from "./components/TransportButtons";
 import { useClipControls } from "./hooks/useClipControls";
 import { useClipNode } from "./hooks/useClipNode";
@@ -86,6 +87,13 @@ export function App() {
 				onDispose={node.dispose}
 				onLog={node.logState}
 				onLoadSound={node.loadSound}
+			/>
+			<hr />
+			<PlayheadSlider
+				value={controls.values.playhead}
+				audioDuration={node.audioDuration}
+				disabled={node.nodeState === "initial" || node.nodeState === "disposed"}
+				onChange={(v) => handleValueChange("playhead", v)}
 			/>
 			<hr />
 			<section id="controls">
