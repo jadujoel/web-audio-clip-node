@@ -555,3 +555,60 @@ describe("SnappableSlider", () => {
 		expect(texts).toContain("10");
 	});
 });
+
+describe("logarithmic mode", () => {
+	test("fill at min is 0%", () => {
+		const { container } = render(
+			<SnappableSlider min={32} max={16384} value={32} logarithmic />,
+		);
+		const fill = q(container, ".slider-fill") as HTMLElement;
+		expect(fill.style.width).toBe("0%");
+	});
+
+	test("fill at max is 100%", () => {
+		const { container } = render(
+			<SnappableSlider min={32} max={16384} value={16384} logarithmic />,
+		);
+		const fill = q(container, ".slider-fill") as HTMLElement;
+		expect(fill.style.width).toBe("100%");
+	});
+
+	test("each octave occupies equal slider space", () => {
+		// min=32, max=16384 → 9 octaves (32→64→128→...→16384)
+		const octaves = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+		const ratios: number[] = [];
+		for (const v of octaves) {
+			const { container } = render(
+				<SnappableSlider min={32} max={16384} value={v} logarithmic />,
+			);
+			const fill = q(container, ".slider-fill") as HTMLElement;
+			ratios.push(Number.parseFloat(fill.style.width));
+			cleanup();
+		}
+		// Each octave step should be ~11.11% (100/9)
+		const expectedStep = 100 / 9;
+		for (let i = 1; i < ratios.length; i++) {
+			const step = ratios[i] - ratios[i - 1];
+			expect(step).toBeCloseTo(expectedStep, 0);
+		}
+	});
+
+	test("ArrowRight increases in log space", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider
+				min={32}
+				max={16384}
+				value={1024}
+				logarithmic
+				onChange={onChange}
+			/>,
+		);
+		const slider = q(container, '[role="slider"]');
+		fireEvent.keyDown(slider, { key: "ArrowRight" });
+		expect(onChange).toHaveBeenCalled();
+		const newValue = (onChange.mock.calls[0] as unknown as [number])[0];
+		expect(newValue).toBeGreaterThan(1024);
+		expect(newValue).toBeLessThan(16384);
+	});
+});

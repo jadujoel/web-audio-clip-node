@@ -134,7 +134,7 @@ export function App() {
 				<fieldset className="control-group">
 					<legend>Loop</legend>
 					<div className="loop-row">
-						<label htmlFor="loop"></label>
+						<label htmlFor="loop">Loop</label>
 						<input
 							type="checkbox"
 							id="loop"
@@ -144,7 +144,7 @@ export function App() {
 					</div>
 					{controls.loop && (
 						<ControlSection
-									legend="Controls"
+							legend="Controls"
 							defs={loopControlDefs}
 							values={controls.values}
 							snaps={controls.snaps}

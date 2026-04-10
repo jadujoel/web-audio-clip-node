@@ -160,4 +160,38 @@ describe("FilterControl", () => {
 		fireEvent.keyDown(input, { key: "Escape" });
 		expect(onChange).not.toHaveBeenCalled();
 	});
+
+	test("slider uses logarithmic mode", () => {
+		const { container } = render(
+			<FilterControl
+				label="Lowpass"
+				controlKey="lowpass"
+				value={32}
+				defaultValue={16384}
+				enabled={true}
+				onChange={() => {}}
+				onToggle={() => {}}
+			/>,
+		);
+		// At min value (32), fill should be 0%
+		const fill = container.querySelector(".slider-fill") as HTMLElement;
+		expect(fill.style.width).toBe("0%");
+	});
+
+	test("slider has snap lines at octave boundaries", () => {
+		const { container } = render(
+			<FilterControl
+				label="Lowpass"
+				controlKey="lowpass"
+				value={1024}
+				defaultValue={16384}
+				enabled={true}
+				onChange={() => {}}
+				onToggle={() => {}}
+			/>,
+		);
+		const snaps = container.querySelectorAll(".slider-snap");
+		// Hertz preset has 10 snap points: 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384
+		expect(snaps.length).toBe(10);
+	});
 });

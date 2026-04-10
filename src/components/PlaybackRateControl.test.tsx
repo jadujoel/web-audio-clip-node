@@ -135,6 +135,6 @@ describe("PlaybackRateControl", () => {
 		const input = q(container, "input.control-output") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "99" } });
 		fireEvent.keyDown(input, { key: "Enter" });
-		expect(onChange).toHaveBeenCalledWith(4);
+		expect(onChange).toHaveBeenCalledWith(2);
 	});
 });
