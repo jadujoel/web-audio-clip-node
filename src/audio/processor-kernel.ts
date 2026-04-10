@@ -637,6 +637,7 @@ export function processBlock(
 
 	const {
 		playbackRate: playbackRates,
+		detune: detunes,
 		lowpass,
 		highpass,
 		gain: gains,
@@ -655,6 +656,7 @@ export function processBlock(
 		enableHighpass,
 		enableGain,
 		enablePan,
+		enableDetune,
 		enableFadeOut,
 		enableFadeIn,
 		enableLoopCrossfade,
@@ -677,6 +679,25 @@ export function processBlock(
 	);
 	const loopLengthSamples = loopEndSamples - loopStartSamples;
 
+	// Apply detune to playback rates: effectiveRate = rate * 2^(detune/1200)
+	const needsDetune = enableDetune && detunes.length > 0 && detunes[0] !== 0;
+	let effectiveRates = playbackRates;
+	if (needsDetune) {
+		const len = Math.max(
+			playbackRates.length,
+			detunes.length,
+			SAMPLE_BLOCK_SIZE,
+		);
+		effectiveRates = new Float32Array(len);
+		for (let i = 0; i < len; i++) {
+			const rate = playbackRates[i] ?? playbackRates[playbackRates.length - 1];
+			const cents = detunes[i] ?? detunes[detunes.length - 1];
+			effectiveRates[i] = rate * 2 ** (cents / 1200);
+		}
+	}
+
+	const useRateIndexing = props.enablePlaybackRate || needsDetune;
+
 	const blockParams: BlockParameters = {
 		bufferLength: sourceLength,
 		loop,
@@ -684,7 +705,7 @@ export function processBlock(
 		loopStartSamples,
 		loopEndSamples,
 		durationSamples,
-		playbackRates,
+		playbackRates: effectiveRates,
 	};
 
 	const {
@@ -692,7 +713,7 @@ export function processBlock(
 		ended,
 		looped,
 		playhead: updatedPlayhead,
-	} = props.enablePlaybackRate
+	} = useRateIndexing
 		? findIndexesWithPlaybackRates(blockParams)
 		: findIndexesNormal(blockParams);
 

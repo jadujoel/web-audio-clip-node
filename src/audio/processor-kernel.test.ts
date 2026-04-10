@@ -1715,4 +1715,101 @@ describe("processBlock", () => {
 		);
 		expect(result.keepAlive).toBe(true);
 	});
+
+	it("detune enabled: +1200 cents doubles playback rate", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+				enableDetune: true,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.detune = new Float32Array([1200]); // +1200 cents = 1 octave up = 2x rate
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// At 2x effective rate, playhead should advance by ~256 samples (128 * 2)
+		expect(props.playhead).toBeCloseTo(256, 0);
+	});
+
+	it("detune disabled: detune param is ignored", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+				enableDetune: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.detune = new Float32Array([1200]); // would be 2x if enabled
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Without detune, normal playback: playhead advances by 128
+		expect(props.playhead).toBe(128);
+	});
+
+	it("detune combined with playbackRate", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: true,
+				enableDetune: true,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		const params = makeProcessParams();
+		params.playbackRate = new Float32Array([2]); // 2x speed
+		params.detune = new Float32Array([1200]); // +1200 cents = another 2x
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// 2x playback * 2x detune = 4x, so playhead should advance by ~512
+		expect(props.playhead).toBeCloseTo(512, 0);
+	});
 });
