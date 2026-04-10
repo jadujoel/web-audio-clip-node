@@ -3,19 +3,23 @@
    --------------------------------------------------------------------------- */
 
 :root {
-	--color-bg: #404040;
-	--color-surface: #505050;
-	--color-text: #fff;
-	--color-accent: #6af;
-	--color-border: #666;
-	--color-border-subtle: #555;
-	--color-error: #8b3030;
-	--color-track: #202020;
-	--color-fill: rgb(230, 230, 230);
-	--slider-height: 64px;
-	--slider-thumb-width: 24px;
-	--control-gap: 4px;
-	--font-size-sm: 0.875rem;
+	--color-bg: #2b2b2b;
+	--color-surface: #3a3a3a;
+	--color-text: #e8e8e8;
+	--color-accent: #5b9bd5;
+	--color-border: #555;
+	--color-border-subtle: #444;
+	--color-error: #c0392b;
+	--color-track: #1a1a1a;
+	--color-fill: #5b9bd5;
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+	--slider-height: 56px;
+	--slider-thumb-width: 20px;
+	--control-gap: 6px;
+	--section-gap: 12px;
+	--font-size-sm: 0.8125rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -26,9 +30,20 @@ body {
 	background-color: var(--color-bg);
 	color: var(--color-text);
 	font-family: system-ui, -apple-system, sans-serif;
-	font-size: larger;
+	font-size: 16px;
 	margin: 0;
 	padding: 0;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+main {
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--section-gap);
 }
 
 /* ---------------------------------------------------------------------------
@@ -36,32 +51,45 @@ body {
    --------------------------------------------------------------------------- */
 
 #display {
-	padding: 0.5em 1em;
+	background: var(--color-surface);
+	border-radius: var(--radius-md);
+	padding: 12px 16px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 16px;
 }
 
 .status-message {
 	background-color: var(--color-error);
 	color: var(--color-text);
-	padding: 0.5em 1em;
-	margin-bottom: 0.5em;
-	border-radius: 4px;
+	padding: 8px 12px;
+	margin-bottom: 8px;
+	border-radius: var(--radius-sm);
+	width: 100%;
+	font-size: var(--font-size-sm);
 }
 
 #display code {
-	margin-right: 0.25em;
+	font-size: var(--font-size-sm);
+	color: #999;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
 }
 
 #display output {
-	margin-right: 1em;
+	font-weight: 600;
+	font-size: 0.95rem;
 }
 
 .display-details {
-	margin-top: 0.25em;
+	width: 100%;
+	margin-top: 4px;
 }
 
 .display-details summary {
 	cursor: pointer;
-	color: #aaa;
+	color: #888;
 	font-size: var(--font-size-sm);
 	user-select: none;
 }
@@ -73,8 +101,7 @@ body {
 #buttons {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--control-gap);
-	padding: 0.5em 1em;
+	gap: 8px;
 	align-items: center;
 }
 
@@ -82,32 +109,43 @@ body {
 .btn-group-secondary {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--control-gap);
+	gap: 6px;
+}
+
+.btn-group-secondary {
+	margin-left: 8px;
+	padding-left: 8px;
+	border-left: 1px solid var(--color-border-subtle);
 }
 
 button {
-	height: 48px;
-	padding: 0 1.5em;
-	font-size: larger;
+	height: 42px;
+	padding: 0 1.25em;
+	font-size: 0.95rem;
 	background-color: var(--color-surface);
 	color: var(--color-text);
 	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
 	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease;
 }
 
 .btn-secondary {
-	height: 36px;
-	font-size: medium;
-	opacity: 0.6;
+	height: 34px;
+	font-size: var(--font-size-sm);
+	opacity: 0.55;
 	background-color: var(--color-bg);
 }
 
 button:hover {
-	background-color: #606060;
+	background-color: #505050;
+	border-color: #777;
 }
 
 button:disabled {
-	opacity: 0.4;
+	opacity: 0.3;
 	cursor: not-allowed;
 }
 
@@ -121,28 +159,75 @@ button:focus-visible {
    --------------------------------------------------------------------------- */
 
 #controls {
-	padding: 0 1em;
+	display: flex;
+	flex-direction: column;
+	gap: var(--section-gap);
 }
 
 .control-group {
 	border: 1px solid var(--color-border-subtle);
-	margin-bottom: 0.5em;
-	padding: 0.5em;
+	border-radius: var(--radius-md);
+	padding: 10px;
+	margin: 0;
 }
 
 .control-group legend {
-	color: #aaa;
+	color: #999;
 	font-size: var(--font-size-sm);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	padding: 0 0.5em;
+	letter-spacing: 0.06em;
+	padding: 0 8px;
+	font-weight: 500;
+}
+
+.tempo-group {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 14px;
+}
+
+.tempo-label {
+	font-size: var(--font-size-sm);
+	color: #bbb;
 }
 
 .loop-row {
 	display: flex;
 	align-items: center;
-	gap: 0.5em;
-	padding: 0.5em 0;
+	gap: 10px;
+	padding: 8px 4px;
+}
+
+.loop-row label {
+	font-size: var(--font-size-sm);
+	color: #bbb;
+}
+
+/* ---------------------------------------------------------------------------
+   Number inputs (BPM, etc.)
+   --------------------------------------------------------------------------- */
+
+input[type="number"] {
+	background: var(--color-track);
+	color: var(--color-text);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	padding: 6px 10px;
+	font: inherit;
+	font-size: 0.95rem;
+	font-variant-numeric: tabular-nums;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+input[type="number"]:focus {
+	border-color: var(--color-accent);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	opacity: 0.5;
 }
 
 .loop-row input[type="checkbox"]:focus-visible {
@@ -158,18 +243,24 @@ button:focus-visible {
 	display: grid;
 	grid-template-columns: auto auto 2fr auto;
 	place-items: center;
-	border: 1px solid grey;
-	padding-left: 1em;
-	padding-right: 1em;
-	font-size: medium;
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	padding: 4px 12px;
+	font-size: 0.9rem;
+	margin-bottom: 2px;
+	transition: border-color 0.15s ease;
+}
+
+.audio-control:hover {
+	border-color: var(--color-border);
 }
 
 .control-toggle {
 	appearance: none;
 	position: relative;
-	width: 51px;
-	height: 31px;
-	border-radius: 31px;
+	width: 40px;
+	height: 24px;
+	border-radius: 24px;
 	background: #555;
 	transition: background 0.2s ease;
 	cursor: pointer;
@@ -187,8 +278,8 @@ button:focus-visible {
 	position: absolute;
 	top: 2px;
 	left: 2px;
-	width: 27px;
-	height: 27px;
+	width: 20px;
+	height: 20px;
 	border-radius: 50%;
 	background: white;
 	transition: transform 0.2s ease;
@@ -196,36 +287,46 @@ button:focus-visible {
 }
 
 .control-toggle:checked::after {
-	transform: translateX(20px);
+	transform: translateX(16px);
 }
 
 .control-toggle-placeholder {
 	display: block;
-	width: 51px;
-	height: 31px;
+	width: 40px;
+	height: 24px;
 }
 
 .control-label {
-	width: 100px;
+	width: 90px;
+	font-size: var(--font-size-sm);
+	color: #ccc;
 }
 
 .control-output {
 	color: var(--color-text);
-	width: 50px;
+	width: 60px;
 	cursor: pointer;
 	background: transparent;
 	border: none;
 	font: inherit;
-	padding: 0;
+	font-variant-numeric: tabular-nums;
+	padding: 2px 4px;
 	text-align: center;
+	border-radius: 4px;
+	transition: background-color 0.15s ease;
+}
+
+.control-output:hover {
+	background: rgba(255, 255, 255, 0.08);
 }
 
 .control-output--editing {
-	background: #303030;
+	background: #1a1a1a;
 	border: 1px solid var(--color-accent);
 	font-size: inherit;
 	text-align: center;
 	outline: none;
+	border-radius: 4px;
 }
 
 .control-toggle:focus-visible {
@@ -236,9 +337,9 @@ button:focus-visible {
 .loop-row input[type="checkbox"] {
 	appearance: none;
 	position: relative;
-	width: 51px;
-	height: 31px;
-	border-radius: 31px;
+	width: 40px;
+	height: 24px;
+	border-radius: 24px;
 	background: #555;
 	transition: background 0.2s ease;
 	cursor: pointer;
@@ -256,8 +357,8 @@ button:focus-visible {
 	position: absolute;
 	top: 2px;
 	left: 2px;
-	width: 27px;
-	height: 27px;
+	width: 20px;
+	height: 20px;
 	border-radius: 50%;
 	background: white;
 	transition: transform 0.2s ease;
@@ -265,7 +366,7 @@ button:focus-visible {
 }
 
 .loop-row input[type="checkbox"]:checked::after {
-	transform: translateX(20px);
+	transform: translateX(16px);
 }
 
 /* ---------------------------------------------------------------------------
@@ -367,7 +468,7 @@ button:focus-visible {
 	margin-right: 3%;
 	margin-bottom: var(--control-gap);
 	overflow: visible;
-	font-size: medium;
+	font-size: var(--font-size-sm);
 	outline: none;
 }
 
@@ -384,8 +485,8 @@ button:focus-visible {
 	background-color: var(--color-track);
 	height: 65%;
 	width: 100%;
-	box-shadow: inset rgba(0, 0, 0, 0.288) 4px 4px 4px;
-	border: 1px solid var(--color-text);
+	border-radius: 4px;
+	border: 1px solid var(--color-border-subtle);
 }
 
 .slider-fill {
@@ -394,58 +495,58 @@ button:focus-visible {
 	z-index: 1;
 	background-color: var(--color-fill);
 	height: 65%;
-	box-shadow: inset rgba(0, 0, 0, 0.288) 4px 4px 4px;
+	border-radius: 4px 0 0 4px;
+	opacity: 0.8;
 }
 
 .slider-thumb {
 	pointer-events: none;
 	position: absolute;
 	z-index: 2;
-	background: var(--color-surface);
+	background: #666;
 	width: var(--slider-thumb-width);
-	height: 65%;
+	height: 70%;
 	transform: translateX(calc(var(--slider-thumb-width) / -2));
-	border-style: solid;
-	border-radius: 10%;
-	border-color: var(--color-border);
-	border-width: 1px;
-	box-shadow: rgba(0, 0, 0, 0.4) 2px 2px 4px;
+	border: 1px solid #888;
+	border-radius: 4px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 .slider-thumb:hover {
-	background: #686868;
+	background: #777;
 }
 
 .slider-snap {
 	pointer-events: none;
 	position: absolute;
-	background-color: rgba(255, 255, 255, 0.487);
+	background-color: rgba(255, 255, 255, 0.3);
 	width: 1px;
-	height: 75%;
+	height: 65%;
 	z-index: 0;
-	opacity: 0.8;
+	opacity: 0.6;
 }
 
 .slider-xval {
 	pointer-events: none;
 	position: absolute;
-	color: var(--color-text);
-	width: 2em;
+	color: #aaa;
+	width: 2.5em;
 	text-align: center;
 	z-index: 1;
 	opacity: 1;
-	top: 80%;
-	transform: translateX(-1em);
+	top: 75%;
+	transform: translateX(-1.25em);
+	font-size: 0.75rem;
 }
 
 .slider-tick {
 	pointer-events: none;
 	position: absolute;
-	background-color: rgba(255, 255, 255, 0.25);
+	background-color: rgba(255, 255, 255, 0.2);
 	width: 1px;
-	height: 75%;
+	height: 65%;
 	z-index: 0;
-	opacity: 0.6;
+	opacity: 0.5;
 }
 
 .snappable-slider--disabled {
@@ -472,7 +573,9 @@ button:focus-visible {
 	display: flex;
 	align-items: center;
 	gap: 0.75em;
-	padding: 0.5em 1em;
+	background: var(--color-surface);
+	border-radius: var(--radius-md);
+	padding: 10px 16px;
 }
 
 .playhead-label {

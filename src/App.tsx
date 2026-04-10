@@ -67,7 +67,6 @@ export function App() {
 
 	return (
 		<main>
-			<hr />
 			<DisplayPanel
 				nodeState={node.nodeState}
 				statusMessage={node.statusMessage}
@@ -78,7 +77,6 @@ export function App() {
 				latency={node.infoLatency}
 				timeTaken={node.infoTimeTaken}
 			/>
-			<hr />
 			<TransportButtons
 				nodeState={node.nodeState}
 				onStart={node.start}
@@ -89,10 +87,11 @@ export function App() {
 				onLog={node.logState}
 				onLoadSound={node.loadSound}
 			/>
-			<hr />
-			<fieldset className="control-group">
+			<fieldset className="control-group tempo-group">
 				<legend>Tempo</legend>
-				<label htmlFor="tempo">BPM</label>
+				<label htmlFor="tempo" className="tempo-label">
+					BPM
+				</label>
 				<input
 					id="tempo"
 					type="number"
@@ -104,17 +103,15 @@ export function App() {
 						const v = Number(e.target.value);
 						if (Number.isFinite(v) && v > 0) controls.setTempo(v);
 					}}
-					style={{ width: 60 }}
+					style={{ width: 70 }}
 				/>
 			</fieldset>
-			<hr />
 			<PlayheadSlider
 				value={controls.values.playhead}
 				audioDuration={node.audioDuration}
 				disabled={node.nodeState === "initial" || node.nodeState === "disposed"}
 				onChange={(v) => handleValueChange("playhead", v)}
 			/>
-			<hr />
 			<section id="controls">
 				<ControlSection
 					legend="Transport"
@@ -216,7 +213,6 @@ export function App() {
 					/>
 				</fieldset>
 			</section>
-			<hr />
 		</main>
 	);
 }
