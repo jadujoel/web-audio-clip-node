@@ -761,11 +761,12 @@ export function processBlock(
 			if (numSamples > 0) {
 				const isWithin = playhead > loopStartSamples && playhead < endIndex;
 				if (isWithin) {
-					const remaining = endIndex - playhead;
+					let remaining = endIndex - playhead;
 					let index = Math.floor(loopEndSamples + numSamples - remaining);
 					const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
 					for (let i = 0; i < n; i++) {
 						index++;
+						remaining--;
 						const position = (numSamples - remaining) / numSamples;
 						const g = Math.cos((Math.PI * position) / 2);
 						if (index >= 0 && index < sourceLength) {
@@ -793,7 +794,7 @@ export function processBlock(
 			}
 			if (numSamples > 0 && playhead > startIndex) {
 				let remaining = loopEndSamples - playhead;
-				let index = firstIndex + numSamples - remaining;
+				let index = Math.floor(firstIndex + numSamples - remaining);
 				const n = Math.min(remaining, SAMPLE_BLOCK_SIZE);
 				for (let i = 0; i < n; i++) {
 					index++;

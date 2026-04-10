@@ -119,6 +119,7 @@ export function useClipNode({
 }: UseClipNodeParams) {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
+	const [soundName, setSoundName] = useState<string | null>(null);
 	const [audioDuration, setAudioDuration] = useState<number | null>(null);
 	const [infoCurrentTime, setInfoCurrentTime] = useState("0");
 	const [infoCurrentFrame, setInfoCurrentFrame] = useState("0");
@@ -306,6 +307,7 @@ export function useClipNode({
 			const ab = await file.arrayBuffer();
 			const buf = await decodeAudio(ab);
 			bufferRef.current = buf;
+			setSoundName(file.name);
 			setValue("playhead", 0);
 		};
 		input.click();
@@ -333,6 +335,7 @@ export function useClipNode({
 	return {
 		nodeState,
 		statusMessage,
+		soundName,
 		audioDuration,
 		infoCurrentTime,
 		infoCurrentFrame,

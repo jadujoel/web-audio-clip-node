@@ -175,6 +175,7 @@ export function ContextMenu({
 				<label className="context-menu__field">
 					<input
 						type="checkbox"
+						className="control-toggle"
 						checked={maxLocked}
 						onChange={(e) => onMaxLockedChange(e.target.checked)}
 					/>

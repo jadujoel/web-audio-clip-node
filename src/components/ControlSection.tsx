@@ -57,7 +57,7 @@ export function ControlSection({
 					hasToggle={def.hasToggle}
 					hasSnap={def.hasSnap}
 					audioDuration={audioDuration}
-					maxLocked={maxLocked[def.key] ?? false}
+					maxLocked={maxLocked[def.key] ?? true}
 					onChange={(v) => onValueChange(def.key, v)}
 					onToggle={(on) => onToggle(def.key, on)}
 					onSnapChange={(s) => onSnapChange(def.key, s)}

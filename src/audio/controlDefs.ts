@@ -230,18 +230,21 @@ export function buildDefaults(): {
 	enabled: Record<ControlKey, boolean>;
 	mins: Record<ControlKey, number>;
 	maxs: Record<ControlKey, number>;
+	maxLocked: Record<ControlKey, boolean>;
 } {
 	const values = {} as Record<ControlKey, number>;
 	const snaps = {} as Record<ControlKey, string>;
 	const enabled = {} as Record<ControlKey, boolean>;
 	const mins = {} as Record<ControlKey, number>;
 	const maxs = {} as Record<ControlKey, number>;
+	const maxLocked = {} as Record<ControlKey, boolean>;
 	for (const d of allDefs) {
 		values[d.key] = d.defaultValue;
 		snaps[d.key] = d.snap ?? "none";
 		enabled[d.key] = true;
 		mins[d.key] = d.min;
 		maxs[d.key] = d.max;
+		maxLocked[d.key] = true;
 	}
-	return { values, snaps, enabled, mins, maxs };
+	return { values, snaps, enabled, mins, maxs, maxLocked };
 }

@@ -182,7 +182,7 @@ export function SnappableSlider({
 	}, [defaultValue, onChange, disabled]);
 
 	const handleWheel = useCallback(
-		(e: React.WheelEvent) => {
+		(e: WheelEvent) => {
 			if (disabled) return;
 			e.preventDefault();
 			const s = e.shiftKey ? resolvedStep / 10 : resolvedStep;
@@ -191,6 +191,14 @@ export function SnappableSlider({
 		},
 		[value, resolvedStep, clampAndEmit, disabled],
 	);
+
+	// Attach wheel listener as non-passive so preventDefault works
+	useEffect(() => {
+		const el = containerRef.current;
+		if (!el) return;
+		el.addEventListener("wheel", handleWheel, { passive: false });
+		return () => el.removeEventListener("wheel", handleWheel);
+	}, [handleWheel]);
 
 	const ratio = getRatioFromValue(value);
 	const pct = `${ratio * 100}%`;
@@ -260,7 +268,6 @@ export function SnappableSlider({
 			onKeyDown={handleKeyDown}
 			onKeyUp={handleKeyUp}
 			onDoubleClick={handleDoubleClick}
-			onWheel={handleWheel}
 		>
 			<span className="slider-track" />
 			<span className="slider-fill" style={{ width: pct }} />

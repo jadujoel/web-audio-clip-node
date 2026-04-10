@@ -51,7 +51,7 @@ export function useClipControls() {
 		persisted?.maxs ?? defaults.maxs,
 	);
 	const [maxLocked, setMaxLocked] = useState<Record<ControlKey, boolean>>(
-		persisted?.maxLocked ?? ({} as Record<ControlKey, boolean>),
+		persisted?.maxLocked ?? defaults.maxLocked,
 	);
 	const [loop, setLoop] = useState(false);
 

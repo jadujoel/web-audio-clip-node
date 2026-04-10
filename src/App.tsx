@@ -71,6 +71,7 @@ export function App() {
 			<DisplayPanel
 				nodeState={node.nodeState}
 				statusMessage={node.statusMessage}
+				soundName={node.soundName}
 				currentTime={node.infoCurrentTime}
 				currentFrame={node.infoCurrentFrame}
 				timesLooped={node.infoTimesLooped}

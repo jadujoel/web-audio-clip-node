@@ -351,11 +351,6 @@ button:focus-visible {
 	opacity: 0.4;
 }
 
-.context-menu__field input[type="checkbox"] {
-	width: 16px;
-	height: 16px;
-}
-
 /* ---------------------------------------------------------------------------
    SnappableSlider
    --------------------------------------------------------------------------- */

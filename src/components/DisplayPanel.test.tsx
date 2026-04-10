@@ -10,6 +10,7 @@ describe("DisplayPanel", () => {
 			<DisplayPanel
 				nodeState="initial"
 				statusMessage={null}
+				soundName={null}
 				currentTime="1.234"
 				currentFrame="5678"
 				timesLooped="3"
@@ -19,6 +20,7 @@ describe("DisplayPanel", () => {
 		);
 		const outputs = container.querySelectorAll("output");
 		const texts = Array.from(outputs).map((o) => o.textContent);
+		expect(texts).toContain("none");
 		expect(texts).toContain("initial");
 		expect(texts).toContain("1.234");
 		expect(texts).toContain("5678");
@@ -32,6 +34,7 @@ describe("DisplayPanel", () => {
 			<DisplayPanel
 				nodeState="started"
 				statusMessage="Loading..."
+				soundName={null}
 				currentTime="0"
 				currentFrame="0"
 				timesLooped="0"
@@ -48,6 +51,7 @@ describe("DisplayPanel", () => {
 			<DisplayPanel
 				nodeState="started"
 				statusMessage={null}
+				soundName={null}
 				currentTime="0"
 				currentFrame="0"
 				timesLooped="0"
@@ -57,5 +61,41 @@ describe("DisplayPanel", () => {
 		);
 		const alert = container.querySelector('[role="alert"]');
 		expect(alert).toBeNull();
+	});
+
+	test("renders sound name when provided", () => {
+		const { container } = render(
+			<DisplayPanel
+				nodeState="initial"
+				statusMessage={null}
+				soundName="kick.wav"
+				currentTime="0"
+				currentFrame="0"
+				timesLooped="0"
+				latency="unknown"
+				timeTaken="unknown"
+			/>,
+		);
+		const outputs = container.querySelectorAll("output");
+		const texts = Array.from(outputs).map((o) => o.textContent);
+		expect(texts).toContain("kick.wav");
+	});
+
+	test("renders 'none' when soundName is null", () => {
+		const { container } = render(
+			<DisplayPanel
+				nodeState="initial"
+				statusMessage={null}
+				soundName={null}
+				currentTime="0"
+				currentFrame="0"
+				timesLooped="0"
+				latency="unknown"
+				timeTaken="unknown"
+			/>,
+		);
+		const outputs = container.querySelectorAll("output");
+		const texts = Array.from(outputs).map((o) => o.textContent);
+		expect(texts).toContain("none");
 	});
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { formatValueText } from "./formatValueText";
+import { formatTickLabel, formatValueText } from "./formatValueText";
 
 describe("formatValueText", () => {
 	it("gain key → dB", () => {
@@ -68,5 +68,50 @@ describe("formatValueText", () => {
 
 	it("default (no snap) → seconds with precision", () => {
 		expect(formatValueText(Math.PI, "duration", "none", 120)).toBe("3.142 s");
+	});
+});
+
+describe("formatTickLabel", () => {
+	it("gain → number only, no dB", () => {
+		expect(formatTickLabel(-6, "gain", "none", 120)).toBe("-6.0");
+	});
+
+	it("lowpass → number only, no Hz", () => {
+		expect(formatTickLabel(1000, "lowpass", "none", 120)).toBe("1000");
+	});
+
+	it("detune → number only, no cents", () => {
+		expect(formatTickLabel(100, "detune", "none", 120)).toBe("100");
+	});
+
+	it("pan → compact L/R/C", () => {
+		expect(formatTickLabel(0, "pan", "none", 120)).toBe("C");
+		expect(formatTickLabel(-0.5, "pan", "none", 120)).toBe("0.50L");
+		expect(formatTickLabel(0.75, "pan", "none", 120)).toBe("0.75R");
+	});
+
+	it("beat snap → number only, no 'beats'", () => {
+		expect(formatTickLabel(0.5, "offset", "beat", 120)).toBe("1");
+		expect(formatTickLabel(1.0, "offset", "beat", 120)).toBe("2");
+	});
+
+	it("bar snap → number only, no 'bars'", () => {
+		expect(formatTickLabel(2.0, "offset", "bar", 120)).toBe("1");
+	});
+
+	it("8th snap → number only", () => {
+		expect(formatTickLabel(0.25, "offset", "8th", 120)).toBe("1");
+	});
+
+	it("16th snap → number only", () => {
+		expect(formatTickLabel(0.125, "offset", "16th", 120)).toBe("1");
+	});
+
+	it("integer snap → number only, no 's'", () => {
+		expect(formatTickLabel(3, "offset", "integer", 120)).toBe("3");
+	});
+
+	it("default → number only, no 's'", () => {
+		expect(formatTickLabel(Math.PI, "duration", "none", 120)).toBe("3.142");
 	});
 });

@@ -41,14 +41,15 @@ describe("controlDefs", () => {
 });
 
 describe("buildDefaults", () => {
-	it("returns values, snaps, enabled, mins, and maxs for all defs", () => {
-		const { values, snaps, enabled, mins, maxs } = buildDefaults();
+	it("returns values, snaps, enabled, mins, maxs, and maxLocked for all defs", () => {
+		const { values, snaps, enabled, mins, maxs, maxLocked } = buildDefaults();
 		for (const def of allDefs) {
 			expect(values[def.key]).toBe(def.defaultValue);
 			expect(snaps[def.key]).toBe(def.snap ?? "none");
 			expect(enabled[def.key]).toBe(true);
 			expect(mins[def.key]).toBe(def.min);
 			expect(maxs[def.key]).toBe(def.max);
+			expect(maxLocked[def.key]).toBe(true);
 		}
 	});
 });

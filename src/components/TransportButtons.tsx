@@ -51,8 +51,8 @@ export function TransportButtons({
 				<button
 					type="button"
 					onClick={onPause}
-					disabled={nodeState !== "started"}
-					aria-disabled={nodeState !== "started"}
+					disabled={nodeState !== "started" && nodeState !== "resumed"}
+					aria-disabled={nodeState !== "started" && nodeState !== "resumed"}
 				>
 					Pause
 				</button>

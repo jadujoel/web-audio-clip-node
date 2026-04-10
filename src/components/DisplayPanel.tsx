@@ -3,6 +3,7 @@ import type { ClipNodeState } from "../audio/types";
 interface DisplayPanelProps {
 	nodeState: ClipNodeState;
 	statusMessage: string | null;
+	soundName: string | null;
 	currentTime: string;
 	currentFrame: string;
 	timesLooped: string;
@@ -13,6 +14,7 @@ interface DisplayPanelProps {
 export function DisplayPanel({
 	nodeState,
 	statusMessage,
+	soundName,
 	currentTime,
 	currentFrame,
 	timesLooped,
@@ -26,6 +28,8 @@ export function DisplayPanel({
 					{statusMessage}
 				</div>
 			)}
+			<code>Sound:</code>
+			<output>{soundName ?? "none"}</output>
 			<code>State:</code>
 			<output>{nodeState}</output>
 			<code>Time:</code>

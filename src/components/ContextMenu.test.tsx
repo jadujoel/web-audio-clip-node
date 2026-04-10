@@ -92,7 +92,7 @@ describe("ContextMenu", () => {
 	test("maxLocked checkbox calls onMaxLockedChange", () => {
 		const { props } = renderMenu({ audioDuration: 10 });
 		const checkbox = document.querySelector<HTMLInputElement>(
-			'.context-menu__field input[type="checkbox"]',
+			".context-menu__field .control-toggle",
 		);
 		expect(checkbox).toBeTruthy();
 		if (!checkbox) throw new Error("checkbox not found");
@@ -103,7 +103,7 @@ describe("ContextMenu", () => {
 	test("maxLocked checkbox hidden when no audioDuration", () => {
 		renderMenu({ audioDuration: null });
 		const checkbox = document.querySelector(
-			'.context-menu__field input[type="checkbox"]',
+			".context-menu__field .control-toggle",
 		);
 		expect(checkbox).toBeNull();
 	});

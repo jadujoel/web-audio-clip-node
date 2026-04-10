@@ -108,7 +108,7 @@ describe("TransportButtons", () => {
 		expect(stopBtn.disabled).toBe(true);
 	});
 
-	test("Pause disabled when nodeState is not 'started'", () => {
+	test("Pause disabled when nodeState is not 'started' or 'resumed'", () => {
 		const { container } = render(
 			<TransportButtons
 				nodeState="paused"
@@ -210,5 +210,43 @@ describe("TransportButtons", () => {
 		if (!btn) throw new Error("Load Sound button not found");
 		fireEvent.click(btn);
 		expect(onLoadSound).toHaveBeenCalled();
+	});
+
+	test("Pause enabled when nodeState is 'resumed'", () => {
+		const { container } = render(
+			<TransportButtons
+				nodeState="resumed"
+				onStart={noop}
+				onStop={noop}
+				onPause={noop}
+				onResume={noop}
+				onDispose={noop}
+				onLog={noop}
+				onLoadSound={noop}
+			/>,
+		);
+		const pauseBtn = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.textContent === "Pause",
+		) as HTMLButtonElement;
+		expect(pauseBtn.disabled).toBe(false);
+	});
+
+	test("Pause enabled when nodeState is 'started'", () => {
+		const { container } = render(
+			<TransportButtons
+				nodeState="started"
+				onStart={noop}
+				onStop={noop}
+				onPause={noop}
+				onResume={noop}
+				onDispose={noop}
+				onLog={noop}
+				onLoadSound={noop}
+			/>,
+		);
+		const pauseBtn = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.textContent === "Pause",
+		) as HTMLButtonElement;
+		expect(pauseBtn.disabled).toBe(false);
 	});
 });
