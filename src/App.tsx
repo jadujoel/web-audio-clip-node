@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { ControlKey } from "./audio/controlDefs";
 import { controlDefs, loopControlDefs } from "./audio/controlDefs";
 import { ControlSection } from "./components/ControlSection";
@@ -21,6 +21,16 @@ export function App() {
 		setValue: controls.setValue,
 	});
 
+	// Auto-update max for locked controls when audioDuration changes
+	useEffect(() => {
+		if (node.audioDuration == null) return;
+		for (const key of Object.keys(controls.maxLocked) as ControlKey[]) {
+			if (controls.maxLocked[key]) {
+				controls.setMax(key, node.audioDuration);
+			}
+		}
+	}, [node.audioDuration, controls.maxLocked, controls.setMax]);
+
 	const handleValueChange = useCallback(
 		(key: ControlKey, val: number) => {
 			node.applyValue(key, val);
@@ -42,6 +52,16 @@ export function App() {
 			node.setLoopOnNode(checked);
 		},
 		[controls.setLoop, node.setLoopOnNode],
+	);
+
+	const handleMaxLockedChange = useCallback(
+		(key: ControlKey, locked: boolean) => {
+			controls.setMaxLocked(key, locked);
+			if (locked && node.audioDuration != null) {
+				controls.setMax(key, node.audioDuration);
+			}
+		},
+		[controls.setMaxLocked, controls.setMax, node.audioDuration],
 	);
 
 	return (
@@ -75,9 +95,16 @@ export function App() {
 					values={controls.values}
 					snaps={controls.snaps}
 					enabled={controls.enabled}
+					mins={controls.mins}
+					maxs={controls.maxs}
+					maxLocked={controls.maxLocked}
+					audioDuration={node.audioDuration}
 					onValueChange={handleValueChange}
 					onToggle={handleToggle}
 					onSnapChange={controls.setSnap}
+					onMinChange={controls.setMin}
+					onMaxChange={controls.setMax}
+					onMaxLockedChange={handleMaxLockedChange}
 				/>
 				<fieldset className="control-group">
 					<legend>Loop</legend>
@@ -97,9 +124,16 @@ export function App() {
 							values={controls.values}
 							snaps={controls.snaps}
 							enabled={controls.enabled}
+							mins={controls.mins}
+							maxs={controls.maxs}
+							maxLocked={controls.maxLocked}
+							audioDuration={node.audioDuration}
 							onValueChange={handleValueChange}
 							onToggle={handleToggle}
 							onSnapChange={controls.setSnap}
+							onMinChange={controls.setMin}
+							onMaxChange={controls.setMax}
+							onMaxLockedChange={handleMaxLockedChange}
 						/>
 					)}
 				</fieldset>

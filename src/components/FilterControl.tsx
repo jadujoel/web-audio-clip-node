@@ -19,7 +19,7 @@ function formatHz(value: number): string {
 
 export function FilterControl({
 	label,
-	controlKey,
+	controlKey: _controlKey,
 	value,
 	defaultValue,
 	enabled,
@@ -82,9 +82,9 @@ export function FilterControl({
 				checked={enabled}
 				onChange={(e) => onToggle(e.target.checked)}
 			/>
-			<label className="control-label" id={labelId}>
+			<span className="control-label" id={labelId}>
 				{label}
-			</label>
+			</span>
 			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}

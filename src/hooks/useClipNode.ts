@@ -85,6 +85,16 @@ function applyToggle(node: ClipNode, key: ControlKey, on: boolean) {
 		case "highpass":
 			node.toggleHighpass(on);
 			break;
+		case "offset":
+			node.offset = on ? node.offset : 0;
+			break;
+		case "duration":
+			node.duration = on ? node.duration : -1;
+			break;
+		case "startDelay":
+		case "stopDelay":
+			// These are applied at start/stop time; toggle state is handled in the hook
+			break;
 	}
 }
 
@@ -103,6 +113,7 @@ export function useClipNode({
 }: UseClipNodeParams) {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
+	const [audioDuration, setAudioDuration] = useState<number | null>(null);
 	const [infoCurrentTime, setInfoCurrentTime] = useState("0");
 	const [infoCurrentFrame, setInfoCurrentFrame] = useState("0");
 	const [infoTimesLooped, setInfoTimesLooped] = useState("0");
@@ -152,6 +163,7 @@ export function useClipNode({
 			if (!arrayBuffer) throw new Error("Could not load audio data");
 			const decoded = await ctx.decodeAudioData(arrayBuffer);
 			bufferRef.current = decoded;
+			setAudioDuration(decoded.duration);
 			return decoded;
 		},
 		[ensureContext],
@@ -227,39 +239,44 @@ export function useClipNode({
 
 		ctx.resume();
 		const node = nodeRef.current;
-		node.start(
-			ctx.currentTime + values.startDelay,
-			values.offset,
-			values.duration,
-		);
+		const delay = enabled.startDelay ? values.startDelay : 0;
+		const offset = enabled.offset ? values.offset : 0;
+		const duration = enabled.duration ? values.duration : -1;
+		node.start(ctx.currentTime + delay, offset, duration);
 	}, [
 		ensureContext,
 		createNode,
 		values.startDelay,
 		values.offset,
 		values.duration,
+		enabled.startDelay,
+		enabled.offset,
+		enabled.duration,
 	]);
 
 	const stop = useCallback(() => {
 		const ctx = ctxRef.current;
 		const node = nodeRef.current;
 		if (!ctx || !node) return;
-		node.stop(ctx.currentTime + values.stopDelay);
-	}, [values.stopDelay]);
+		const delay = enabled.stopDelay ? values.stopDelay : 0;
+		node.stop(ctx.currentTime + delay);
+	}, [values.stopDelay, enabled.stopDelay]);
 
 	const pause = useCallback(() => {
 		const ctx = ctxRef.current;
 		const node = nodeRef.current;
 		if (!ctx || !node) return;
-		node.pause(ctx.currentTime + values.stopDelay);
-	}, [values.stopDelay]);
+		const delay = enabled.stopDelay ? values.stopDelay : 0;
+		node.pause(ctx.currentTime + delay);
+	}, [values.stopDelay, enabled.stopDelay]);
 
 	const resume = useCallback(() => {
 		const ctx = ctxRef.current;
 		const node = nodeRef.current;
 		if (!ctx || !node) return;
-		node.resume(ctx.currentTime + values.startDelay);
-	}, [values.startDelay]);
+		const delay = enabled.startDelay ? values.startDelay : 0;
+		node.resume(ctx.currentTime + delay);
+	}, [values.startDelay, enabled.startDelay]);
 
 	const dispose = useCallback(() => {
 		nodeRef.current?.dispose();
@@ -308,6 +325,7 @@ export function useClipNode({
 	return {
 		nodeState,
 		statusMessage,
+		audioDuration,
 		infoCurrentTime,
 		infoCurrentFrame,
 		infoTimesLooped,

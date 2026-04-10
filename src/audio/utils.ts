@@ -108,3 +108,38 @@ export function audioBufferFromFloat32Array(
 	}
 	return buffer;
 }
+
+export function generateSnapPoints(
+	snap: string,
+	tempo: number,
+	min: number,
+	max: number,
+): number[] {
+	let interval: number;
+	switch (snap) {
+		case "beat":
+			interval = 60 / tempo;
+			break;
+		case "bar":
+			interval = (60 / tempo) * 4;
+			break;
+		case "8th":
+			interval = 60 / tempo / 2;
+			break;
+		case "16th":
+			interval = 60 / tempo / 4;
+			break;
+		case "int":
+			interval = 1;
+			break;
+		default:
+			return [];
+	}
+	if (interval <= 0) return [];
+	const points: number[] = [];
+	const start = Math.ceil(min / interval) * interval;
+	for (let v = start; v <= max; v += interval) {
+		points.push(Math.round(v * 1e10) / 1e10);
+	}
+	return points;
+}

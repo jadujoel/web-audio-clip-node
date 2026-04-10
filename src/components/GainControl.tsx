@@ -75,9 +75,9 @@ export function GainControl({
 				checked={enabled}
 				onChange={(e) => onToggle(e.target.checked)}
 			/>
-			<label className="control-label" id={labelId}>
+			<span className="control-label" id={labelId}>
 				Gain
-			</label>
+			</span>
 			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}

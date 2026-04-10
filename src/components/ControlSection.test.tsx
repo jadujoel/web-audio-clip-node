@@ -89,6 +89,69 @@ function makeEnabled(): Record<ControlKey, boolean> {
 	};
 }
 
+function makeMins(): Record<ControlKey, number> {
+	return {
+		playhead: 0,
+		offset: 0,
+		duration: -1,
+		startDelay: 0,
+		stopDelay: 0,
+		fadeIn: 0,
+		fadeOut: 0,
+		loopStart: 0,
+		loopEnd: 0,
+		loopCrossfade: 0,
+		playbackRate: -2,
+		detune: -2400,
+		gain: -100,
+		pan: -1,
+		lowpass: 32,
+		highpass: 32,
+	};
+}
+
+function makeMaxs(): Record<ControlKey, number> {
+	return {
+		playhead: 480000,
+		offset: 4,
+		duration: 40,
+		startDelay: 4,
+		stopDelay: 4,
+		fadeIn: 4,
+		fadeOut: 4,
+		loopStart: 1,
+		loopEnd: 1,
+		loopCrossfade: 1,
+		playbackRate: 2,
+		detune: 2400,
+		gain: 0,
+		pan: 1,
+		lowpass: 16384,
+		highpass: 16384,
+	};
+}
+
+function makeMaxLocked(): Record<ControlKey, boolean> {
+	return {
+		playhead: false,
+		offset: false,
+		duration: false,
+		startDelay: false,
+		stopDelay: false,
+		fadeIn: false,
+		fadeOut: false,
+		loopStart: false,
+		loopEnd: false,
+		loopCrossfade: false,
+		playbackRate: false,
+		detune: false,
+		gain: false,
+		pan: false,
+		lowpass: false,
+		highpass: false,
+	};
+}
+
 describe("ControlSection", () => {
 	test("renders a fieldset with legend", () => {
 		const { container } = render(
@@ -98,9 +161,15 @@ describe("ControlSection", () => {
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
 			/>,
 		);
 		const legend = container.querySelector("legend");
@@ -115,9 +184,15 @@ describe("ControlSection", () => {
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
 			/>,
 		);
 		const labels = container.querySelectorAll(".control-label");
@@ -135,12 +210,17 @@ describe("ControlSection", () => {
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
 				onValueChange={onValueChange}
 				onToggle={() => {}}
 				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
 			/>,
 		);
-		// Find the first slider and change it
 		const slider = container.querySelector('[role="slider"]');
 		expect(slider).toBeTruthy();
 		if (!slider) throw new Error("slider not found");
@@ -159,9 +239,15 @@ describe("ControlSection", () => {
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
 				onValueChange={() => {}}
 				onToggle={onToggle}
 				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
 			/>,
 		);
 		const toggle = container.querySelector(".control-toggle");
@@ -171,7 +257,7 @@ describe("ControlSection", () => {
 		expect(onToggle).toHaveBeenCalled();
 	});
 
-	test("onSnapChange is called when snap changes", () => {
+	test("onSnapChange is called via context menu", () => {
 		const onSnapChange = mock(() => {});
 		const defsWithSnap: ControlDef[] = [
 			{
@@ -190,15 +276,24 @@ describe("ControlSection", () => {
 				values={makeValues()}
 				snaps={makeSnaps()}
 				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
 				onValueChange={() => {}}
 				onToggle={() => {}}
 				onSnapChange={onSnapChange}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
 			/>,
 		);
-		const select = container.querySelector(".control-snap");
-		expect(select).toBeTruthy();
-		if (!select) throw new Error("select not found");
-		fireEvent.change(select, { target: { value: "beat" } });
+		const control = container.querySelector(".audio-control");
+		expect(control).toBeTruthy();
+		if (!control) throw new Error("control not found");
+		fireEvent.contextMenu(control, { clientX: 200, clientY: 200 });
+		const items = document.querySelectorAll('[role="menuitemradio"]');
+		expect(items.length).toBeGreaterThan(0);
+		fireEvent.click(items[1]); // Beat
 		expect(onSnapChange).toHaveBeenCalled();
 	});
 });

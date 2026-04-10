@@ -26,14 +26,22 @@ export function formatValueText(
 	}
 
 	// Time-based snaps
-	if (snap === "beat" || snap === "bar") {
+	if (snap === "beat" || snap === "bar" || snap === "8th" || snap === "16th") {
 		const spb = 60 / tempo;
 		if (snap === "bar") {
 			const bars = value / (spb * 4);
-			return `${bars.toFixed(1)} bars`;
+			return `${Math.round(bars)} bars`;
+		}
+		if (snap === "8th") {
+			const eighths = value / (spb / 2);
+			return `${Math.round(eighths)} 8ths`;
+		}
+		if (snap === "16th") {
+			const sixteenths = value / (spb / 4);
+			return `${Math.round(sixteenths)} 16ths`;
 		}
 		const beats = value / spb;
-		return `${beats.toFixed(1)} beats`;
+		return `${Math.round(beats)} beats`;
 	}
 
 	return value.toPrecision(4);

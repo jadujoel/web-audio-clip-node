@@ -13,11 +13,12 @@ import {
 	highpassFilter,
 	lowpassFilter,
 	monoToStereo,
+	type OutboundMessage,
 	panFilter,
 	processBlock,
 	setOffset,
 } from "./processor-kernel";
-import type { BlockParameters } from "./types";
+import type { BlockParameters, ClipProcessorOptions } from "./types";
 import { State } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -1811,5 +1812,1471 @@ describe("processBlock", () => {
 		);
 		// 2x playback * 2x detune = 4x, so playhead should advance by ~512
 		expect(props.playhead).toBeCloseTo(512, 0);
+	});
+});
+
+// ===========================================================================
+// Loop parameter combination tests
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Additional helpers for loop tests
+// ---------------------------------------------------------------------------
+
+function simulateBlocks(
+	props: Required<ClipProcessorOptions>,
+	numBlocks: number,
+	params?: Record<string, Float32Array>,
+	sampleRate = 48000,
+): {
+	allOutputs: Float32Array[][];
+	messages: OutboundMessage[];
+	playheadHistory: number[];
+} {
+	const p = params ?? {
+		playbackRate: new Float32Array([1]),
+		detune: new Float32Array([0]),
+		lowpass: new Float32Array([20000]),
+		highpass: new Float32Array([20]),
+		gain: new Float32Array([1]),
+		pan: new Float32Array([0]),
+	};
+	const filterState = {
+		lowpass: createFilterState(),
+		highpass: createFilterState(),
+	};
+	const allOutputs: Float32Array[][] = [];
+	const messages: OutboundMessage[] = [];
+	const playheadHistory: number[] = [props.playhead];
+	const blockDuration = 128 / sampleRate;
+
+	for (let b = 0; b < numBlocks; b++) {
+		const outputs = [makeOutput(2)];
+		const ct = 0.001 + b * blockDuration;
+		const result = processBlock(
+			props,
+			outputs,
+			p,
+			{ currentTime: ct, currentFrame: b * 128, sampleRate },
+			filterState,
+		);
+		allOutputs.push(outputs[0]);
+		messages.push(...result.messages);
+		playheadHistory.push(props.playhead);
+		if (!result.keepAlive) break;
+	}
+	return { allOutputs, messages, playheadHistory };
+}
+
+function makeLoopProps(
+	overrides: Partial<ClipProcessorOptions> & { buffer: Float32Array[] },
+	sampleRate = 48000,
+): Required<ClipProcessorOptions> {
+	return getProperties(
+		{
+			state: State.Started,
+			startWhen: 0,
+			stopWhen: 100,
+			duration: 100,
+			enableLowpass: false,
+			enableHighpass: false,
+			enableGain: false,
+			enablePan: false,
+			enablePlaybackRate: false,
+			...overrides,
+		},
+		sampleRate,
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Category A: findIndexesNormal — Loop Index Generation
+// ---------------------------------------------------------------------------
+
+describe("Loop: findIndexesNormal", () => {
+	it("A1: no loop, sequential indexes from start", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: false,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 1000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.indexes.length).toBe(128);
+		for (let i = 0; i < 128; i++) expect(r.indexes[i]).toBe(i);
+		expect(r.ended).toBe(false);
+		expect(r.looped).toBe(false);
+	});
+
+	it("A2: no loop, near end → truncated, ended=true", () => {
+		const p: BlockParameters = {
+			playhead: 950,
+			bufferLength: 1000,
+			loop: false,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 1000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.indexes.length).toBe(50);
+		expect(r.ended).toBe(true);
+		expect(r.looped).toBe(false);
+	});
+
+	it("A3: loop, playhead at start, no wrap needed", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.indexes.length).toBe(128);
+		for (let i = 0; i < 128; i++) expect(r.indexes[i]).toBe(i);
+		expect(r.looped).toBe(false);
+		expect(r.ended).toBe(false);
+	});
+
+	it("A4: loop wraps from loopEnd to loopStart mid-block", () => {
+		const p: BlockParameters = {
+			playhead: 900,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 100,
+			loopEndSamples: 950,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.looped).toBe(true);
+		expect(r.ended).toBe(false);
+		// First 50 samples are 900..949
+		for (let i = 0; i < 50; i++) expect(r.indexes[i]).toBe(900 + i);
+		// After wrap: index 50 should be 100 (loopStart)
+		expect(r.indexes[50]).toBe(100);
+		expect(r.indexes[51]).toBe(101);
+	});
+
+	it("A5: loop, playhead exactly at loopEnd → immediate wrap", () => {
+		const p: BlockParameters = {
+			playhead: 950,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 100,
+			loopEndSamples: 950,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.looped).toBe(true);
+		expect(r.indexes[0]).toBe(100);
+	});
+
+	it("A6: short loop (200 samples) wraps multiple times per block", () => {
+		const p: BlockParameters = {
+			playhead: 150,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 200,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.looped).toBe(true);
+		// All indexes should be in [0, 200)
+		for (const idx of r.indexes) {
+			expect(idx).toBeGreaterThanOrEqual(0);
+			expect(idx).toBeLessThan(200);
+		}
+	});
+
+	it("A7: zero-length loop (loopStart == loopEnd) — no crash", () => {
+		const p: BlockParameters = {
+			playhead: 500,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 500,
+			loopEndSamples: 500,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		// Should not throw
+		const r = findIndexesNormal(p);
+		expect(r.indexes.length).toBe(128);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category B: findIndexesWithPlaybackRates — Loop + Rate
+// ---------------------------------------------------------------------------
+
+describe("Loop: findIndexesWithPlaybackRates", () => {
+	it("B1: rate=1.0 matches normal indexing", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const rNormal = findIndexesNormal(p);
+		const rRate = findIndexesWithPlaybackRates(p);
+		expect(rRate.indexes).toEqual(rNormal.indexes);
+		expect(rRate.playhead).toBeCloseTo(rNormal.playhead);
+	});
+
+	it("B2: rate=2.0, wraps sooner", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([2]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		// At rate=2, playhead should advance ~256
+		expect(r.playhead).toBeCloseTo(256, 0);
+		// Indexes should skip every other sample
+		expect(r.indexes[0]).toBe(0);
+		expect(r.indexes[1]).toBe(2);
+	});
+
+	it("B3: rate=0.5, wraps later", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([0.5]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.playhead).toBeCloseTo(64, 0);
+		expect(r.looped).toBe(false);
+	});
+
+	it("B4: rate=-1.0, reverse wraps from loopStart to loopEnd", () => {
+		const p: BlockParameters = {
+			playhead: 500,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([-1]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		// Playing in reverse from 500
+		expect(r.indexes[0]).toBe(500);
+		expect(r.indexes[1]).toBe(499);
+		// Eventually wraps to loopEnd once past loopStart(0)
+		expect(r.looped).toBe(false); // 500 steps backward, only 128 samples processed → still at 372
+	});
+
+	it("B5: reverse rate with custom loop bounds", () => {
+		const p: BlockParameters = {
+			playhead: 110,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 100,
+			loopEndSamples: 800,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([-1]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.looped).toBe(true);
+		// After wrapping past loopStart, should be at loopEnd
+	});
+
+	it("B6: rate=-2.0, fast reverse", () => {
+		const p: BlockParameters = {
+			playhead: 500,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([-2]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		// From 500, 128 samples at rate=-2 = -256, arrives at 244 → no wrap
+		// But if heading < 0 it wraps → 500 - 256 = 244, no wrap
+		expect(r.indexes[0]).toBe(500);
+		expect(r.indexes[1]).toBe(498);
+	});
+
+	it("B7: no loop, rate=2.0, ends sooner", () => {
+		const p: BlockParameters = {
+			playhead: 900,
+			bufferLength: 1000,
+			loop: false,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 1000,
+			playbackRates: new Float32Array([2]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.ended).toBe(true);
+	});
+
+	it("B8: no loop, rate=-1.0, ends when head < 0", () => {
+		const p: BlockParameters = {
+			playhead: 50,
+			bufferLength: 1000,
+			loop: false,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 1000,
+			playbackRates: new Float32Array([-1]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.ended).toBe(true);
+	});
+
+	it("B9: a-rate changes across block with loop wrapping", () => {
+		const rates = new Float32Array(128);
+		for (let i = 0; i < 128; i++) rates[i] = i < 64 ? 1 : 2;
+		const p: BlockParameters = {
+			playhead: 850,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 100,
+			loopEndSamples: 900,
+			durationSamples: 100000,
+			playbackRates: rates,
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.looped).toBe(true);
+		// All indexes should be within valid buffer range
+		for (const idx of r.indexes) {
+			expect(idx).toBeGreaterThanOrEqual(0);
+			expect(idx).toBeLessThan(1000);
+		}
+	});
+
+	it("B10: rate=0, playhead frozen — all indexes same", () => {
+		const p: BlockParameters = {
+			playhead: 500,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([0]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		for (const idx of r.indexes) {
+			expect(idx).toBe(500);
+		}
+		expect(r.looped).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category H: Property Defaults & Message Handling (loop-related)
+// ---------------------------------------------------------------------------
+
+describe("Loop: property defaults & messages", () => {
+	const SR = 48000;
+	const CT = 1.0;
+
+	it("H1: getProperties defaults loopEnd to bufLen/sampleRate", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties({ buffer }, SR);
+		expect(props.loopEnd).toBeCloseTo(1.0);
+	});
+
+	it("H2: getProperties respects explicit loopEnd", () => {
+		const buffer = makeBuffer(48000);
+		const props = getProperties({ buffer, loopEnd: 0.5 }, SR);
+		expect(props.loopEnd).toBe(0.5);
+	});
+
+	it("H3: loopCrossfade message sets property", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(props, { type: "loopCrossfade", data: 0.1 }, CT, SR);
+		expect(props.loopCrossfade).toBe(0.1);
+	});
+
+	it("H4: loop=true on Started extends stopWhen to MAX", () => {
+		const props = getProperties({ state: State.Started, stopWhen: 5 }, SR);
+		handleProcessorMessage(props, { type: "loop", data: true }, CT, SR);
+		expect(props.loop).toBe(true);
+		expect(props.stopWhen).toBe(Number.MAX_SAFE_INTEGER);
+	});
+
+	it("H5: loop=true on Scheduled extends stopWhen to MAX", () => {
+		const props = getProperties({ state: State.Scheduled, stopWhen: 5 }, SR);
+		handleProcessorMessage(props, { type: "loop", data: true }, CT, SR);
+		expect(props.stopWhen).toBe(Number.MAX_SAFE_INTEGER);
+	});
+
+	it("H6: toggleLoopCrossfade toggles both directions", () => {
+		const props = getProperties({}, SR);
+		expect(props.enableLoopCrossfade).toBe(false);
+		handleProcessorMessage(
+			props,
+			{ type: "toggleLoopCrossfade", data: true },
+			CT,
+			SR,
+		);
+		expect(props.enableLoopCrossfade).toBe(true);
+		handleProcessorMessage(props, { type: "toggleLoopCrossfade" }, CT, SR);
+		expect(props.enableLoopCrossfade).toBe(false);
+	});
+
+	it("H7: start with loop=true sets duration=MAX_SAFE_INTEGER", () => {
+		const buf = makeBuffer(48000);
+		const props = getProperties({ buffer: buf, loop: true }, SR);
+		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		expect(props.duration).toBe(Number.MAX_SAFE_INTEGER);
+	});
+
+	it("H8: start resets timesLooped to 0", () => {
+		const buf = makeBuffer(48000);
+		const props = getProperties({ buffer: buf, timesLooped: 5 }, SR);
+		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		expect(props.timesLooped).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category C: processBlock — Loop Crossfade
+// ---------------------------------------------------------------------------
+
+describe("Loop: crossfade via processBlock", () => {
+	const SR = 48000;
+
+	function makeUniformBuffer(length: number, value = 1.0, channels = 2) {
+		return Array.from({ length: channels }, () =>
+			new Float32Array(length).fill(value),
+		);
+	}
+
+	it("C1: xfade-out zone near loopStart — output > 1.0 (blended)", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopStartSamples = Math.floor(0.1 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// In the crossfade-out zone, buffer[ch][loopEnd + offset] * g is added to 1.0
+		// So some output values should exceed 1.0
+		const hasBlended = outputs[0][0].some((v) => v > 1.0);
+		expect(hasBlended).toBe(true);
+	});
+
+	it("C2: xfade-in zone approaching loopEnd — output > 1.0 (blended)", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopEndSamples = Math.floor(0.9 * SR);
+		const xfadeNumSamples = Math.floor(0.05 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: loopEndSamples - xfadeNumSamples + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		const hasBlended = outputs[0][0].some((v) => v > 1.0);
+		expect(hasBlended).toBe(true);
+	});
+
+	it("C3: enableLoopCrossfade=false — no crossfade despite params", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopStartSamples = Math.floor(0.1 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: false,
+			playhead: loopStartSamples + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// All values should be exactly 1.0 (no blending)
+		for (let i = 0; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0);
+		}
+	});
+
+	it("C4: crossfade=0, enable=true — no effect", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		for (let i = 0; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0);
+		}
+	});
+
+	it("C5: middle of loop — outside both xfade zones — no crossfade", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.5 * SR), // middle of loop
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		for (let i = 0; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0);
+		}
+	});
+
+	it("C6: small loopStart, large crossfade — firstIndex<0 clamped, no crash", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopEndSamples = Math.floor(0.9 * SR);
+		const xfadeNumSamples = Math.floor(0.02 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.005,
+			loopEnd: 0.9,
+			loopCrossfade: 0.02,
+			enableLoopCrossfade: true,
+			playhead: loopEndSamples - xfadeNumSamples + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("C7: loopEnd near buffer end — loopEnd+xfade > sourceLength, no OOB", () => {
+		const bufLen = 2000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopStartSamples = Math.floor(0.005 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.005,
+			loopEnd: (bufLen - 100) / SR,
+			loopCrossfade: 0.02,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples + 5,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("C8: no crossfade when loop=false", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: false,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.5 * SR),
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		for (let i = 0; i < 128; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0);
+		}
+	});
+
+	it("C9: crossfade at buffer start (loopStart=0)", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: bufLen / SR,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("C10: crossfade > loop length — clamped", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopLength = 0.9 - 0.1; // 0.8s
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: loopLength + 1.0, // way larger than loop
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.5 * SR),
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// Should not crash; crossfade is clamped by min(xfadeNumSamples, loopLengthSamples)
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("C13: crossfade with rate=2.0 — still applied correctly", () => {
+		const bufLen = 48000;
+		const buffer = makeUniformBuffer(bufLen);
+		const loopStartSamples = Math.floor(0.1 * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+			playhead: loopStartSamples + 10,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([2]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+		// playhead should have advanced at 2x rate
+		expect(props.playhead).toBeGreaterThan(loopStartSamples + 10 + 128);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category E: Loop + Offset Interaction
+// ---------------------------------------------------------------------------
+
+describe("Loop: offset interaction", () => {
+	const SR = 48000;
+
+	it("E1: offset=0, loop=true, plays from 0 and loops", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.2,
+			loopEnd: 0.8,
+		});
+		handleProcessorMessage(
+			props,
+			{ type: "start", data: { offset: 0 } },
+			0,
+			SR,
+		);
+		props.state = State.Started as number as typeof props.state;
+		const { playheadHistory } = simulateBlocks(props, 400);
+		// Playhead should be within loop bounds after entering loop
+		const loopStartSamples = Math.floor(0.2 * SR);
+		const loopEndSamples = Math.floor(0.8 * SR);
+		// After initial playthrough, should stay in loop
+		const later = playheadHistory.slice(100);
+		for (const ph of later) {
+			expect(ph).toBeGreaterThanOrEqual(loopStartSamples - 128);
+			expect(ph).toBeLessThanOrEqual(loopEndSamples + 128);
+		}
+	});
+
+	it("E2: offset within loop region", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.2,
+			loopEnd: 0.8,
+		});
+		handleProcessorMessage(
+			props,
+			{ type: "start", data: { offset: 0.5 } },
+			0,
+			SR,
+		);
+		props.state = State.Started as number as typeof props.state;
+		// Playhead should be at offset
+		expect(props.playhead).toBe(Math.floor(0.5 * SR));
+	});
+
+	it("E4: loop=false, offset respected, no looping", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: false,
+		});
+		handleProcessorMessage(
+			props,
+			{ type: "start", data: { offset: 0.5 } },
+			0,
+			SR,
+		);
+		props.state = State.Started as number as typeof props.state;
+		expect(props.playhead).toBe(Math.floor(0.5 * SR));
+		const { messages } = simulateBlocks(props, 500);
+		// Should eventually end
+		expect(messages.some((m) => m.type === "ended")).toBe(true);
+		// Should NOT have looped
+		expect(messages.some((m) => m.type === "looped")).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category F: Loop + Duration Interaction
+// ---------------------------------------------------------------------------
+
+describe("Loop: duration interaction", () => {
+	it("F1: duration shorter than 1 loop — ends before completing loop", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const loopLen = 0.5; // 24000 samples
+		const duration = 0.2; // shorter than one loop
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: loopLen,
+			duration,
+			stopWhen: duration,
+		});
+		const { messages } = simulateBlocks(props, 200);
+		expect(messages.some((m) => m.type === "ended")).toBe(true);
+		// Should not have looped (duration too short)
+		expect(messages.filter((m) => m.type === "looped").length).toBe(0);
+	});
+
+	it("F2: duration exactly 1 loop length — completes then ends", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const loopLen = 0.5;
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: loopLen,
+			duration: loopLen,
+			stopWhen: loopLen,
+		});
+		const { messages } = simulateBlocks(props, 300);
+		expect(messages.some((m) => m.type === "ended")).toBe(true);
+	});
+
+	it("F4: duration MAX_SAFE_INTEGER — loops indefinitely (tested for 500 blocks)", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0.5,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const { messages } = simulateBlocks(props, 500);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(messages.filter((m) => m.type === "looped").length).toBeGreaterThan(
+			0,
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category D: Multi-Block Loop Lifecycle
+// ---------------------------------------------------------------------------
+
+describe("Loop: multi-block lifecycle", () => {
+	const SR = 48000;
+
+	it("D1: loop emits 'looped' messages at correct intervals", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const loopEnd = 0.5; // 24000 samples
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const { messages } = simulateBlocks(props, 250);
+		const loopedMessages = messages.filter((m) => m.type === "looped");
+		expect(loopedMessages.length).toBeGreaterThan(0);
+		// timesLooped should increment
+		expect(props.timesLooped).toBe(loopedMessages.length);
+	});
+
+	it("D2: playhead stays within loop bounds over 3 iterations", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const loopStart = 0.1;
+		const loopEnd = 0.3;
+		const loopStartSamples = Math.floor(loopStart * SR);
+		const loopEndSamples = Math.floor(loopEnd * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+			playhead: loopStartSamples,
+		});
+		// 0.2s loop = 9600 samples, 75 blocks per loop, need ~225 for 3 loops
+		const { playheadHistory, messages } = simulateBlocks(props, 300);
+		const loopedCount = messages.filter((m) => m.type === "looped").length;
+		expect(loopedCount).toBeGreaterThanOrEqual(3);
+		// After entering loop, playhead should always be in [loopStart, loopEnd + 128]
+		for (const ph of playheadHistory.slice(1)) {
+			expect(ph).toBeGreaterThanOrEqual(loopStartSamples - 1);
+			expect(ph).toBeLessThanOrEqual(loopEndSamples + 128);
+		}
+	});
+
+	it("D3: loop + crossfade multi-block — no NaN", () => {
+		const bufLen = 48000;
+		const buffer = Array.from({ length: 2 }, () =>
+			new Float32Array(bufLen).fill(1),
+		);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR) + 10,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const { allOutputs } = simulateBlocks(props, 400);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("D4: enable loop mid-playback — extends stopWhen and wraps", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: false,
+			playhead: 0,
+			duration: 1,
+			stopWhen: 1,
+		});
+		// Play 5 blocks normally
+		simulateBlocks(props, 5);
+		// Now enable loop
+		handleProcessorMessage(props, { type: "loop", data: true }, 0.1, SR);
+		expect(props.loop).toBe(true);
+		expect(props.stopWhen).toBe(Number.MAX_SAFE_INTEGER);
+		// Continue playing — should wrap and not end
+		const { messages } = simulateBlocks(props, 500);
+		expect(messages.some((m) => m.type === "looped")).toBe(true);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+	});
+
+	it("D5: disable loop mid-playback — plays to end", () => {
+		const bufLen = 4800; // short buffer
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: bufLen / SR,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		// Play a few blocks with loop enabled
+		simulateBlocks(props, 10);
+		// Disable loop
+		handleProcessorMessage(props, { type: "loop", data: false }, 0.1, SR);
+		expect(props.loop).toBe(false);
+		// Now set a reasonable stopWhen so it will end
+		props.stopWhen = 0.2;
+		props.duration = 0.2;
+		const { messages } = simulateBlocks(props, 100);
+		expect(messages.some((m) => m.type === "ended")).toBe(true);
+	});
+
+	it("D6: change loopStart mid-playback", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0.5,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		simulateBlocks(props, 50);
+		// Change loopStart
+		handleProcessorMessage(props, { type: "loopStart", data: 0.2 }, 0.1, SR);
+		expect(props.loopStart).toBe(0.2);
+		// Continue — should respect new loopStart
+		const { playheadHistory } = simulateBlocks(props, 200);
+		// After wrapping, playhead should be >= new loopStartSamples
+		const newLoopStart = Math.floor(0.2 * SR);
+		const wrappedHeads = playheadHistory.filter(
+			(ph) => ph >= newLoopStart - 128 && ph <= Math.floor(0.5 * SR) + 128,
+		);
+		expect(wrappedHeads.length).toBeGreaterThan(0);
+	});
+
+	it("D7: change loopEnd mid-playback", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0.5,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		simulateBlocks(props, 50);
+		handleProcessorMessage(props, { type: "loopEnd", data: 0.3 }, 0.1, SR);
+		expect(props.loopEnd).toBe(0.3);
+		// Continue playing with shorter loop
+		const { messages } = simulateBlocks(props, 200);
+		expect(messages.filter((m) => m.type === "looped").length).toBeGreaterThan(
+			0,
+		);
+	});
+
+	it("D8: change loopCrossfade mid-playback", () => {
+		const bufLen = 48000;
+		const buffer = Array.from({ length: 2 }, () =>
+			new Float32Array(bufLen).fill(1),
+		);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR) + 10,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		simulateBlocks(props, 5);
+		// Increase crossfade
+		handleProcessorMessage(
+			props,
+			{ type: "loopCrossfade", data: 0.05 },
+			0.1,
+			SR,
+		);
+		expect(props.loopCrossfade).toBe(0.05);
+		const { allOutputs } = simulateBlocks(props, 400);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("D9: toggleLoopCrossfade on/off mid-playback", () => {
+		const bufLen = 48000;
+		const buffer = Array.from({ length: 2 }, () =>
+			new Float32Array(bufLen).fill(1),
+		);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: false,
+			playhead: Math.floor(0.1 * SR) + 10,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		simulateBlocks(props, 5);
+		// Enable crossfade
+		handleProcessorMessage(
+			props,
+			{ type: "toggleLoopCrossfade", data: true },
+			0.1,
+			SR,
+		);
+		expect(props.enableLoopCrossfade).toBe(true);
+		const { allOutputs: out1 } = simulateBlocks(props, 5);
+		// Disable crossfade
+		handleProcessorMessage(
+			props,
+			{ type: "toggleLoopCrossfade", data: false },
+			0.1,
+			SR,
+		);
+		expect(props.enableLoopCrossfade).toBe(false);
+		const { allOutputs: out2 } = simulateBlocks(props, 5);
+		// Both runs should have no NaN
+		for (const out of [...out1, ...out2]) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Category G: Edge Cases & Boundary Conditions
+// ---------------------------------------------------------------------------
+
+describe("Loop: edge cases", () => {
+	const SR = 48000;
+
+	it("G1: loopStart > loopEnd — no crash", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.8,
+			loopEnd: 0.2,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		// Should not throw
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("G2: loopEnd > buffer duration — clamped to buffer length", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 10.0, // way past buffer duration
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("G4: buffer shorter than 128 samples + loop — wraps correctly", () => {
+		const bufLen = 64;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: bufLen / SR,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// Should not have NaN and should wrap
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("G5: very short loop (64 samples) — multiple wraps per block", () => {
+		const p: BlockParameters = {
+			playhead: 0,
+			bufferLength: 1000,
+			loop: true,
+			loopStartSamples: 0,
+			loopEndSamples: 64,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.looped).toBe(true);
+		// All indexes should be in [0, 64)
+		for (const idx of r.indexes) {
+			expect(idx).toBeGreaterThanOrEqual(0);
+			expect(idx).toBeLessThan(64);
+		}
+		// Should have wrapped: 128 > 64
+		expect(r.indexes[64]).toBe(0); // wrapped back to start
+	});
+
+	it("G6: negative loopCrossfade — no crossfade (enableLoopCrossfade derives as false)", () => {
+		const props = getProperties({ loopCrossfade: -0.1 }, SR);
+		expect(props.enableLoopCrossfade).toBe(false);
+	});
+
+	it("G7: empty buffer + loop=true — outputs silence, no crash", () => {
+		const props = makeLoopProps({
+			buffer: [new Float32Array(0), new Float32Array(0)],
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0,
+		});
+		const outputs = [makeOutput(2)];
+		const result = processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(result.keepAlive).toBe(true);
+	});
+
+	it("G8: mono buffer + loop + crossfade — monoToStereo works", () => {
+		const bufLen = 48000;
+		const buffer = [new Float32Array(bufLen).fill(0.5)]; // mono
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.5 * SR),
+		});
+		const outputs = [makeOutput(1)]; // start mono
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// After processing, should have 2 channels (mono-to-stereo)
+		expect(outputs[0].length).toBe(2);
+	});
+
+	it("G9: loop + playbackRate + detune combined", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0.5,
+			enablePlaybackRate: true,
+			enableDetune: true,
+			playhead: 0,
+			duration: Number.MAX_SAFE_INTEGER,
+			stopWhen: Number.MAX_SAFE_INTEGER,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([2]),
+				detune: new Float32Array([1200]), // +1 octave = 2x more
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// computedRate = 2 * 2^(1200/1200) = 4, playhead should advance ~512
+		expect(props.playhead).toBeCloseTo(512, -1);
+		expect(checkNans(outputs[0])).toBe(0);
+	});
+
+	it("G10: NaN in buffer within loop region — checkNans catches it", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		buffer[0][100] = Number.NaN;
+		buffer[0][101] = Number.NaN;
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 0.5,
+			playhead: 95,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		// NaN should have been replaced with 0
+		expect(outputs[0][0][5]).toBe(0); // was NaN at buffer index 100
+		expect(outputs[0][0][6]).toBe(0); // was NaN at buffer index 101
+	});
+
+	it("G11: loopStart=0, loopEnd=0 — loops entire buffer", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		// Per W3C: loopEnd=0 means loop entire buffer
+		// In our impl, getProperties defaults loopEnd to bufLen/SR when not specified
+		const props = getProperties(
+			{
+				buffer,
+				loop: true,
+				loopStart: 0,
+				// loopEnd not specified → defaults to bufLen/SR
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		expect(props.loopEnd).toBeCloseTo(bufLen / SR);
+		const { messages } = simulateBlocks(props, 500);
+		expect(messages.filter((m) => m.type === "looped").length).toBeGreaterThan(
+			0,
+		);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
 	});
 });

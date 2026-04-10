@@ -3,6 +3,7 @@ import {
 	audioBufferFromFloat32Array,
 	dbFromLin,
 	float32ArrayFromAudioBuffer,
+	generateSnapPoints,
 	getSnappedValue,
 	linFromDb,
 } from "./utils";
@@ -125,5 +126,43 @@ describe("audioBufferFromFloat32Array", () => {
 		expect(result?.numberOfChannels).toBe(2);
 		expect(result?.length).toBe(2);
 		ctx.close();
+	});
+});
+
+describe("generateSnapPoints", () => {
+	const tempo = 120; // 1 beat = 0.5s
+
+	it("beat: generates multiples of 0.5s", () => {
+		const points = generateSnapPoints("beat", tempo, 0, 2);
+		expect(points).toEqual([0, 0.5, 1, 1.5, 2]);
+	});
+
+	it("bar: generates multiples of 2s (4 beats)", () => {
+		const points = generateSnapPoints("bar", tempo, 0, 4);
+		expect(points).toEqual([0, 2, 4]);
+	});
+
+	it("8th: generates multiples of 0.25s", () => {
+		const points = generateSnapPoints("8th", tempo, 0, 1);
+		expect(points).toEqual([0, 0.25, 0.5, 0.75, 1]);
+	});
+
+	it("16th: generates multiples of 0.125s", () => {
+		const points = generateSnapPoints("16th", tempo, 0, 0.5);
+		expect(points).toEqual([0, 0.125, 0.25, 0.375, 0.5]);
+	});
+
+	it("int: generates integer values", () => {
+		const points = generateSnapPoints("int", tempo, 0, 4);
+		expect(points).toEqual([0, 1, 2, 3, 4]);
+	});
+
+	it("none: returns empty array", () => {
+		expect(generateSnapPoints("none", tempo, 0, 4)).toEqual([]);
+	});
+
+	it("respects min boundary", () => {
+		const points = generateSnapPoints("beat", tempo, 0.6, 2);
+		expect(points).toEqual([1, 1.5, 2]);
 	});
 });

@@ -37,16 +37,28 @@ describe("formatValueText", () => {
 		);
 	});
 
-	it("beat snap → shows beats", () => {
+	it("beat snap → shows beats (integer)", () => {
 		// 120 BPM, 1 beat = 0.5s
-		expect(formatValueText(0.5, "offset", "beat", 120)).toBe("1.0 beats");
-		expect(formatValueText(1.0, "offset", "beat", 120)).toBe("2.0 beats");
+		expect(formatValueText(0.5, "offset", "beat", 120)).toBe("1 beats");
+		expect(formatValueText(1.0, "offset", "beat", 120)).toBe("2 beats");
 	});
 
-	it("bar snap → shows bars", () => {
+	it("bar snap → shows bars (integer)", () => {
 		// 120 BPM, 1 bar = 2.0s
-		expect(formatValueText(2.0, "offset", "bar", 120)).toBe("1.0 bars");
-		expect(formatValueText(4.0, "offset", "bar", 120)).toBe("2.0 bars");
+		expect(formatValueText(2.0, "offset", "bar", 120)).toBe("1 bars");
+		expect(formatValueText(4.0, "offset", "bar", 120)).toBe("2 bars");
+	});
+
+	it("8th snap → shows 8ths (integer)", () => {
+		// 120 BPM, 1 8th = 0.25s
+		expect(formatValueText(0.25, "offset", "8th", 120)).toBe("1 8ths");
+		expect(formatValueText(0.5, "offset", "8th", 120)).toBe("2 8ths");
+	});
+
+	it("16th snap → shows 16ths (integer)", () => {
+		// 120 BPM, 1 16th = 0.125s
+		expect(formatValueText(0.125, "offset", "16th", 120)).toBe("1 16ths");
+		expect(formatValueText(0.25, "offset", "16th", 120)).toBe("2 16ths");
 	});
 
 	it("default → toPrecision(4)", () => {

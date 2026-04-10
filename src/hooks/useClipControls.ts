@@ -7,6 +7,9 @@ interface PersistedState {
 	values: Record<ControlKey, number>;
 	snaps: Record<ControlKey, string>;
 	enabled: Record<ControlKey, boolean>;
+	mins?: Record<ControlKey, number>;
+	maxs?: Record<ControlKey, number>;
+	maxLocked?: Record<ControlKey, boolean>;
 }
 
 function saveState(state: PersistedState) {
@@ -41,15 +44,25 @@ export function useClipControls() {
 	const [enabled, setEnabled] = useState<Record<ControlKey, boolean>>(
 		persisted?.enabled ?? defaults.enabled,
 	);
+	const [mins, setMins] = useState<Record<ControlKey, number>>(
+		persisted?.mins ?? defaults.mins,
+	);
+	const [maxs, setMaxs] = useState<Record<ControlKey, number>>(
+		persisted?.maxs ?? defaults.maxs,
+	);
+	const [maxLocked, setMaxLocked] = useState<Record<ControlKey, boolean>>(
+		persisted?.maxLocked ?? ({} as Record<ControlKey, boolean>),
+	);
 	const [loop, setLoop] = useState(false);
 
 	// Save state on unload
 	useEffect(() => {
 		if (disableState) return;
-		const handler = () => saveState({ values, snaps, enabled });
+		const handler = () =>
+			saveState({ values, snaps, enabled, mins, maxs, maxLocked });
 		window.addEventListener("beforeunload", handler);
 		return () => window.removeEventListener("beforeunload", handler);
-	}, [values, snaps, enabled, disableState]);
+	}, [values, snaps, enabled, mins, maxs, maxLocked, disableState]);
 
 	const setValue = useCallback((key: ControlKey, val: number) => {
 		setValues((prev) => ({ ...prev, [key]: val }));
@@ -67,14 +80,32 @@ export function useClipControls() {
 		setLoop(checked);
 	}, []);
 
+	const setMinKey = useCallback((key: ControlKey, val: number) => {
+		setMins((prev) => ({ ...prev, [key]: val }));
+	}, []);
+
+	const setMaxKey = useCallback((key: ControlKey, val: number) => {
+		setMaxs((prev) => ({ ...prev, [key]: val }));
+	}, []);
+
+	const setMaxLockedKey = useCallback((key: ControlKey, locked: boolean) => {
+		setMaxLocked((prev) => ({ ...prev, [key]: locked }));
+	}, []);
+
 	return {
 		values,
 		snaps,
 		enabled,
+		mins,
+		maxs,
+		maxLocked,
 		loop,
 		setValue,
 		setSnap,
 		setEnabled: setEnabledKey,
+		setMin: setMinKey,
+		setMax: setMaxKey,
+		setMaxLocked: setMaxLockedKey,
 		setLoop: setLoopValue,
 		setValues,
 	};

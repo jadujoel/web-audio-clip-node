@@ -1,6 +1,7 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { formatValueText } from "../audio/formatValueText";
-import { getSnappedValue, presets } from "../audio/utils";
+import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
+import { ContextMenu } from "./ContextMenu";
 import { SnappableSlider } from "./SnappableSlider";
 
 export interface AudioControlProps {
@@ -11,7 +12,6 @@ export interface AudioControlProps {
 	value: number;
 	defaultValue?: number;
 	step?: number;
-	precision?: number;
 	tempo?: number;
 	snap?: string;
 	preset?: string;
@@ -19,9 +19,14 @@ export interface AudioControlProps {
 	enabled?: boolean;
 	hasToggle?: boolean;
 	hasSnap?: boolean;
+	audioDuration?: number | null;
+	maxLocked?: boolean;
 	onChange?: (value: number) => void;
 	onToggle?: (enabled: boolean) => void;
 	onSnapChange?: (snap: string) => void;
+	onMinChange?: (val: number) => void;
+	onMaxChange?: (val: number) => void;
+	onMaxLockedChange?: (locked: boolean) => void;
 }
 
 export function AudioControl({
@@ -32,7 +37,6 @@ export function AudioControl({
 	value,
 	defaultValue,
 	step,
-	precision = 5,
 	tempo = 120,
 	snap = "none",
 	preset,
@@ -40,19 +44,29 @@ export function AudioControl({
 	enabled = true,
 	hasToggle = false,
 	hasSnap = false,
+	audioDuration,
+	maxLocked = false,
 	onChange,
 	onToggle,
 	onSnapChange,
+	onMinChange,
+	onMaxChange,
+	onMaxLockedChange,
 }: AudioControlProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState("");
+	const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const labelId = useId();
 
 	const presetConfig = preset ? presets[preset] : undefined;
 	const resolvedMin = presetConfig?.min ?? propMin;
 	const resolvedMax = presetConfig?.max ?? propMax;
-	const resolvedSnaps = presetConfig?.snaps ?? [];
+	const tempoSnaps =
+		snap !== "none" && !preset
+			? generateSnapPoints(snap, tempo, resolvedMin, resolvedMax)
+			: [];
+	const resolvedSnaps = presetConfig?.snaps ?? tempoSnaps;
 	const resolvedTicks = presetConfig?.ticks ?? [];
 	const resolvedSkew = presetConfig?.skew ?? 1;
 	const resolvedStep = step ?? presetConfig?.step;
@@ -102,10 +116,21 @@ export function AudioControl({
 		[commitEdit, cancelEdit],
 	);
 
+	const handleContextMenu = useCallback(
+		(e: React.MouseEvent) => {
+			if (!hasSnap) return;
+			e.preventDefault();
+			setCtxMenu({ x: e.clientX, y: e.clientY });
+		},
+		[hasSnap],
+	);
+
 	return (
+		// biome-ignore lint/a11y/noStaticElementInteractions: context menu on right-click is standard UX
 		<div
 			className={`audio-control${hasToggle && !enabled ? " audio-control--disabled" : ""}`}
 			title={title}
+			onContextMenu={handleContextMenu}
 		>
 			{hasToggle && (
 				<input
@@ -116,25 +141,9 @@ export function AudioControl({
 				/>
 			)}
 			{!hasToggle && <span className="control-toggle-placeholder" />}
-			<label className="control-label" id={labelId}>
+			<span className="control-label" id={labelId}>
 				{label}
-			</label>
-			{hasSnap ? (
-				<select
-					className="control-snap"
-					value={snap}
-					onChange={(e) => onSnapChange?.(e.target.value)}
-				>
-					<option value="none">None</option>
-					<option value="beat">Beat</option>
-					<option value="bar">Bar</option>
-					<option value="8th">8th</option>
-					<option value="16th">16th</option>
-					<option value="int">Int</option>
-				</select>
-			) : (
-				<span className="control-snap-placeholder" />
-			)}
+			</span>
 			<SnappableSlider
 				min={resolvedMin}
 				max={resolvedMax}
@@ -142,7 +151,7 @@ export function AudioControl({
 				skew={resolvedSkew}
 				step={resolvedStep}
 				defaultValue={defaultValue}
-				enableSnap={!!preset}
+				enableSnap={snap !== "none" || !!preset}
 				snaps={resolvedSnaps}
 				ticks={resolvedTicks}
 				disabled={hasToggle && !enabled}
@@ -164,6 +173,24 @@ export function AudioControl({
 				<button type="button" className="control-output" onClick={startEditing}>
 					{displayValue}
 				</button>
+			)}
+			{ctxMenu && (
+				<ContextMenu
+					x={ctxMenu.x}
+					y={ctxMenu.y}
+					snap={snap}
+					min={propMin}
+					max={propMax}
+					maxLocked={maxLocked}
+					audioDuration={audioDuration ?? null}
+					onSnapChange={(s) => {
+						onSnapChange?.(s);
+					}}
+					onMinChange={(v) => onMinChange?.(v)}
+					onMaxChange={(v) => onMaxChange?.(v)}
+					onMaxLockedChange={(locked) => onMaxLockedChange?.(locked)}
+					onClose={() => setCtxMenu(null)}
+				/>
 			)}
 		</div>
 	);

@@ -75,9 +75,9 @@ export function DetuneControl({
 				checked={enabled}
 				onChange={(e) => onToggle(e.target.checked)}
 			/>
-			<label className="control-label" id={labelId}>
+			<span className="control-label" id={labelId}>
 				Detune
-			</label>
+			</span>
 			<span className="control-snap-placeholder" />
 			<SnappableSlider
 				min={min}

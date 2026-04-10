@@ -46,6 +46,7 @@ export const controlDefs: ControlDef[] = [
 		defaultValue: 0,
 		snap: "bar",
 		hasSnap: true,
+		hasToggle: true,
 		title: "Start position in the buffer (seconds).",
 	},
 	{
@@ -55,6 +56,7 @@ export const controlDefs: ControlDef[] = [
 		max: 40,
 		defaultValue: -1,
 		hasSnap: true,
+		hasToggle: true,
 		title:
 			"How long to play before auto-stopping (seconds). -1 for full length.",
 	},
@@ -66,6 +68,7 @@ export const controlDefs: ControlDef[] = [
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
+		hasToggle: true,
 		title: "Delay before starting (seconds).",
 	},
 	{
@@ -76,6 +79,7 @@ export const controlDefs: ControlDef[] = [
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
+		hasToggle: true,
 		title: "Delay before stopping (seconds).",
 	},
 	{
@@ -222,14 +226,20 @@ export function buildDefaults(): {
 	values: Record<ControlKey, number>;
 	snaps: Record<ControlKey, string>;
 	enabled: Record<ControlKey, boolean>;
+	mins: Record<ControlKey, number>;
+	maxs: Record<ControlKey, number>;
 } {
 	const values = {} as Record<ControlKey, number>;
 	const snaps = {} as Record<ControlKey, string>;
 	const enabled = {} as Record<ControlKey, boolean>;
+	const mins = {} as Record<ControlKey, number>;
+	const maxs = {} as Record<ControlKey, number>;
 	for (const d of allDefs) {
 		values[d.key] = d.defaultValue;
 		snaps[d.key] = d.snap ?? "none";
 		enabled[d.key] = true;
+		mins[d.key] = d.min;
+		maxs[d.key] = d.max;
 	}
-	return { values, snaps, enabled };
+	return { values, snaps, enabled, mins, maxs };
 }

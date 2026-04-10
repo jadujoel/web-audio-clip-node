@@ -23,17 +23,32 @@ describe("AudioControl", () => {
 		expect(container.querySelector(".control-output")).toBeTruthy();
 	});
 
-	test("renders snap dropdown only when hasSnap is true", () => {
-		const { container: withSnap } = render(
+	test("context menu opens on right-click when hasSnap is true", () => {
+		const { container } = render(
 			<AudioControl label="Offset" min={0} max={4} value={0} hasSnap={true} />,
 		);
-		expect(withSnap.querySelector(".control-snap")).toBeTruthy();
+		const control = q(container, ".audio-control");
+		fireEvent.contextMenu(control, { clientX: 200, clientY: 200 });
+		const menu = document.querySelector('[role="menu"]');
+		expect(menu).toBeTruthy();
+	});
 
-		const { container: withoutSnap } = render(
+	test("no context menu on right-click when hasSnap is false", () => {
+		const { container } = render(
 			<AudioControl label="Gain" min={0} max={100} value={50} />,
 		);
-		expect(withoutSnap.querySelector(".control-snap")).toBeNull();
-		expect(withoutSnap.querySelector(".control-snap-placeholder")).toBeTruthy();
+		const control = q(container, ".audio-control");
+		fireEvent.contextMenu(control, { clientX: 200, clientY: 200 });
+		const menu = document.querySelector('[role="menu"]');
+		expect(menu).toBeNull();
+	});
+
+	test("no snap dropdown is rendered (snap is in context menu now)", () => {
+		const { container } = render(
+			<AudioControl label="Offset" min={0} max={4} value={0} hasSnap={true} />,
+		);
+		expect(container.querySelector(".control-snap")).toBeNull();
+		expect(container.querySelector(".control-snap-placeholder")).toBeNull();
 	});
 
 	test("slider is labelled by the label element", () => {
@@ -89,7 +104,7 @@ describe("AudioControl", () => {
 		expect(onToggle).toHaveBeenCalledWith(false);
 	});
 
-	test("onSnapChange fires when snap select changes", () => {
+	test("onSnapChange fires when snap is selected in context menu", () => {
 		const onSnapChange = mock(() => {});
 		const { container } = render(
 			<AudioControl
@@ -101,14 +116,22 @@ describe("AudioControl", () => {
 				onSnapChange={onSnapChange}
 			/>,
 		);
-		const select = q(container, ".control-snap") as HTMLSelectElement;
-		fireEvent.change(select, { target: { value: "beat" } });
+		const control = q(container, ".audio-control");
+		fireEvent.contextMenu(control, { clientX: 200, clientY: 200 });
+		const items = document.querySelectorAll('[role="menuitemradio"]');
+		fireEvent.click(items[1]); // Beat
 		expect(onSnapChange).toHaveBeenCalledWith("beat");
 	});
 
 	test("displays formatted output value", () => {
 		const { container } = render(
-			<AudioControl label="Gain" controlKey="gain" min={-100} max={0} value={-6} />,
+			<AudioControl
+				label="Gain"
+				controlKey="gain"
+				min={-100}
+				max={0}
+				value={-6}
+			/>,
 		);
 		const output = q(container, ".control-output");
 		expect(output.textContent).toBe("-6.0 dB");
@@ -248,9 +271,7 @@ describe("AudioControl", () => {
 				onChange={onChange}
 			/>,
 		);
-		expect(
-			container.querySelector(".audio-control--disabled"),
-		).toBeTruthy();
+		expect(container.querySelector(".audio-control--disabled")).toBeTruthy();
 		const slider = q(container, '[role="slider"]');
 		expect(slider.getAttribute("aria-disabled")).toBe("true");
 	});

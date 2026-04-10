@@ -43,3 +43,5 @@ When asked to implement todo
 When asked to fix lint issues, do not be lazy and suppress but instead fix the issues.
 
 Avoid mocking, instead refactor to use dependency injection.
+
+when done with a task, check types lint and tests before moving to done.
