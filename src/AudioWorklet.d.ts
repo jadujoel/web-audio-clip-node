@@ -41,7 +41,10 @@ declare interface AudioParamDescriptor {
  *
  * If the automation rate is "k-rate", the array will contain a single value, which is to be used for each of 128 frames.
  */
-type ProcessParameters<TParameterNames extends string = string> = Record<TParameterNames, Float32Array>;
+type ProcessParameters<TParameterNames extends string = string> = Record<
+	TParameterNames,
+	Float32Array
+>;
 
 /**
  * An array of inputs connected to the node, each item of which is, in turn, an array of channels.
@@ -60,7 +63,6 @@ type ProcessInputs = Float32Array[][];
  * Each of the output channels is filled with zeros by default
  * — the processor will output silence unless the output arrays are modified.
  */
-// biome-ignore lint/correctness/noUnusedVariables: declaration fikle
 type ProcessOutputs = Float32Array[][];
 
 /**

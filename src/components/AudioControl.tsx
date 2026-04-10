@@ -1,17 +1,20 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
+import { formatValueText } from "../audio/formatValueText";
 import { getSnappedValue, getUnitValue, presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
 export interface AudioControlProps {
 	label: string;
+	controlKey?: string;
 	min: number;
 	max: number;
 	value: number;
+	defaultValue?: number;
+	step?: number;
 	precision?: number;
 	tempo?: number;
 	snap?: string;
 	preset?: string;
-	transform?: string;
 	title?: string;
 	enabled?: boolean;
 	hasToggle?: boolean;
@@ -22,9 +25,12 @@ export interface AudioControlProps {
 
 export function AudioControl({
 	label,
+	controlKey,
 	min: propMin,
 	max: propMax,
 	value,
+	defaultValue,
+	step,
 	precision = 5,
 	tempo = 120,
 	snap = "none",
@@ -37,6 +43,10 @@ export function AudioControl({
 	onSnapChange,
 }: AudioControlProps) {
 	const [unit, setUnit] = useState("lin");
+	const [isEditing, setIsEditing] = useState(false);
+	const [editText, setEditText] = useState("");
+	const inputRef = useRef<HTMLInputElement>(null);
+	const labelId = useId();
 
 	const presetConfig = preset ? presets[preset] : undefined;
 	const resolvedMin = presetConfig?.min ?? propMin;
@@ -57,6 +67,42 @@ export function AudioControl({
 		return Number.isFinite(uv) ? uv.toPrecision(precision) : "0";
 	})();
 
+	const startEditing = useCallback(() => {
+		setEditText(displayValue);
+		setIsEditing(true);
+		queueMicrotask(() => {
+			inputRef.current?.select();
+		});
+	}, [displayValue]);
+
+	const commitEdit = useCallback(() => {
+		setIsEditing(false);
+		const parsed = Number.parseFloat(editText);
+		if (Number.isFinite(parsed)) {
+			const resolvedMin = presetConfig?.min ?? propMin;
+			const resolvedMax = presetConfig?.max ?? propMax;
+			const clamped = Math.min(Math.max(parsed, resolvedMin), resolvedMax);
+			onChange?.(clamped);
+		}
+	}, [editText, presetConfig, propMin, propMax, onChange]);
+
+	const cancelEdit = useCallback(() => {
+		setIsEditing(false);
+	}, []);
+
+	const handleEditKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				commitEdit();
+			} else if (e.key === "Escape") {
+				e.preventDefault();
+				cancelEdit();
+			}
+		},
+		[commitEdit, cancelEdit],
+	);
+
 	return (
 		<div className="audio-control" title={title}>
 			{hasToggle && (
@@ -68,7 +114,11 @@ export function AudioControl({
 				/>
 			)}
 			{!hasToggle && <span className="control-toggle-placeholder" />}
-			<label className="control-label" htmlFor={`control-snap-${label}`}>
+			<label
+				className="control-label"
+				id={labelId}
+				htmlFor={`control-snap-${label}`}
+			>
 				{label}
 			</label>
 			<select
@@ -91,11 +141,29 @@ export function AudioControl({
 				max={resolvedMax}
 				value={value}
 				skew={resolvedSkew}
+				step={step}
+				defaultValue={defaultValue}
 				enableSnap={!!preset}
 				snaps={resolvedSnaps}
+				labelId={labelId}
+				valueText={formatValueText(value, controlKey, snap, tempo)}
 				onChange={handleSliderChange}
 			/>
-			<output className="control-output">{displayValue}</output>
+			{isEditing ? (
+				<input
+					ref={inputRef}
+					type="text"
+					className="control-output control-output--editing"
+					value={editText}
+					onChange={(e) => setEditText(e.target.value)}
+					onBlur={commitEdit}
+					onKeyDown={handleEditKeyDown}
+				/>
+			) : (
+				<button type="button" className="control-output" onClick={startEditing}>
+					{displayValue}
+				</button>
+			)}
 			<select
 				className="control-unit"
 				value={unit}

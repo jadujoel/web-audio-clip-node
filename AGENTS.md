@@ -32,7 +32,7 @@ When asked to create a thorough plan
 - do the research step and discover the gold standard for how to do the thing you're planning
 - do the planning step based on the research
 - critique the plan
-- create a final plan based on the critiques of the plan
+- create a final plan based on the critiques of the plan, then remove drafts to avoid confusion
 
 When asked to implement todo
 - Read through the issues in todo

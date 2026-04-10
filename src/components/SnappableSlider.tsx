@@ -5,8 +5,12 @@ export interface SnappableSliderProps {
 	max: number;
 	value: number;
 	skew?: number;
+	step?: number;
+	defaultValue?: number;
 	enableSnap?: boolean;
 	snaps?: number[];
+	labelId?: string;
+	valueText?: string;
 	onChange?: (value: number) => void;
 }
 
@@ -15,13 +19,19 @@ export function SnappableSlider({
 	max,
 	value,
 	skew = 1,
+	step,
+	defaultValue,
 	enableSnap = false,
 	snaps = [],
+	labelId,
+	valueText,
 	onChange,
 }: SnappableSliderProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isDragging = useRef(false);
 	const isOptionKeyHeld = useRef(false);
+
+	const resolvedStep = step ?? (max - min) / 100;
 
 	const getRatioFromValue = useCallback(
 		(v: number) => {
@@ -52,6 +62,15 @@ export function SnappableSlider({
 		[enableSnap, snaps],
 	);
 
+	const clampAndEmit = useCallback(
+		(raw: number) => {
+			const clamped = Math.min(Math.max(raw, min), max);
+			const snapped = getSnapped(clamped);
+			onChange?.(snapped);
+		},
+		[min, max, getSnapped, onChange],
+	);
+
 	const updateFromClientX = useCallback(
 		(clientX: number) => {
 			const el = containerRef.current;
@@ -65,38 +84,97 @@ export function SnappableSlider({
 		[getValueFromRatio, getSnapped, onChange],
 	);
 
+	// Register drag listeners only when dragging
 	useEffect(() => {
-		const handleMouseMove = (e: MouseEvent) => {
-			if (isDragging.current) updateFromClientX(e.clientX);
-		};
-		const handleTouchMove = (e: TouchEvent) => {
-			if (isDragging.current) updateFromClientX(e.touches[0].clientX);
-		};
-		const handleUp = () => {
-			isDragging.current = false;
-		};
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Alt") isOptionKeyHeld.current = true;
-		};
-		const handleKeyUp = (e: KeyboardEvent) => {
-			if (e.key === "Alt") isOptionKeyHeld.current = false;
-		};
+		if (!isDragging.current) return;
+		// This effect re-runs when isDragging changes don't apply here;
+		// We manage drag lifecycle via mouse/touch down/up handlers
+	}, []);
 
-		document.addEventListener("mousemove", handleMouseMove);
-		document.addEventListener("mouseup", handleUp);
-		document.addEventListener("touchmove", handleTouchMove);
-		document.addEventListener("touchend", handleUp);
-		document.addEventListener("keydown", handleKeyDown);
-		document.addEventListener("keyup", handleKeyUp);
-		return () => {
-			document.removeEventListener("mousemove", handleMouseMove);
-			document.removeEventListener("mouseup", handleUp);
-			document.removeEventListener("touchmove", handleTouchMove);
-			document.removeEventListener("touchend", handleUp);
-			document.removeEventListener("keydown", handleKeyDown);
-			document.removeEventListener("keyup", handleKeyUp);
-		};
-	}, [updateFromClientX]);
+	const startDrag = useCallback(
+		(clientX: number) => {
+			isDragging.current = true;
+			updateFromClientX(clientX);
+
+			const handleMove = (e: MouseEvent) => updateFromClientX(e.clientX);
+			const handleTouchMove = (e: TouchEvent) =>
+				updateFromClientX(e.touches[0].clientX);
+			const handleUp = () => {
+				isDragging.current = false;
+				document.removeEventListener("mousemove", handleMove);
+				document.removeEventListener("mouseup", handleUp);
+				document.removeEventListener("touchmove", handleTouchMove);
+				document.removeEventListener("touchend", handleUp);
+			};
+
+			document.addEventListener("mousemove", handleMove);
+			document.addEventListener("mouseup", handleUp);
+			document.addEventListener("touchmove", handleTouchMove);
+			document.addEventListener("touchend", handleUp);
+		},
+		[updateFromClientX],
+	);
+
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (e.key === "Alt") {
+				isOptionKeyHeld.current = true;
+				return;
+			}
+
+			let newValue = value;
+			const s = resolvedStep;
+			const bigStep = s * 10;
+
+			switch (e.key) {
+				case "ArrowRight":
+				case "ArrowUp":
+					newValue = value + s;
+					break;
+				case "ArrowLeft":
+				case "ArrowDown":
+					newValue = value - s;
+					break;
+				case "PageUp":
+					newValue = value + bigStep;
+					break;
+				case "PageDown":
+					newValue = value - bigStep;
+					break;
+				case "Home":
+					newValue = min;
+					break;
+				case "End":
+					newValue = max;
+					break;
+				default:
+					return;
+			}
+			e.preventDefault();
+			clampAndEmit(newValue);
+		},
+		[value, resolvedStep, min, max, clampAndEmit],
+	);
+
+	const handleKeyUp = useCallback((e: React.KeyboardEvent) => {
+		if (e.key === "Alt") isOptionKeyHeld.current = false;
+	}, []);
+
+	const handleDoubleClick = useCallback(() => {
+		if (defaultValue !== undefined) {
+			onChange?.(defaultValue);
+		}
+	}, [defaultValue, onChange]);
+
+	const handleWheel = useCallback(
+		(e: React.WheelEvent) => {
+			e.preventDefault();
+			const s = e.shiftKey ? resolvedStep / 10 : resolvedStep;
+			const direction = e.deltaY < 0 ? 1 : -1;
+			clampAndEmit(value + direction * s);
+		},
+		[value, resolvedStep, clampAndEmit],
+	);
 
 	const ratio = getRatioFromValue(value);
 	const pct = `${ratio * 100}%`;
@@ -127,17 +205,17 @@ export function SnappableSlider({
 			aria-valuemin={min}
 			aria-valuemax={max}
 			aria-valuenow={value}
+			aria-valuetext={valueText}
+			aria-labelledby={labelId}
 			tabIndex={0}
 			ref={containerRef}
 			className="snappable-slider"
-			onMouseDown={(e) => {
-				isDragging.current = true;
-				updateFromClientX(e.clientX);
-			}}
-			onTouchStart={(e) => {
-				isDragging.current = true;
-				updateFromClientX(e.touches[0].clientX);
-			}}
+			onMouseDown={(e) => startDrag(e.clientX)}
+			onTouchStart={(e) => startDrag(e.touches[0].clientX)}
+			onKeyDown={handleKeyDown}
+			onKeyUp={handleKeyUp}
+			onDoubleClick={handleDoubleClick}
+			onWheel={handleWheel}
 		>
 			<span className="slider-track" />
 			<span className="slider-fill" style={{ width: pct }} />

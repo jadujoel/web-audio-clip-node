@@ -1,10 +1,30 @@
 /* ---------------------------------------------------------------------------
+   Custom Properties
+   --------------------------------------------------------------------------- */
+
+:root {
+	--color-bg: #404040;
+	--color-surface: #505050;
+	--color-text: #fff;
+	--color-accent: #6af;
+	--color-border: #666;
+	--color-border-subtle: #555;
+	--color-error: #8b3030;
+	--color-track: #202020;
+	--color-fill: rgb(230, 230, 230);
+	--slider-height: 64px;
+	--slider-thumb-width: 24px;
+	--control-gap: 4px;
+	--font-size-sm: 0.875rem;
+}
+
+/* ---------------------------------------------------------------------------
    Global
    --------------------------------------------------------------------------- */
 
 body {
-	background-color: #404040;
-	color: white;
+	background-color: var(--color-bg);
+	color: var(--color-text);
 	font-family: system-ui, -apple-system, sans-serif;
 	font-size: larger;
 	margin: 0;
@@ -17,6 +37,14 @@ body {
 
 #display {
 	padding: 0.5em 1em;
+}
+
+.status-message {
+	background-color: var(--color-error);
+	color: var(--color-text);
+	padding: 0.5em 1em;
+	margin-bottom: 0.5em;
+	border-radius: 4px;
 }
 
 #display code {
@@ -34,7 +62,7 @@ body {
 #buttons {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: var(--control-gap);
 	padding: 0.5em 1em;
 }
 
@@ -42,14 +70,24 @@ button {
 	height: 80px;
 	width: 200px;
 	font-size: larger;
-	background-color: #505050;
-	color: white;
-	border: 1px solid #666;
+	background-color: var(--color-surface);
+	color: var(--color-text);
+	border: 1px solid var(--color-border);
 	cursor: pointer;
 }
 
 button:hover {
 	background-color: #606060;
+}
+
+button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+button:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -58,6 +96,20 @@ button:hover {
 
 #controls {
 	padding: 0 1em;
+}
+
+.control-group {
+	border: 1px solid var(--color-border-subtle);
+	margin-bottom: 0.5em;
+	padding: 0.5em;
+}
+
+.control-group legend {
+	color: #aaa;
+	font-size: var(--font-size-sm);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 0 0.5em;
 }
 
 .loop-row {
@@ -101,17 +153,42 @@ button:hover {
 }
 
 .control-output {
-	color: white;
+	color: var(--color-text);
 	width: 50px;
+	cursor: pointer;
+	background: transparent;
+	border: none;
+	font: inherit;
+	padding: 0;
+	text-align: center;
+}
+
+.control-output--editing {
+	background: #303030;
+	border: 1px solid var(--color-accent);
+	font-size: inherit;
+	text-align: center;
+	outline: none;
 }
 
 .control-snap,
 .control-unit {
 	height: 40px;
 	width: 100px;
-	background-color: #404040;
-	color: white;
+	background-color: var(--color-bg);
+	color: var(--color-text);
 	border: none;
+}
+
+.control-snap:focus-visible,
+.control-unit:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+.control-toggle:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -125,30 +202,37 @@ button:hover {
 	position: relative;
 	z-index: 0;
 	width: 94%;
-	height: 120px;
+	height: var(--slider-height);
 	margin-left: 3%;
 	margin-right: 3%;
-	margin-bottom: 4px;
+	margin-bottom: var(--control-gap);
 	overflow: visible;
 	font-size: medium;
+	outline: none;
+}
+
+.snappable-slider:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 .slider-track {
 	pointer-events: none;
 	position: absolute;
 	z-index: 0;
-	background-color: #202020;
+	background-color: var(--color-track);
 	height: 65%;
 	width: 100%;
 	box-shadow: inset rgba(0, 0, 0, 0.288) 4px 4px 4px;
-	border: 1px solid white;
+	border: 1px solid var(--color-text);
 }
 
 .slider-fill {
 	pointer-events: none;
 	position: absolute;
 	z-index: 1;
-	background-color: rgb(230, 230, 230);
+	background-color: var(--color-fill);
 	height: 65%;
 	box-shadow: inset rgba(0, 0, 0, 0.288) 4px 4px 4px;
 }
@@ -157,19 +241,19 @@ button:hover {
 	pointer-events: none;
 	position: absolute;
 	z-index: 2;
-	background: linear-gradient(
-		to bottom right,
-		rgba(239, 239, 239, 0.069) 0%,
-		rgba(47, 47, 47, 0.1) 100%
-	);
-	width: 40px;
+	background: var(--color-surface);
+	width: var(--slider-thumb-width);
 	height: 65%;
-	transform: translateX(-20px);
+	transform: translateX(calc(var(--slider-thumb-width) / -2));
 	border-style: solid;
 	border-radius: 10%;
-	border-color: rgb(66, 66, 66);
+	border-color: var(--color-border);
 	border-width: 1px;
-	box-shadow: rgba(0, 0, 0, 0.288) 4px 4px 4px;
+	box-shadow: rgba(0, 0, 0, 0.4) 2px 2px 4px;
+}
+
+.slider-thumb:hover {
+	background: #686868;
 }
 
 .slider-snap {
@@ -185,11 +269,48 @@ button:hover {
 .slider-xval {
 	pointer-events: none;
 	position: absolute;
-	color: white;
+	color: var(--color-text);
 	width: 2em;
 	text-align: center;
 	z-index: 1;
 	opacity: 1;
 	top: 80%;
 	transform: translateX(-1em);
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+	.audio-control {
+		grid-template-columns: auto auto 1fr auto auto;
+	}
+
+	button {
+		width: 150px;
+		height: 60px;
+	}
+
+	:root {
+		--slider-height: 48px;
+	}
+}
+
+@media (max-width: 480px) {
+	.audio-control {
+		grid-template-columns: 1fr;
+		gap: 0.25em;
+		padding: 0.5em;
+	}
+
+	#buttons {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	button {
+		width: 100%;
+		height: 48px;
+	}
 }
