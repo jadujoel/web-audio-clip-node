@@ -36,7 +36,8 @@
 	"files": [
 		"dist",
 		"README.md",
-		"LICENSE"
+		"LICENSE",
+		"examples"
 	],
 	"sideEffects": false,
 	"scripts": {
