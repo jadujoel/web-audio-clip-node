@@ -4,7 +4,8 @@
 	"author": "joel.lof@icloud.com",
 	"license": "MIT",
 	"scripts": {
-		"dev": "bun run serve.ts",
+		"dev": "bun serve.ts",
+		"build": "bun build.ts",
 		"lint": "biome check",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"

@@ -1,30 +1,5 @@
+import { buildProcessor } from './build';
 import index from "./src/index.html";
-
-const processorBuild = await Bun.build({
-	entrypoints: ["./src/audio/processor.ts"],
-	target: "browser",
-	minify: false,
-});
-
-if (!processorBuild.success) {
-	console.error("Failed to build processor:", processorBuild.logs);
-	process.exit(1);
-}
-
-export async function buildProcessor(): Promise<string> {
-	await Bun.build({
-		entrypoints: ["./src/audio/processor.ts"],
-		target: "browser",
-		minify: false,
-		throw: false,
-		sourcemap: "inline",
-	});
-	const processorCode = await processorBuild.outputs[0].text();
-	if (!processorCode) {
-		throw new Error("Failed to read processor code.");
-	}
-	return processorCode;
-}
 
 export function serve(): Bun.Server<unknown> {
 	return Bun.serve({
@@ -43,6 +18,6 @@ export function serve(): Bun.Server<unknown> {
 }
 
 if (import.meta.main) {
-	const _server = serve();
-	console.log("Server running at http://localhost:3000");
+	const server = serve();
+	console.log(`Server running at ${server.hostname}:${server.port}`);
 }
