@@ -7,4 +7,4 @@ bun install
 bun index.html
 ```
 
-Uses `useClipNode` + `useClipControls` to wire everything up, and renders `<TransportButtons />` and `<AudioControl />` out of the box.
+Uses `useClipNode` + `useClipControls` to wire up `TransportButtons`, `PlaybackRateControl`, and `GainControl` with valid props.

@@ -43,16 +43,62 @@ clip.start();
 ## Quick Start (React)
 
 ```tsx
-import { useClipNode, useClipControls, TransportButtons, AudioControl } from "@jadujoel/web-audio-clip-node/react";
+import {
+  GainControl,
+  PlaybackRateControl,
+  TransportButtons,
+  useClipControls,
+  useClipNode,
+} from "@jadujoel/web-audio-clip-node/react";
 import "@jadujoel/web-audio-clip-node/styles.css";
 
 function Player() {
   const controls = useClipControls();
-  const clip = useClipNode({ ...controls });
+  const clip = useClipNode({
+    values: controls.values,
+    enabled: controls.enabled,
+    loop: controls.loop,
+    setValue: controls.setValue,
+  });
+
   return (
     <>
-      <TransportButtons />
-      <AudioControl />
+      <TransportButtons
+        nodeState={clip.nodeState}
+        onStart={clip.start}
+        onStop={clip.stop}
+        onPause={clip.pause}
+        onResume={clip.resume}
+        onDispose={clip.dispose}
+        onLog={clip.logState}
+        onLoadSound={clip.loadSound}
+      />
+      <PlaybackRateControl
+        value={controls.values.playbackRate}
+        defaultValue={1}
+        enabled={controls.enabled.playbackRate}
+        onChange={(value) => {
+          controls.setValue("playbackRate", value);
+          clip.applyValue("playbackRate", value);
+        }}
+        onToggle={(enabled) => {
+          controls.setEnabled("playbackRate", enabled);
+          clip.applyToggle("playbackRate", enabled);
+        }}
+      />
+      <GainControl
+        value={controls.values.gain}
+        defaultValue={0}
+        enabled={controls.enabled.gain}
+        onChange={(value) => {
+          controls.setValue("gain", value);
+          clip.applyValue("gain", value);
+        }}
+        onToggle={(enabled) => {
+          controls.setEnabled("gain", enabled);
+          clip.applyToggle("gain", enabled);
+        }}
+      />
     </>
   );
 }
