@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { createContext } from "../../TestPreload";
 import {
 	audioBufferFromFloat32Array,
 	dbFromLin,
@@ -107,7 +108,7 @@ describe("tempo-relative helpers", () => {
 
 describe("float32ArrayFromAudioBuffer", () => {
 	it("returns single channel array for mono buffer", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		const ab = ctx.createBuffer(1, 128, ctx.sampleRate);
 		const data = ab.getChannelData(0);
 		data[0] = 0.5;
@@ -117,7 +118,7 @@ describe("float32ArrayFromAudioBuffer", () => {
 	});
 
 	it("returns two channel arrays for stereo buffer", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		const ab = ctx.createBuffer(2, 128, ctx.sampleRate);
 		ab.getChannelData(0)[0] = 0.25;
 		ab.getChannelData(1)[0] = 0.75;
@@ -130,17 +131,17 @@ describe("float32ArrayFromAudioBuffer", () => {
 
 describe("audioBufferFromFloat32Array", () => {
 	it("returns undefined for undefined data", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		expect(audioBufferFromFloat32Array(ctx, undefined)).toBeUndefined();
 	});
 
 	it("returns undefined for empty array", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		expect(audioBufferFromFloat32Array(ctx, [])).toBeUndefined();
 	});
 
 	it("creates AudioBuffer from mono Float32Array data", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		const data = [new Float32Array([0.1, 0.2, 0.3])];
 		const result = audioBufferFromFloat32Array(ctx, data);
 		expect(result).toBeDefined();
@@ -149,7 +150,7 @@ describe("audioBufferFromFloat32Array", () => {
 	});
 
 	it("creates AudioBuffer from stereo Float32Array data", () => {
-		const ctx = new OfflineAudioContext(1, 1, 44100);
+		const ctx = createContext();
 		const data = [new Float32Array([0.1, 0.2]), new Float32Array([0.3, 0.4])];
 		const result = audioBufferFromFloat32Array(ctx, data);
 		expect(result).toBeDefined();

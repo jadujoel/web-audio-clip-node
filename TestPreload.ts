@@ -80,3 +80,41 @@ globalThis.navigator.userActivation ??= {
 	isActive: true,
 	hasBeenActive: true,
 };
+
+/**
+ * Try to create a real AudioContext; fall back to OfflineAudioContext when
+ * no audio device is available (e.g. CI runners).
+ */
+export function createContext(opts?: {
+	sampleRate?: number;
+	length?: number;
+	channels?: number;
+}): AudioContext | OfflineAudioContext {
+	const sampleRate = opts?.sampleRate ?? 44100;
+	try {
+		return new AudioContext({ sampleRate });
+	} catch {
+		return new OfflineAudioContext(
+			opts?.channels ?? 1,
+			opts?.length ?? sampleRate,
+			sampleRate,
+		);
+	}
+}
+
+/**
+ * Run audio through the context and then clean up.
+ * - OfflineAudioContext: calls startRendering()
+ * - AudioContext: sleeps for the given duration then closes
+ */
+export async function renderContext(
+	context: AudioContext | OfflineAudioContext,
+	durationMs = 150,
+): Promise<void> {
+	if (context instanceof OfflineAudioContext) {
+		await context.startRendering();
+	} else {
+		await Bun.sleep(durationMs);
+		await context.close();
+	}
+}
