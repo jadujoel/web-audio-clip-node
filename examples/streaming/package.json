@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:worker": "bun build decode-worker.ts --outdir public --target browser --minify",
+    "build:worker": "bun run build-worker.ts",
     "dev": "bun run build:worker && bun index.html"
   },
   "dependencies": {

@@ -25,6 +25,7 @@ export class ClipNode extends AudioWorkletNode {
 	private _duration = -1;
 	private _previousState: ClipNodeState = "initial";
 	private _bufferWriteCursor = 0;
+	private _hasStreamingPort = false;
 
 	timesLooped = 0;
 	state: ClipNodeState = "initial";
@@ -159,6 +160,11 @@ export class ClipNode extends AudioWorkletNode {
 		this.port.postMessage({ type: "loopEnd", data: this._loopEnd });
 	}
 
+	transferPort(port: MessagePort) {
+		this._hasStreamingPort = true;
+		this.port.postMessage({ type: "transferPort", data: port }, [port]);
+	}
+
 	initializeBuffer(
 		totalLength: number,
 		channels: number,
@@ -221,7 +227,7 @@ export class ClipNode extends AudioWorkletNode {
 	}
 
 	start(when?: number, offset?: number, duration?: number) {
-		if (!this._buffer) {
+		if (!this._buffer && !this._hasStreamingPort) {
 			console.error("Buffer not set.");
 			return;
 		}

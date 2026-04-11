@@ -1,7 +1,5 @@
 import { ClipNode, getProcessorBlobUrl } from "@jadujoel/web-audio-clip-node";
-// Import pre-built worker JS as text — Bun's dev server bundles this inline.
-// Build with: bun build decode-worker.ts --outdir public --target browser --minify
-import workerCode from "./public/decode-worker.js" with { type: "text" };
+import { workerCode } from "./generated/worker-code";
 
 function getWorkerBlobUrl(): string {
 	const blob = new Blob([workerCode], { type: "application/javascript" });
@@ -66,11 +64,8 @@ streamBtn.addEventListener("click", async () => {
 	// Create MessageChannel: port1 → Worker, port2 → Processor
 	const channel = new MessageChannel();
 
-	// Transfer port2 to the processor via the ClipNode's existing port
-	clip.port.postMessage(
-		{ type: "transferPort", data: channel.port2 },
-		[channel.port2],
-	);
+	// Transfer port2 to the processor via the ClipNode API (zero main-thread allocation)
+	clip.transferPort(channel.port2);
 
 	// Create and start decode worker from inline Blob URL
 	worker = new Worker(getWorkerBlobUrl());
@@ -93,7 +88,6 @@ streamBtn.addEventListener("click", async () => {
 			case "decoded": {
 				const { samplesDecoded } = ev.data;
 				if (samplesDecoded > 0 && clip && clip.state === "initial") {
-					// Start playback as soon as we have some data
 					clip.start();
 					setStatus("Streaming & playing…");
 				}
