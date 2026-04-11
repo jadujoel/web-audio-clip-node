@@ -3,7 +3,10 @@ import "./TestPreload.ts";
 import { ClipNode } from "./src/audio/ClipNode.ts";
 
 async function main() {
-	const context = new AudioContext({ sampleRate: 48_000 });
+	const context = new AudioContext({
+		sampleRate: 48_000,
+		latencyHint: "playback",
+	});
 	await Bun.build({
 		entrypoints: ["src/audio/processor.ts"],
 		outdir: "dist/audio",
@@ -11,18 +14,23 @@ async function main() {
 	await context.audioWorklet.addModule("./dist/audio/processor.js");
 	console.log("AudioWorkletProcessor module loaded successfully.");
 
-  const srcFile = "./src/lml.webm";
-  const convert = Bun.$`ffmpeg -i ${srcFile} -f wav -`;
-  const wavData = await convert.arrayBuffer();
-  console.log("Audio file converted to WAV format successfully.");
+	const srcFile = "./src/lml.webm";
+	const convert = Bun.$`ffmpeg -i ${srcFile} -f wav -`;
+	const wavData = await convert.arrayBuffer();
 	const audioBuffer = await context.decodeAudioData(wavData);
-  console.log("Audio file decoded successfully.");
-  console.log(`AudioBuffer has ${audioBuffer.numberOfChannels} channel(s) and a length of ${audioBuffer.length} samples.`);
 	const clip = new ClipNode(context);
 	clip.buffer = audioBuffer;
 	clip.start();
+	clip.connect(context.destination);
+	clip.loop = true;
+	clip.playbackRate.setValueCurveAtTime(
+		[1, -1, 2, 1],
+		context.currentTime + 0.1,
+		0.8,
+	);
 
-	// await context.close();
+	await Bun.sleep(1_500);
+	await context.close();
 }
 
 if (import.meta.main) {

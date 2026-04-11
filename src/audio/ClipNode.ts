@@ -142,11 +142,19 @@ export class ClipNode extends AudioWorkletNode {
 	}
 	set buffer(ab: AudioBuffer) {
 		this._buffer = ab;
+		if (this._loopStart >= ab.duration) {
+			this._loopStart = 0;
+		}
+		if (this._loopEnd <= this._loopStart || this._loopEnd > ab.duration) {
+			this._loopEnd = ab.duration;
+		}
 		const data =
 			ab.numberOfChannels === 1
 				? [ab.getChannelData(0)]
 				: [ab.getChannelData(0), ab.getChannelData(1)];
 		this.port.postMessage({ type: "buffer", data });
+		this.port.postMessage({ type: "loopStart", data: this._loopStart });
+		this.port.postMessage({ type: "loopEnd", data: this._loopEnd });
 	}
 
 	start(when?: number, offset?: number, duration?: number) {

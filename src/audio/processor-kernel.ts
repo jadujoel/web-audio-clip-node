@@ -85,6 +85,39 @@ export function getProperties(
 	};
 }
 
+function getBufferDurationSeconds(
+	properties: Required<ClipProcessorOptions>,
+	sampleRate: number,
+): number {
+	return (properties.buffer[0]?.length ?? 0) / sampleRate;
+}
+
+function normalizeLoopBounds(
+	properties: Required<ClipProcessorOptions>,
+	sampleRate: number,
+): void {
+	const bufferDuration = getBufferDurationSeconds(properties, sampleRate);
+	if (bufferDuration <= 0) {
+		properties.loopStart = 0;
+		properties.loopEnd = 0;
+		return;
+	}
+
+	if (!Number.isFinite(properties.loopStart) || properties.loopStart < 0) {
+		properties.loopStart = 0;
+	}
+	if (properties.loopStart >= bufferDuration) {
+		properties.loopStart = 0;
+	}
+	if (
+		!Number.isFinite(properties.loopEnd) ||
+		properties.loopEnd <= properties.loopStart ||
+		properties.loopEnd > bufferDuration
+	) {
+		properties.loopEnd = bufferDuration;
+	}
+}
+
 export function setOffset(
 	properties: Required<ClipProcessorOptions>,
 	offset: number | undefined,
@@ -462,11 +495,10 @@ export function handleProcessorMessage(
 	switch (type) {
 		case "buffer":
 			properties.buffer = data as Float32Array[];
+			normalizeLoopBounds(properties, sampleRate);
 			return [];
 		case "start":
 			properties.timesLooped = 0;
-			properties.loopStart ??= 0;
-			properties.loopEnd ??= (properties.buffer[0]?.length ?? 0) / sampleRate;
 			{
 				const d = data as
 					| { duration?: number; offset?: number; when?: number }
@@ -478,6 +510,7 @@ export function handleProcessorMessage(
 						: (properties.buffer[0]?.length ?? 0) / sampleRate;
 				}
 				setOffset(properties, d?.offset, sampleRate);
+				normalizeLoopBounds(properties, sampleRate);
 				properties.playhead = properties.offset;
 				properties.startWhen = d?.when ?? currentTime;
 				properties.stopWhen = properties.startWhen + properties.duration;
@@ -514,6 +547,9 @@ export function handleProcessorMessage(
 				properties.duration = Number.MAX_SAFE_INTEGER;
 			}
 			properties.loop = loop;
+			if (loop) {
+				normalizeLoopBounds(properties, sampleRate);
+			}
 			return [];
 		}
 		case "loopStart":

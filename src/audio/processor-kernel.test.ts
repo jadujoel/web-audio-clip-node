@@ -708,6 +708,16 @@ describe("handleProcessorMessage", () => {
 		expect(msgs).toEqual([]);
 	});
 
+	it("buffer message repairs the default loopEnd after late buffer assignment", () => {
+		const props = getProperties({}, SR);
+		const buf = makeBuffer(48000);
+
+		handleProcessorMessage(props, { type: "buffer", data: buf }, CT, SR);
+
+		expect(props.loopStart).toBe(0);
+		expect(props.loopEnd).toBe(1);
+	});
+
 	it("start message → Scheduled, returns scheduled", () => {
 		const buf = makeBuffer(48000);
 		const props = getProperties({ buffer: buf }, SR);
@@ -737,6 +747,19 @@ describe("handleProcessorMessage", () => {
 		const buf = makeBuffer(48000);
 		const props = getProperties({ buffer: buf, loop: true }, SR);
 		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		expect(props.duration).toBe(Number.MAX_SAFE_INTEGER);
+	});
+
+	it("start keeps a valid loop range when the buffer arrives after construction", () => {
+		const props = getProperties({}, SR);
+		const buf = makeBuffer(48000);
+
+		handleProcessorMessage(props, { type: "buffer", data: buf }, CT, SR);
+		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		handleProcessorMessage(props, { type: "loop", data: true }, CT, SR);
+
+		expect(props.loopStart).toBe(0);
+		expect(props.loopEnd).toBe(1);
 		expect(props.duration).toBe(Number.MAX_SAFE_INTEGER);
 	});
 
