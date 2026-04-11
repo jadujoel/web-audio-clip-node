@@ -4593,3 +4593,210 @@ describe("fade via message is audible (DD-CLIP-14)", () => {
 		expect(hasNonZero).toBe(true);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Category H: Streaming Loop Behavior
+// ---------------------------------------------------------------------------
+
+describe("Streaming Loop", () => {
+	const SR = 48000;
+
+	function makeStreamingProps(
+		overrides: Partial<ClipProcessorOptions> = {},
+	): Required<ClipProcessorOptions> {
+		return getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+				...overrides,
+			},
+			SR,
+		);
+	}
+
+	function initStreamingBuffer(
+		props: Required<ClipProcessorOptions>,
+		totalLength: number,
+		committedLength: number,
+		channels = 2,
+	): void {
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels, totalLength, streaming: true },
+			},
+			0,
+			SR,
+		);
+		if (committedLength > 0) {
+			const channelData = Array.from({ length: channels }, (_, ch) => {
+				const arr = new Float32Array(committedLength);
+				for (let i = 0; i < committedLength; i++) arr[i] = ch * 1000 + i;
+				return arr;
+			});
+			handleProcessorMessage(
+				props,
+				{
+					type: "bufferRange",
+					data: { startSample: 0, channelData },
+				},
+				0,
+				SR,
+			);
+			// Apply pending writes
+			processBlock(
+				props,
+				[makeOutput(channels)],
+				{
+					playbackRate: new Float32Array([1]),
+					detune: new Float32Array([0]),
+					lowpass: new Float32Array([20000]),
+					highpass: new Float32Array([20]),
+					gain: new Float32Array([1]),
+					pan: new Float32Array([0]),
+				},
+				{ currentTime: 0, currentFrame: 0, sampleRate: SR },
+				{
+					lowpass: createFilterState(),
+					highpass: createFilterState(),
+				},
+			);
+			// Reset playhead to 0 after the initial write-apply block
+			props.playhead = 0;
+			props.playedSamples = 0;
+		}
+	}
+
+	it("H1: loop wraps at committedLength during streaming", () => {
+		const props = makeStreamingProps({ loop: true });
+		initStreamingBuffer(props, 1024, 512);
+
+		const { messages, playheadHistory } = simulateBlocks(props, 10);
+		// Should have looped (512 samples = 4 blocks of 128)
+		expect(messages.some((m) => m.type === "looped")).toBe(true);
+		// Should NOT have ended
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+		// Playhead should have wrapped back within committed range
+		const maxPlayhead = Math.max(...playheadHistory);
+		expect(maxPlayhead).toBeLessThanOrEqual(512);
+	});
+
+	it("H2: degenerate small committedLength outputs silence", () => {
+		const props = makeStreamingProps({ loop: true });
+		// committedLength = 64, which is < 2 * SAMPLE_BLOCK_SIZE (256)
+		initStreamingBuffer(props, 1024, 64);
+
+		const { allOutputs, messages } = simulateBlocks(props, 3);
+		// Should output silence (degenerate guard)
+		for (const block of allOutputs) {
+			for (const ch of block) {
+				expect(ch.every((v) => v === 0)).toBe(true);
+			}
+		}
+		// Should NOT have ended or looped
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+	});
+
+	it("H3: after stream completes, normal loop behavior uses full buffer", () => {
+		const props = makeStreamingProps({ loop: true });
+		initStreamingBuffer(props, 512, 256);
+
+		// Play a few blocks to confirm looping at committed length
+		simulateBlocks(props, 3);
+		expect(props.state).toBe(State.Started);
+
+		// Now commit the rest of the buffer and end stream
+		const channelData = [
+			new Float32Array(256).fill(0.75),
+			new Float32Array(256).fill(0.25),
+		];
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: { startSample: 256, channelData },
+			},
+			0,
+			SR,
+		);
+		handleProcessorMessage(props, { type: "bufferEnd", data: {} }, 0, SR);
+
+		// After stream ends, loop should use full 512 samples
+		const { messages, playheadHistory } = simulateBlocks(props, 10);
+		expect(messages.some((m) => m.type === "looped")).toBe(true);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		// Playhead should reach beyond 256 now (the old committed limit)
+		const maxPlayhead = Math.max(...playheadHistory);
+		expect(maxPlayhead).toBeGreaterThan(256);
+	});
+
+	it("H4: non-loop streaming still ends normally", () => {
+		const props = makeStreamingProps({ loop: false });
+		initStreamingBuffer(props, 512, 512);
+
+		// End the stream so it behaves as a complete buffer
+		handleProcessorMessage(props, { type: "bufferEnd", data: {} }, 0, SR);
+
+		const { messages } = simulateBlocks(props, 10);
+		expect(messages.some((m) => m.type === "ended")).toBe(true);
+		expect(props.state).toBe(State.Ended);
+	});
+
+	it("H5: loop start/end params are clamped to effectiveSourceLength during streaming", () => {
+		const props = makeStreamingProps({
+			loop: true,
+			loopStart: 0,
+			loopEnd: 1024 / SR, // loopEnd well beyond committed
+		});
+		initStreamingBuffer(props, 1024, 384);
+
+		const { messages, playheadHistory } = simulateBlocks(props, 10);
+		// Should loop — loopEnd should be clamped to 384 (committed)
+		expect(messages.some((m) => m.type === "looped")).toBe(true);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		const maxPlayhead = Math.max(...playheadHistory);
+		expect(maxPlayhead).toBeLessThanOrEqual(384);
+	});
+
+	it("H6: crossfade is disabled during incomplete stream loop", () => {
+		const props = makeStreamingProps({
+			loop: true,
+			loopCrossfade: 0.1,
+			enableLoopCrossfade: true,
+		});
+		initStreamingBuffer(props, 2048, 1024);
+
+		// Run enough blocks to loop. With crossfade disabled during streaming,
+		// the output near loop boundary should not contain crossfade artifacts.
+		// The main check: no NaN, no crash, and playback continues.
+		const { messages } = simulateBlocks(props, 20);
+		expect(messages.some((m) => m.type === "looped")).toBe(true);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+	});
+
+	it("H7: playhead beyond committedLength gets wrapped on next block", () => {
+		const props = makeStreamingProps({ loop: true });
+		initStreamingBuffer(props, 1024, 512);
+
+		// Manually set playhead beyond committed length to simulate edge case
+		props.playhead = 600;
+
+		const { messages } = simulateBlocks(props, 5);
+		// Should have wrapped and continued — not ended
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+		// Playhead should be within committed range
+		expect(props.playhead).toBeLessThan(512);
+	});
+});

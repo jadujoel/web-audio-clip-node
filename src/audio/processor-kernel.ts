@@ -931,19 +931,39 @@ export function processBlock(
 	const hasIncompleteStream =
 		props.streamBuffer.streaming &&
 		props.streamBuffer.committedLength < sourceLength;
-	const loop = props.loop && !hasIncompleteStream;
+	const loop = props.loop;
+
+	// When looping during an incomplete stream, clamp effective length to committed data
+	// to avoid reading silence/unwritten regions.
+	const effectiveSourceLength =
+		hasIncompleteStream && loop
+			? Math.max(props.streamBuffer.committedLength, 0)
+			: sourceLength;
+
+	// Guard against degenerate tiny loops that would produce audible artifacts
+	const MIN_LOOP_SAMPLES = SAMPLE_BLOCK_SIZE * 2;
+	if (hasIncompleteStream && loop && effectiveSourceLength < MIN_LOOP_SAMPLES) {
+		fillWithSilence(output0);
+		for (let i = 1; i < outputs.length; i++) {
+			copy(output0, outputs[i]);
+		}
+		return { keepAlive: true, messages };
+	}
 
 	const nc = Math.min(buffer.length, output0.length);
 	const durationSamples = props.duration * ctx.sampleRate;
 
 	const loopCrossfadeSamples = Math.floor(ctx.sampleRate * loopCrossfade);
-	const maxLoopStartSample = Math.max(sourceLength - SAMPLE_BLOCK_SIZE, 0);
+	const maxLoopStartSample = Math.max(
+		effectiveSourceLength - SAMPLE_BLOCK_SIZE,
+		0,
+	);
 	const loopStartSamples = enableLoopStart
 		? Math.min(Math.floor(loopStart * ctx.sampleRate), maxLoopStartSample)
 		: 0;
 	const loopEndSamples = enableLoopEnd
-		? Math.min(Math.floor(loopEnd * ctx.sampleRate), sourceLength)
-		: sourceLength;
+		? Math.min(Math.floor(loopEnd * ctx.sampleRate), effectiveSourceLength)
+		: effectiveSourceLength;
 	const loopLengthSamples = loopEndSamples - loopStartSamples;
 
 	// Apply detune to playback rates: effectiveRate = rate * 2^(detune/1200)
@@ -995,9 +1015,9 @@ export function processBlock(
 	}
 
 	const blockParams: BlockParameters = {
-		bufferLength: sourceLength,
+		bufferLength: effectiveSourceLength,
 		loop,
-		playhead,
+		playhead: props.playhead,
 		loopStartSamples,
 		loopEndSamples,
 		durationSamples,
@@ -1047,7 +1067,8 @@ export function processBlock(
 	const needsCrossfade =
 		enableLoopCrossfade &&
 		loopCrossfadeSamples > 0 &&
-		sourceLength > SAMPLE_BLOCK_SIZE;
+		effectiveSourceLength > SAMPLE_BLOCK_SIZE &&
+		!hasIncompleteStream;
 
 	if (isWithinLoopRange && needsCrossfade) {
 		// Crossfade out at loop start: fade out tail of previous loop iteration.
