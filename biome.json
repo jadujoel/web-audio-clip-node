@@ -10,7 +10,8 @@
 			"**",
 			"!!**/dist",
 			"!!src/audio/processor-code.ts",
-			"!!src/audio/version.ts"
+			"!!src/audio/version.ts",
+			"!!examples"
 		]
 	},
 	"formatter": {
