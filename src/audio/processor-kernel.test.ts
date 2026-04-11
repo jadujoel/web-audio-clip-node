@@ -3323,21 +3323,33 @@ describe("Loop: edge cases", () => {
 			stopWhen: Number.MAX_SAFE_INTEGER,
 		});
 		const outputs = [makeOutput(2)];
-		processBlock(
-			props,
-			outputs,
-			{
-				playbackRate: new Float32Array([1]),
-				detune: new Float32Array([0]),
-				lowpass: new Float32Array([20000]),
-				highpass: new Float32Array([20]),
-				gain: new Float32Array([1]),
-				pan: new Float32Array([0]),
-			},
-			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
-			{ lowpass: createFilterState(), highpass: createFilterState() },
-		);
+		const originalConsoleLog = console.log;
+		const consoleLogCalls: unknown[][] = [];
+		console.log = (...args) => {
+			consoleLogCalls.push(args);
+		};
+
+		try {
+			processBlock(
+				props,
+				outputs,
+				{
+					playbackRate: new Float32Array([1]),
+					detune: new Float32Array([0]),
+					lowpass: new Float32Array([20000]),
+					highpass: new Float32Array([20]),
+					gain: new Float32Array([1]),
+					pan: new Float32Array([0]),
+				},
+				{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+				{ lowpass: createFilterState(), highpass: createFilterState() },
+			);
+		} finally {
+			console.log = originalConsoleLog;
+		}
+
 		// Should not have NaN and should wrap
+		expect(consoleLogCalls).toHaveLength(0);
 		expect(checkNans(outputs[0])).toBe(0);
 	});
 

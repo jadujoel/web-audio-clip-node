@@ -683,11 +683,9 @@ export function processBlock(
 	const durationSamples = props.duration * ctx.sampleRate;
 
 	const loopCrossfadeSamples = Math.floor(ctx.sampleRate * loopCrossfade);
+	const maxLoopStartSample = Math.max(sourceLength - SAMPLE_BLOCK_SIZE, 0);
 	const loopStartSamples = enableLoopStart
-		? Math.min(
-				Math.floor(loopStart * ctx.sampleRate),
-				sourceLength - SAMPLE_BLOCK_SIZE,
-			)
+		? Math.min(Math.floor(loopStart * ctx.sampleRate), maxLoopStartSample)
 		: 0;
 	const loopEndSamples = enableLoopEnd
 		? Math.min(Math.floor(loopEnd * ctx.sampleRate), sourceLength)
