@@ -256,7 +256,15 @@ async function startStreaming(
 		}
 
 		// Flush remaining decoded data
-		await decoder.flush();
+		if (configuredDecoder) {
+			await decoder.flush();
+		} else {
+			self.postMessage({
+				type: "error",
+				message: "No MP3 frames found in the stream",
+			});
+			return;
+		}
 
 		// Signal end of buffer
 		processorPort.postMessage({
