@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 
 export async function buildProcessor(minify = true): Promise<string> {
 	const output = await Bun.build({
@@ -21,6 +21,52 @@ const reactProductionDefine = {
 };
 
 const distDir = "dist";
+
+function withJsExtension(specifier: string): string {
+	if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
+		return specifier;
+	}
+
+	if (/\.[a-z0-9]+(?:[?#].*)?$/i.test(specifier)) {
+		return specifier;
+	}
+
+	return `${specifier}.js`;
+}
+
+export function addJsExtensionsToRelativeImports(source: string): string {
+	return source
+		.replace(
+			/((?:import|export)\s[^"'`]*?from\s+["'])(\.{1,2}\/[^"']+)(["'])/g,
+			(_match, prefix: string, specifier: string, suffix: string) =>
+				`${prefix}${withJsExtension(specifier)}${suffix}`,
+		)
+		.replace(
+			/(import\(\s*["'])(\.{1,2}\/[^"']+)(["']\s*\))/g,
+			(_match, prefix: string, specifier: string, suffix: string) =>
+				`${prefix}${withJsExtension(specifier)}${suffix}`,
+		);
+}
+
+async function rewriteDistImports(dir: string): Promise<void> {
+	for (const entry of await readdir(dir, { withFileTypes: true })) {
+		const entryPath = `${dir}/${entry.name}`;
+		if (entry.isDirectory()) {
+			await rewriteDistImports(entryPath);
+			continue;
+		}
+
+		if (!entry.isFile() || !entry.name.endsWith(".js")) {
+			continue;
+		}
+
+		const source = await readFile(entryPath, "utf8");
+		const updated = addJsExtensionsToRelativeImports(source);
+		if (updated !== source) {
+			await writeFile(entryPath, updated);
+		}
+	}
+}
 
 export function createAppBuildConfig(outdir = distDir): Bun.BuildConfig {
 	return {
@@ -75,6 +121,8 @@ export async function buildLibrary(): Promise<void> {
 		throw new Error(`tsc exited with code ${exitCode}`);
 	}
 
+	await rewriteDistImports(distDir);
+
 	// 5. Bundle single-file ESM for CDN usage (no bare specifiers)
 	const esbuild = Bun.spawn(
 		[
@@ -96,6 +144,7 @@ export async function buildLibrary(): Promise<void> {
 
 	// 6. Copy styles
 	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
+	await Bun.write("dist/styles.css.d.ts", Bun.file("src/styles.css.d.ts"));
 }
 
 if (import.meta.main) {

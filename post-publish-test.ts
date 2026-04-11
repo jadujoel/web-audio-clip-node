@@ -316,6 +316,10 @@ try {
 		dtsFiles.some((f) => f === "lib-react.d.ts"),
 		"lib-react.d.ts exists",
 	);
+	assert(
+		dtsFiles.some((f) => f === "styles.css.d.ts"),
+		"styles.css.d.ts exists",
+	);
 
 	// -----------------------------------------------------------------------
 	// 7. Verify TypeScript compilation against the package types
@@ -324,6 +328,8 @@ try {
 	await writeFile(
 		join(tmp, "check-types.ts"),
 		`
+import "@jadujoel/web-audio-clip-node/styles.css";
+
 import type { ClipNode, ClipNodeState, ClipProcessorState, FrameData } from "@jadujoel/web-audio-clip-node";
 import type { ControlDef, ControlKey } from "@jadujoel/web-audio-clip-node";
 import type { LinkedControlPairDef, LinkedControlPairKey } from "@jadujoel/web-audio-clip-node";

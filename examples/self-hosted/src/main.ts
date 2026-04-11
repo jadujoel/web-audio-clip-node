@@ -28,9 +28,7 @@ document.getElementById("play")!.addEventListener("click", async () => {
 		// Load the processor from your own server (public/processor.js)
 		const processorUrl = getProcessorModuleUrl(window.location.href);
 		await ctx.audioWorklet.addModule(processorUrl);
-		clip = new ClipNode(ctx, {
-			processorOptions: { sampleRate: ctx.sampleRate },
-		});
+		clip = new ClipNode(ctx);
 		clip.connect(ctx.destination);
 		clip.buffer = createToneBuffer(ctx);
 	}

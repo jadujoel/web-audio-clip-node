@@ -3,7 +3,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createAppBuildConfig } from "./build";
+import {
+	addJsExtensionsToRelativeImports,
+	createAppBuildConfig,
+} from "./build";
 
 const tempDirs: string[] = [];
 
@@ -14,6 +17,24 @@ afterAll(async () => {
 });
 
 describe("app build", () => {
+	test("adds .js extensions to emitted relative imports", () => {
+		const source = [
+			'import { foo } from "./foo";',
+			'export { bar } from "../bar";',
+			'const mod = import("./baz");',
+			'import "./keep.css";',
+		].join("\n");
+
+		expect(addJsExtensionsToRelativeImports(source)).toBe(
+			[
+				'import { foo } from "./foo.js";',
+				'export { bar } from "../bar.js";',
+				'const mod = import("./baz.js");',
+				'import "./keep.css";',
+			].join("\n"),
+		);
+	});
+
 	test("emits the React production bundle", async () => {
 		const outdir = await mkdtemp(join(tmpdir(), "clip-build-"));
 		tempDirs.push(outdir);

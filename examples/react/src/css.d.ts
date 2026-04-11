@@ -1,0 +1,1 @@
+declare module "@jadujoel/web-audio-clip-node/styles.css";
