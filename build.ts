@@ -85,6 +85,8 @@ export async function build(): Promise<void> {
 	await rm(distDir, { force: true, recursive: true });
 	await buildProcessor();
 	await Bun.build(createAppBuildConfig());
+	// Copy static assets for GitHub Pages
+	await Bun.write("dist/example.mp3", Bun.file("src/example.mp3"));
 }
 
 async function buildProcessorCodeModule(): Promise<string> {
