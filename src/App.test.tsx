@@ -4,14 +4,33 @@ import { buildDefaults, DEFAULT_TEMPO } from "./controls/controlDefs";
 import { buildLinkedControlPairDefaults } from "./controls/linkedControlPairs";
 import { useClipControls } from "./store/clipStore";
 
+type UseClipNodeImpl = typeof import("./hooks/useClipNode").useClipNode;
+
 const applyValueMock = mock(() => {});
 const applyValuesMock = mock(() => {});
 const applyToggleMock = mock(() => {});
 const setLoopOnNodeMock = mock(() => {});
 
-mock.module("./hooks/useClipNode", () => ({
-	useClipNode: () => ({
-		nodeState: "initial",
+const cacheMatchMock = mock(async () => undefined);
+const cachePutMock = mock(async () => undefined);
+
+if (!("caches" in globalThis)) {
+	globalThis.caches = {
+		open: mock(
+			async () =>
+				({
+					match: cacheMatchMock,
+					put: cachePutMock,
+				}) as unknown as Cache,
+		) as unknown as CacheStorage["open"],
+	} as unknown as CacheStorage;
+}
+
+const { App } = await import("./App");
+
+const useClipNodeStub: UseClipNodeImpl = () => {
+	return {
+		nodeState: "initial" as const,
 		statusMessage: null,
 		soundName: null,
 		audioDuration: null,
@@ -20,7 +39,7 @@ mock.module("./hooks/useClipNode", () => ({
 		infoTimesLooped: "0",
 		infoLatency: "unknown",
 		infoTimeTaken: "unknown",
-		start: mock(() => {}),
+		start: mock(async () => {}),
 		stop: mock(() => {}),
 		pause: mock(() => {}),
 		resume: mock(() => {}),
@@ -31,10 +50,8 @@ mock.module("./hooks/useClipNode", () => ({
 		applyValues: applyValuesMock,
 		applyToggle: applyToggleMock,
 		setLoopOnNode: setLoopOnNodeMock,
-	}),
-}));
-
-const { App } = await import("./App");
+	};
+};
 
 function getAudioControl(label: string): HTMLElement {
 	const labels = Array.from(
@@ -110,7 +127,7 @@ describe("App tempo resync", () => {
 			tempo: 90,
 		}));
 
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		const input = screen.getByLabelText("BPM");
 		expect(screen.getByDisplayValue("90")).toBeTruthy();
@@ -153,7 +170,7 @@ describe("App tempo resync", () => {
 			tempo: 120,
 		}));
 
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		const input = screen.getByLabelText("BPM");
 		fireEvent.focus(input);
@@ -185,7 +202,7 @@ describe("App tempo resync", () => {
 			},
 		}));
 
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		fireEvent.click(screen.getByLabelText("Link StopDelay and FadeOut"));
 		fireEvent.keyDown(screen.getByRole("slider", { name: "StopDelay" }), {
@@ -227,7 +244,7 @@ describe("App tempo resync", () => {
 			loop: true,
 		}));
 
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		fireEvent.click(screen.getByLabelText("Link Start and End"));
 
@@ -266,7 +283,7 @@ describe("App tempo resync", () => {
 			},
 		}));
 
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		fireEvent.click(screen.getByLabelText("Link StopDelay and FadeOut"));
 		fireEvent.contextMenu(getAudioControl("StopDelay"), {
@@ -281,7 +298,7 @@ describe("App tempo resync", () => {
 	});
 
 	test("linked stopDelay and fadeOut share range and toggle state", () => {
-		render(<App />);
+		render(<App useClipNodeImpl={useClipNodeStub} />);
 
 		fireEvent.click(screen.getByLabelText("Link StopDelay and FadeOut"));
 		fireEvent.contextMenu(getAudioControl("StopDelay"), {

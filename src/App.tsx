@@ -21,6 +21,10 @@ import {
 import { useClipNode } from "./hooks/useClipNode";
 import { useClipControls } from "./store/clipStore";
 
+interface AppProps {
+	useClipNodeImpl?: typeof useClipNode;
+}
+
 function buildControlUpdates<T>(
 	keys: readonly ControlKey[],
 	value: T,
@@ -30,9 +34,9 @@ function buildControlUpdates<T>(
 	) as Partial<Record<ControlKey, T>>;
 }
 
-export function App() {
+export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 	const controls = useClipControls();
-	const node = useClipNode({
+	const node = useClipNodeImpl({
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
