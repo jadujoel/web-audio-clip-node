@@ -1,11 +1,11 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
+  "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "esm-bundler-example",
+      "name": "self-hosted-example",
       "dependencies": {
-        "@jadujoel/web-audio-clip-node": "latest",
+        "@jadujoel/web-audio-clip-node": "^0.1.1",
       },
     },
   },

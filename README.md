@@ -90,6 +90,17 @@ function Player() {
 | Processor | `@jadujoel/web-audio-clip-node/processor` | Standalone worklet script |
 | Styles | `@jadujoel/web-audio-clip-node/styles.css` | CSS for React components |
 
+## Examples
+
+The [`examples/`](examples/) directory contains ready-to-run demos for different setups:
+
+| Example | Description | Build step? |
+|---------|-------------|-------------|
+| [cdn-vanilla](examples/cdn-vanilla/) | Pure HTML + `<script type="module">` via jsDelivr CDN | No |
+| [esm-bundler](examples/esm-bundler/) | Vite + TypeScript with `npm install` | Yes |
+| [react](examples/react/) | Vite + React using the built-in hooks & components | Yes |
+| [self-hosted](examples/self-hosted/) | Vite + self-hosted `processor.js` via `getProcessorModuleUrl()` | Yes |
+
 ## License
 
 MIT

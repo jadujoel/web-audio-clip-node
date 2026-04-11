@@ -6,7 +6,7 @@
     "dev": "bun index.html"
   },
   "dependencies": {
-    "@jadujoel/web-audio-clip-node": "^0.1.1",
+    "@jadujoel/web-audio-clip-node": "latest",
     "react": "^19",
     "react-dom": "^19",
     "zustand": "^5"
