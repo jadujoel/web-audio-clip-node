@@ -4768,7 +4768,7 @@ describe("Streaming Loop", () => {
 		expect(maxPlayhead).toBeLessThanOrEqual(384);
 	});
 
-	it("H6: crossfade is disabled during incomplete stream loop", () => {
+	it("H6: crossfade works during incomplete stream loop", () => {
 		const props = makeStreamingProps({
 			loop: true,
 			loopCrossfade: 0.1,
@@ -4776,9 +4776,8 @@ describe("Streaming Loop", () => {
 		});
 		initStreamingBuffer(props, 2048, 1024);
 
-		// Run enough blocks to loop. With crossfade disabled during streaming,
-		// the output near loop boundary should not contain crossfade artifacts.
-		// The main check: no NaN, no crash, and playback continues.
+		// Run enough blocks to loop. Crossfade should work during streaming
+		// using committed data. The main check: no NaN, no crash, loops, continues.
 		const { messages } = simulateBlocks(props, 20);
 		expect(messages.some((m) => m.type === "looped")).toBe(true);
 		expect(messages.some((m) => m.type === "ended")).toBe(false);

@@ -1067,8 +1067,7 @@ export function processBlock(
 	const needsCrossfade =
 		enableLoopCrossfade &&
 		loopCrossfadeSamples > 0 &&
-		effectiveSourceLength > SAMPLE_BLOCK_SIZE &&
-		!hasIncompleteStream;
+		effectiveSourceLength > SAMPLE_BLOCK_SIZE;
 
 	if (isWithinLoopRange && needsCrossfade) {
 		// Crossfade out at loop start: fade out tail of previous loop iteration.
@@ -1088,7 +1087,7 @@ export function processBlock(
 					const srcIdx = Math.floor(
 						loopEndSamples - xfadeNumSamples + elapsed + i,
 					);
-					if (srcIdx >= 0 && srcIdx < sourceLength) {
+					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
 							output0[ch][i] += buffer[ch][srcIdx] * g;
 						}
@@ -1115,7 +1114,7 @@ export function processBlock(
 					const position = (elapsed + i) / xfadeNumSamples;
 					const g = Math.sin((Math.PI * position) / 2);
 					const srcIdx = Math.floor(loopStartSamples + elapsed + i);
-					if (srcIdx >= 0 && srcIdx < sourceLength) {
+					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
 							output0[ch][i] += buffer[ch][srcIdx] * g;
 						}
