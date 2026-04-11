@@ -13,6 +13,48 @@ const stopBtn = document.getElementById("stop") as HTMLButtonElement;
 const urlInput = document.getElementById("url") as HTMLInputElement;
 const progressBar = document.getElementById("progress") as HTMLDivElement;
 const statusText = document.getElementById("status") as HTMLParagraphElement;
+const controlsPanel = document.getElementById("controls") as HTMLDivElement;
+
+// Control sliders
+const gainSlider = document.getElementById("ctrl-gain") as HTMLInputElement;
+const panSlider = document.getElementById("ctrl-pan") as HTMLInputElement;
+const rateSlider = document.getElementById("ctrl-rate") as HTMLInputElement;
+const detuneSlider = document.getElementById("ctrl-detune") as HTMLInputElement;
+const lowpassSlider = document.getElementById("ctrl-lowpass") as HTMLInputElement;
+const highpassSlider = document.getElementById(
+	"ctrl-highpass",
+) as HTMLInputElement;
+const fadeInSlider = document.getElementById("ctrl-fadein") as HTMLInputElement;
+const fadeOutSlider = document.getElementById(
+	"ctrl-fadeout",
+) as HTMLInputElement;
+const loopCheckbox = document.getElementById("ctrl-loop") as HTMLInputElement;
+const loopStartSlider = document.getElementById(
+	"ctrl-loopstart",
+) as HTMLInputElement;
+const loopEndSlider = document.getElementById(
+	"ctrl-loopend",
+) as HTMLInputElement;
+const crossfadeSlider = document.getElementById(
+	"ctrl-crossfade",
+) as HTMLInputElement;
+
+// Value displays
+const valGain = document.getElementById("val-gain") as HTMLSpanElement;
+const valPan = document.getElementById("val-pan") as HTMLSpanElement;
+const valRate = document.getElementById("val-rate") as HTMLSpanElement;
+const valDetune = document.getElementById("val-detune") as HTMLSpanElement;
+const valLowpass = document.getElementById("val-lowpass") as HTMLSpanElement;
+const valHighpass = document.getElementById("val-highpass") as HTMLSpanElement;
+const valFadeIn = document.getElementById("val-fadein") as HTMLSpanElement;
+const valFadeOut = document.getElementById("val-fadeout") as HTMLSpanElement;
+const valLoopStart = document.getElementById(
+	"val-loopstart",
+) as HTMLSpanElement;
+const valLoopEnd = document.getElementById("val-loopend") as HTMLSpanElement;
+const valCrossfade = document.getElementById(
+	"val-crossfade",
+) as HTMLSpanElement;
 
 // ── State ────────────────────────────────────────────────────────────
 let ctx: AudioContext | null = null;
@@ -60,6 +102,14 @@ streamBtn.addEventListener("click", async () => {
 	clip = new ClipNode(ctx);
 	clip.loop = true;
 	clip.connect(ctx.destination);
+
+	// Apply current slider values to the new clip
+	applyControls();
+
+	// Show controls panel
+	controlsPanel.style.display = "";
+	pauseBtn.disabled = false;
+	stopBtn.disabled = false;
 
 	// Create MessageChannel: port1 → Worker, port2 → Processor
 	const channel = new MessageChannel();
@@ -146,4 +196,79 @@ stopBtn.addEventListener("click", () => {
 	}
 	setProgress(0);
 	setStatus("Stopped.");
+});
+
+// ── Control wiring ───────────────────────────────────────────────────
+function formatPan(v: number): string {
+	if (Math.abs(v) < 0.005) return "C";
+	return v < 0 ? `L ${(-v * 100).toFixed(0)}` : `R ${(v * 100).toFixed(0)}`;
+}
+
+function formatHz(v: number): string {
+	return v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${v} Hz`;
+}
+
+function applyControls() {
+	if (!clip) return;
+	clip.gain.value = Number(gainSlider.value);
+	clip.pan.value = Number(panSlider.value);
+	clip.playbackRate.value = Number(rateSlider.value);
+	clip.detune.value = Number(detuneSlider.value);
+	clip.lowpass.value = Number(lowpassSlider.value);
+	clip.highpass.value = Number(highpassSlider.value);
+	clip.fadeIn = Number(fadeInSlider.value);
+	clip.fadeOut = Number(fadeOutSlider.value);
+	clip.loop = loopCheckbox.checked;
+	clip.loopStart = Number(loopStartSlider.value);
+	clip.loopEnd = Number(loopEndSlider.value);
+	clip.loopCrossfade = Number(crossfadeSlider.value);
+}
+
+// Wire each slider to update the value display and the clip
+gainSlider.addEventListener("input", () => {
+	valGain.textContent = Number(gainSlider.value).toFixed(2);
+	if (clip) clip.gain.value = Number(gainSlider.value);
+});
+panSlider.addEventListener("input", () => {
+	valPan.textContent = formatPan(Number(panSlider.value));
+	if (clip) clip.pan.value = Number(panSlider.value);
+});
+rateSlider.addEventListener("input", () => {
+	valRate.textContent = `${Number(rateSlider.value).toFixed(2)}×`;
+	if (clip) clip.playbackRate.value = Number(rateSlider.value);
+});
+detuneSlider.addEventListener("input", () => {
+	valDetune.textContent = `${detuneSlider.value} ct`;
+	if (clip) clip.detune.value = Number(detuneSlider.value);
+});
+lowpassSlider.addEventListener("input", () => {
+	valLowpass.textContent = formatHz(Number(lowpassSlider.value));
+	if (clip) clip.lowpass.value = Number(lowpassSlider.value);
+});
+highpassSlider.addEventListener("input", () => {
+	valHighpass.textContent = formatHz(Number(highpassSlider.value));
+	if (clip) clip.highpass.value = Number(highpassSlider.value);
+});
+fadeInSlider.addEventListener("input", () => {
+	valFadeIn.textContent = `${Number(fadeInSlider.value).toFixed(2)} s`;
+	if (clip) clip.fadeIn = Number(fadeInSlider.value);
+});
+fadeOutSlider.addEventListener("input", () => {
+	valFadeOut.textContent = `${Number(fadeOutSlider.value).toFixed(2)} s`;
+	if (clip) clip.fadeOut = Number(fadeOutSlider.value);
+});
+loopCheckbox.addEventListener("change", () => {
+	if (clip) clip.loop = loopCheckbox.checked;
+});
+loopStartSlider.addEventListener("input", () => {
+	valLoopStart.textContent = `${Number(loopStartSlider.value).toFixed(2)} s`;
+	if (clip) clip.loopStart = Number(loopStartSlider.value);
+});
+loopEndSlider.addEventListener("input", () => {
+	valLoopEnd.textContent = `${Number(loopEndSlider.value).toFixed(2)} s`;
+	if (clip) clip.loopEnd = Number(loopEndSlider.value);
+});
+crossfadeSlider.addEventListener("input", () => {
+	valCrossfade.textContent = `${Number(crossfadeSlider.value).toFixed(2)} s`;
+	if (clip) clip.loopCrossfade = Number(crossfadeSlider.value);
 });

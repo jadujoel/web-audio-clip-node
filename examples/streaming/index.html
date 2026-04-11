@@ -44,6 +44,50 @@
       margin-top: 0.75rem; font-size: 0.85rem; color: #94a3b8;
       min-height: 1.2em;
     }
+
+    /* ── Controls ─────────────────────────────────────── */
+    .controls {
+      margin-top: 1.5rem;
+      border-top: 1px solid #334155;
+      padding-top: 1rem;
+    }
+    .controls h2 {
+      font-size: 1rem; margin: 0 0 0.75rem;
+      color: #cbd5e1;
+    }
+    .control-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 56px;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .control-row label {
+      margin: 0; font-size: 0.82rem; color: #94a3b8;
+      text-align: right; padding-right: 0.25rem;
+    }
+    .control-row input[type="range"] {
+      width: 100%; accent-color: #38bdf8;
+    }
+    .control-row .val {
+      font-size: 0.8rem; color: #e2e8f0;
+      font-variant-numeric: tabular-nums;
+      text-align: left;
+    }
+    .control-group {
+      margin-bottom: 0.75rem;
+    }
+    .control-group summary {
+      cursor: pointer; font-size: 0.9rem;
+      color: #cbd5e1; font-weight: 600;
+      padding: 0.25rem 0;
+    }
+    .control-group[open] summary { margin-bottom: 0.5rem; }
+    .loop-toggle {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .loop-toggle label { margin: 0; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -64,6 +108,90 @@
 
   <div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
   <p id="status">Idle</p>
+
+  <!-- ── Audio Controls ───────────────────────────────── -->
+  <div class="controls" id="controls" style="display:none">
+    <h2>Controls</h2>
+
+    <details class="control-group" open>
+      <summary>Volume &amp; Panning</summary>
+      <div class="control-row">
+        <label for="ctrl-gain">Gain</label>
+        <input type="range" id="ctrl-gain" min="0" max="2" step="0.01" value="1" />
+        <span class="val" id="val-gain">1.00</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-pan">Pan</label>
+        <input type="range" id="ctrl-pan" min="-1" max="1" step="0.01" value="0" />
+        <span class="val" id="val-pan">C</span>
+      </div>
+    </details>
+
+    <details class="control-group" open>
+      <summary>Speed &amp; Pitch</summary>
+      <div class="control-row">
+        <label for="ctrl-rate">Playback Rate</label>
+        <input type="range" id="ctrl-rate" min="0.25" max="4" step="0.01" value="1" />
+        <span class="val" id="val-rate">1.00×</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-detune">Detune</label>
+        <input type="range" id="ctrl-detune" min="-2400" max="2400" step="1" value="0" />
+        <span class="val" id="val-detune">0 ct</span>
+      </div>
+    </details>
+
+    <details class="control-group">
+      <summary>Filters</summary>
+      <div class="control-row">
+        <label for="ctrl-lowpass">Lowpass</label>
+        <input type="range" id="ctrl-lowpass" min="20" max="20000" step="1" value="20000" />
+        <span class="val" id="val-lowpass">20000 Hz</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-highpass">Highpass</label>
+        <input type="range" id="ctrl-highpass" min="20" max="20000" step="1" value="20" />
+        <span class="val" id="val-highpass">20 Hz</span>
+      </div>
+    </details>
+
+    <details class="control-group">
+      <summary>Fades</summary>
+      <div class="control-row">
+        <label for="ctrl-fadein">Fade In</label>
+        <input type="range" id="ctrl-fadein" min="0" max="5" step="0.01" value="0" />
+        <span class="val" id="val-fadein">0.00 s</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-fadeout">Fade Out</label>
+        <input type="range" id="ctrl-fadeout" min="0" max="5" step="0.01" value="0" />
+        <span class="val" id="val-fadeout">0.00 s</span>
+      </div>
+    </details>
+
+    <details class="control-group">
+      <summary>Loop</summary>
+      <div class="loop-toggle">
+        <input type="checkbox" id="ctrl-loop" checked />
+        <label for="ctrl-loop">Loop enabled</label>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-loopstart">Loop Start</label>
+        <input type="range" id="ctrl-loopstart" min="0" max="120" step="0.01" value="0" />
+        <span class="val" id="val-loopstart">0.00 s</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-loopend">Loop End</label>
+        <input type="range" id="ctrl-loopend" min="0" max="120" step="0.01" value="0" />
+        <span class="val" id="val-loopend">0.00 s</span>
+      </div>
+      <div class="control-row">
+        <label for="ctrl-crossfade">Crossfade</label>
+        <input type="range" id="ctrl-crossfade" min="0" max="5" step="0.01" value="0" />
+        <span class="val" id="val-crossfade">0.00 s</span>
+      </div>
+    </details>
+  </div>
 
   <script type="module" src="./main.ts"></script>
 </body>
