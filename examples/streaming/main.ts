@@ -11,6 +11,7 @@ const streamBtn = document.getElementById("stream") as HTMLButtonElement;
 const pauseBtn = document.getElementById("pause") as HTMLButtonElement;
 const stopBtn = document.getElementById("stop") as HTMLButtonElement;
 const urlInput = document.getElementById("url") as HTMLInputElement;
+const throttleSelect = document.getElementById("throttle-select") as HTMLSelectElement;
 const progressBar = document.getElementById("progress") as HTMLDivElement;
 const statusText = document.getElementById("status") as HTMLParagraphElement;
 const controlsPanel = document.getElementById("controls") as HTMLDivElement;
@@ -165,12 +166,13 @@ streamBtn.addEventListener("click", async () => {
 
 	// Init the worker with the port and absolute URL
 	const absoluteUrl = new URL(url, location.href).href;
+	const throttle = Number(throttleSelect.value);
 	worker.postMessage(
-		{ type: "init", port: channel.port1, url: absoluteUrl },
+		{ type: "init", port: channel.port1, url: absoluteUrl, throttle },
 		[channel.port1],
 	);
 
-	setStatus("Starting stream…");
+	setStatus(throttle > 0 ? `Starting stream… (${(throttle / 1024).toFixed(0)} KB/s)` : "Starting stream…");
 	setProgress(0);
 });
 

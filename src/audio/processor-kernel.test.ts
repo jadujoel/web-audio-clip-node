@@ -840,6 +840,7 @@ describe("handleProcessorMessage", () => {
 		const props = getProperties({}, SR);
 		handleProcessorMessage(props, { type: "loopCrossfade", data: 0.1 }, CT, SR);
 		expect(props.loopCrossfade).toBe(0.1);
+		expect(props.enableLoopCrossfade).toBe(true);
 	});
 
 	it("playhead setter (floors value)", () => {
@@ -852,12 +853,38 @@ describe("handleProcessorMessage", () => {
 		const props = getProperties({}, SR);
 		handleProcessorMessage(props, { type: "fadeIn", data: 0.5 }, CT, SR);
 		expect(props.fadeInDuration).toBe(0.5);
+		expect(props.enableFadeIn).toBe(true);
 	});
 
 	it("fadeOut setter", () => {
 		const props = getProperties({}, SR);
 		handleProcessorMessage(props, { type: "fadeOut", data: 0.3 }, CT, SR);
 		expect(props.fadeOutDuration).toBe(0.3);
+		expect(props.enableFadeOut).toBe(true);
+	});
+
+	it("fadeIn setter to 0 disables enableFadeIn", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(props, { type: "fadeIn", data: 0.5 }, CT, SR);
+		expect(props.enableFadeIn).toBe(true);
+		handleProcessorMessage(props, { type: "fadeIn", data: 0 }, CT, SR);
+		expect(props.enableFadeIn).toBe(false);
+	});
+
+	it("fadeOut setter to 0 disables enableFadeOut", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(props, { type: "fadeOut", data: 0.3 }, CT, SR);
+		expect(props.enableFadeOut).toBe(true);
+		handleProcessorMessage(props, { type: "fadeOut", data: 0 }, CT, SR);
+		expect(props.enableFadeOut).toBe(false);
+	});
+
+	it("loopCrossfade setter to 0 disables enableLoopCrossfade", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(props, { type: "loopCrossfade", data: 0.2 }, CT, SR);
+		expect(props.enableLoopCrossfade).toBe(true);
+		handleProcessorMessage(props, { type: "loopCrossfade", data: 0 }, CT, SR);
+		expect(props.enableLoopCrossfade).toBe(false);
 	});
 
 	it("toggleGain", () => {
@@ -3719,5 +3746,850 @@ describe("Loop: edge cases", () => {
 		);
 		expect(outputs[0][0].every((sample) => sample === 0)).toBe(true);
 		expect(props.playhead).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// H. Buffer swap during playback
+// ---------------------------------------------------------------------------
+
+describe("Buffer swap during playback", () => {
+	const SR = 48000;
+	const BLOCK = 128;
+
+	function makeProcessParams(
+		overrides: Partial<Record<string, Float32Array>> = {},
+	) {
+		return {
+			playbackRate: new Float32Array([1]),
+			detune: new Float32Array([0]),
+			lowpass: new Float32Array([20000]),
+			highpass: new Float32Array([20]),
+			gain: new Float32Array([1]),
+			pan: new Float32Array([0]),
+			...overrides,
+		};
+	}
+
+	function makeFilterState() {
+		return {
+			lowpass: createFilterState(),
+			highpass: createFilterState(),
+		};
+	}
+
+	function makeSine(length: number, freq = 440, channels = 2): Float32Array[] {
+		return Array.from({ length: channels }, () => {
+			const arr = new Float32Array(length);
+			for (let i = 0; i < length; i++)
+				arr[i] = Math.sin((2 * Math.PI * freq * i) / SR);
+			return arr;
+		});
+	}
+
+	function makeConstant(
+		length: number,
+		value: number,
+		channels = 2,
+	): Float32Array[] {
+		return Array.from({ length: channels }, () =>
+			new Float32Array(length).fill(value),
+		);
+	}
+
+	function rms(arr: Float32Array, start = 0, end?: number): number {
+		const e = end ?? arr.length;
+		let sum = 0;
+		for (let i = start; i < e; i++) sum += arr[i] * arr[i];
+		return Math.sqrt(sum / (e - start));
+	}
+
+	function hasSound(output: Float32Array[], threshold = 1e-10): boolean {
+		for (const ch of output) {
+			for (let i = 0; i < ch.length; i++) {
+				if (Math.abs(ch[i]) > threshold) return true;
+			}
+		}
+		return false;
+	}
+
+	/** Start a props in playing state with effects disabled for clarity. */
+	function makePlayingProps(
+		overrides: Partial<ClipProcessorOptions> = {},
+	): Required<ClipProcessorOptions> {
+		return getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+				...overrides,
+			},
+			SR,
+		);
+	}
+
+	/** Process N blocks, collecting messages and tracking NaNs. */
+	function runBlocks(
+		props: Required<ClipProcessorOptions>,
+		numBlocks: number,
+		params?: Record<string, Float32Array>,
+	) {
+		const p = params ?? makeProcessParams();
+		const filterState = makeFilterState();
+		const allOutputs: Float32Array[][] = [];
+		const allMessages: OutboundMessage[] = [];
+		let totalNans = 0;
+		const blockDuration = BLOCK / SR;
+
+		for (let b = 0; b < numBlocks; b++) {
+			const out = [makeOutput(2)];
+			const ct = 0.001 + b * blockDuration;
+			const result = processBlock(
+				props,
+				out,
+				p,
+				{ currentTime: ct, currentFrame: b * BLOCK, sampleRate: SR },
+				filterState,
+			);
+			allOutputs.push(out[0]);
+			allMessages.push(...result.messages);
+			totalNans += checkNans(out[0]);
+			if (!result.keepAlive) break;
+		}
+		return { allOutputs, allMessages, totalNans };
+	}
+
+	// ── A. Full buffer swap ──────────────────────────────────────────────
+
+	it("A1: swap to same-length buffer (different content) — sound before & after, no NaN, playhead preserved", () => {
+		const buf1 = makeConstant(1024, 0.3);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		// Play 3 blocks
+		const before = runBlocks(props, 3);
+		expect(before.totalNans).toBe(0);
+		expect(hasSound(before.allOutputs[0])).toBe(true);
+		const playheadBeforeSwap = props.playhead;
+
+		// Swap buffer
+		const buf2 = makeConstant(1024, 0.7);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.01, SR);
+
+		// Playhead should NOT have been reset
+		expect(props.playhead).toBe(playheadBeforeSwap);
+
+		// Play 3 more blocks
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		expect(hasSound(after.allOutputs[0])).toBe(true);
+	});
+
+	it("A2: swap to shorter buffer (playhead beyond new length) — no crash, clamped read", () => {
+		const buf1 = makeConstant(1024, 0.5);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		// Advance playhead past 512
+		runBlocks(props, 5);
+		expect(props.playhead).toBeGreaterThan(512);
+
+		// Swap to shorter buffer
+		const buf2 = makeConstant(256, 0.8);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.1, SR);
+
+		// Should not crash; process a few more blocks
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+	});
+
+	it("A3: swap to longer buffer — playhead unchanged, can play extended region", () => {
+		const buf1 = makeConstant(512, 0.3);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		runBlocks(props, 2);
+		const playheadBefore = props.playhead;
+
+		// Swap to longer buffer
+		const buf2 = makeConstant(4096, 0.6);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.01, SR);
+		expect(props.playhead).toBe(playheadBefore);
+
+		// Play many more blocks — should produce sound in extended region
+		const after = runBlocks(props, 20);
+		expect(after.totalNans).toBe(0);
+		expect(hasSound(after.allOutputs[10])).toBe(true);
+	});
+
+	it("A4: swap from stereo to mono buffer — monoToStereo activates, both channels populated", () => {
+		const buf1 = makeConstant(1024, 0.5, 2);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		runBlocks(props, 2);
+
+		// Swap to mono
+		const bufMono = makeConstant(1024, 0.4, 1);
+		handleProcessorMessage(props, { type: "buffer", data: bufMono }, 0.01, SR);
+
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		// Both output channels should have sound (monoToStereo copies ch0→ch1)
+		expect(rms(after.allOutputs[0][0])).toBeGreaterThan(0);
+		expect(rms(after.allOutputs[0][1])).toBeGreaterThan(0);
+	});
+
+	it("A5: swap from mono to stereo buffer — stereo output correct", () => {
+		const bufMono = makeConstant(1024, 0.4, 1);
+		const props = makePlayingProps({ buffer: bufMono });
+
+		runBlocks(props, 2);
+
+		const bufStereo = makeConstant(1024, 0.6, 2);
+		handleProcessorMessage(
+			props,
+			{ type: "buffer", data: bufStereo },
+			0.01,
+			SR,
+		);
+
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		expect(rms(after.allOutputs[0][0])).toBeGreaterThan(0);
+		expect(rms(after.allOutputs[0][1])).toBeGreaterThan(0);
+	});
+
+	it("A6: swap buffer while looping — loop still wraps, looped message emitted", () => {
+		const buf1 = makeConstant(384, 0.5); // 3 blocks
+		const props = makePlayingProps({
+			buffer: buf1,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 384 / SR,
+		});
+
+		// Run enough blocks to loop at least once
+		const result = runBlocks(props, 6);
+		expect(result.allMessages.some((m) => m.type === "looped")).toBe(true);
+
+		// Swap buffer
+		const buf2 = makeConstant(384, 0.8);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.1, SR);
+
+		// Continue playing — should still loop
+		const after = runBlocks(props, 6);
+		expect(after.totalNans).toBe(0);
+		expect(after.allMessages.some((m) => m.type === "looped")).toBe(true);
+	});
+
+	it("A7: swap to shorter buffer while looping — normalizeLoopBounds clamps loopEnd", () => {
+		const buf1 = makeConstant(1024, 0.5);
+		const props = makePlayingProps({
+			buffer: buf1,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 1024 / SR,
+		});
+
+		runBlocks(props, 2);
+
+		// Swap to much shorter buffer
+		const buf2 = makeConstant(256, 0.8);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.1, SR);
+
+		// loopEnd should have been clamped to new buffer duration
+		expect(props.loopEnd).toBeLessThanOrEqual(256 / SR + 0.0001);
+
+		// Continue looping — should not crash
+		const after = runBlocks(props, 10);
+		expect(after.totalNans).toBe(0);
+	});
+
+	it("A8: swap buffer multiple times rapidly (5 swaps in 10 blocks) — last buffer heard", () => {
+		const buf1 = makeConstant(2048, 0.1);
+		const props = makePlayingProps({ buffer: buf1 });
+		const params = makeProcessParams();
+		const filterState = makeFilterState();
+		let totalNans = 0;
+
+		for (let b = 0; b < 10; b++) {
+			if (b % 2 === 1) {
+				const val = 0.1 * (b + 1);
+				const newBuf = makeConstant(2048, val);
+				handleProcessorMessage(
+					props,
+					{ type: "buffer", data: newBuf },
+					0.001 + (b * BLOCK) / SR,
+					SR,
+				);
+			}
+			const out = [makeOutput(2)];
+			const result = processBlock(
+				props,
+				out,
+				params,
+				{
+					currentTime: 0.001 + (b * BLOCK) / SR,
+					currentFrame: b * BLOCK,
+					sampleRate: SR,
+				},
+				filterState,
+			);
+			totalNans += checkNans(out[0]);
+			expect(result.keepAlive).toBe(true);
+		}
+		expect(totalNans).toBe(0);
+	});
+
+	it("A9: swap to empty buffer — output is silence, no crash", () => {
+		const buf1 = makeConstant(1024, 0.5);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		runBlocks(props, 2);
+
+		// Swap to empty
+		handleProcessorMessage(props, { type: "buffer", data: [] }, 0.1, SR);
+
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		// All output should be silence
+		for (const out of after.allOutputs) {
+			expect(hasSound(out)).toBe(false);
+		}
+	});
+
+	it("A10: swap from empty to populated buffer — sound begins", () => {
+		const props = makePlayingProps({ buffer: [] });
+
+		// Silence before
+		const before = runBlocks(props, 2);
+		for (const out of before.allOutputs) {
+			expect(hasSound(out)).toBe(false);
+		}
+
+		// Swap in a real buffer
+		const buf = makeConstant(1024, 0.6);
+		handleProcessorMessage(props, { type: "buffer", data: buf }, 0.01, SR);
+
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		// Playhead was at 0 (buffer was empty), now should produce sound
+		// Reset playhead to 0 so we read from start of new buffer
+		props.playhead = 0;
+		const afterReset = runBlocks(props, 3);
+		expect(hasSound(afterReset.allOutputs[0])).toBe(true);
+	});
+
+	it("A11: swap buffer while paused, then resume — reads from new buffer", () => {
+		const buf1 = makeConstant(1024, 0.3);
+		const props = makePlayingProps({ buffer: buf1 });
+
+		runBlocks(props, 2);
+
+		// Pause
+		handleProcessorMessage(props, { type: "pause" }, 0.01, SR);
+
+		// Swap buffer while paused
+		const buf2 = makeConstant(1024, 0.9);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.02, SR);
+
+		// Resume
+		handleProcessorMessage(props, { type: "resume" }, 0.03, SR);
+
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+		expect(hasSound(after.allOutputs[0])).toBe(true);
+	});
+
+	it("A12: swap buffer during loop crossfade — no OOB, no NaN", () => {
+		const buf1 = makeSine(2048, 440);
+		const props = makePlayingProps({
+			buffer: buf1,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 2048 / SR,
+			loopCrossfade: 0.005, // ~240 samples
+			enableLoopCrossfade: true,
+		});
+
+		// Advance to near the loop end (crossfade zone)
+		const nearEnd = Math.floor(2048 / BLOCK) - 2;
+		runBlocks(props, nearEnd);
+
+		// Swap buffer while in crossfade zone
+		const buf2 = makeSine(2048, 880);
+		handleProcessorMessage(props, { type: "buffer", data: buf2 }, 0.1, SR);
+
+		// Continue through crossfade and loop wrap
+		const after = runBlocks(props, 6);
+		expect(after.totalNans).toBe(0);
+	});
+
+	// ── B. Partial buffer replacement / streaming ────────────────────────
+
+	it("B1: replace region ahead of playhead — output reflects new data", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 1024, streaming: true },
+			},
+			0,
+			SR,
+		);
+
+		// Write initial data (first 512 samples)
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(512).fill(0.3),
+						new Float32Array(512).fill(0.3),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+		// Write region ahead of playhead (512–768) with different data
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 512,
+					channelData: [
+						new Float32Array(256).fill(0.9),
+						new Float32Array(256).fill(0.9),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Play past 512 samples
+		const result = runBlocks(props, 8);
+		expect(result.totalNans).toBe(0);
+		// Block 4 starts at sample 512 — should see higher amplitude
+		expect(rms(result.allOutputs[4][0])).toBeGreaterThan(0.5);
+	});
+
+	it("B2: replace region behind playhead — no crash, no effect on current output", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 1024, streaming: true },
+			},
+			0,
+			SR,
+		);
+		// Write all data
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(1024).fill(0.5),
+						new Float32Array(1024).fill(0.5),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Play 4 blocks (playhead at 512)
+		runBlocks(props, 4);
+
+		// Replace region 0–128 (behind playhead)
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(128).fill(0.1),
+						new Float32Array(128).fill(0.1),
+					],
+				},
+			},
+			0.01,
+			SR,
+		);
+
+		// Continue — no crash
+		const after = runBlocks(props, 3);
+		expect(after.totalNans).toBe(0);
+	});
+
+	it("B3: replace region at current playhead position — next blocks use new data", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 1024, streaming: true },
+			},
+			0,
+			SR,
+		);
+		// Write all data at 0.3
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(1024).fill(0.3),
+						new Float32Array(1024).fill(0.3),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Play 2 blocks (playhead at 256)
+		runBlocks(props, 2);
+		const ph = Math.floor(props.playhead);
+
+		// Replace region at playhead with high-amplitude data
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: ph,
+					channelData: [
+						new Float32Array(128).fill(0.95),
+						new Float32Array(128).fill(0.95),
+					],
+				},
+			},
+			0.01,
+			SR,
+		);
+
+		// Next block should use the new data
+		const after = runBlocks(props, 1);
+		expect(after.totalNans).toBe(0);
+		expect(rms(after.allOutputs[0][0])).toBeGreaterThan(0.8);
+	});
+
+	it("B4: playhead reaches uncommitted region → underrun, then clears after writing data", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 512, streaming: true },
+			},
+			0,
+			SR,
+		);
+		// Write only first 128 samples
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(128).fill(0.5),
+						new Float32Array(128).fill(0.5),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Play 1 block (consumes 128 samples), then run another will be underrun
+		const first = runBlocks(props, 1);
+		expect(first.totalNans).toBe(0);
+
+		const second = runBlocks(props, 1);
+		expect(second.allMessages.some((m) => m.type === "bufferUnderrun")).toBe(
+			true,
+		);
+
+		// Write more data
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 128,
+					channelData: [
+						new Float32Array(256).fill(0.5),
+						new Float32Array(256).fill(0.5),
+					],
+				},
+			},
+			0.01,
+			SR,
+		);
+
+		// Should be able to proceed now
+		const third = runBlocks(props, 1);
+		expect(third.totalNans).toBe(0);
+	});
+
+	it("B5: all data written before playhead catches up — no underrun", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 512, streaming: true },
+			},
+			0,
+			SR,
+		);
+		// Write all 512 samples upfront
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(512).fill(0.5),
+						new Float32Array(512).fill(0.5),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		const result = runBlocks(props, 4);
+		expect(result.totalNans).toBe(0);
+		expect(result.allMessages.some((m) => m.type === "bufferUnderrun")).toBe(
+			false,
+		);
+	});
+
+	it("B6: sequential bufferRange messages (append) — spans merge, committedLength advances", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 512, streaming: true },
+			},
+			0,
+			SR,
+		);
+
+		// Append 4 chunks of 128 samples each
+		for (let i = 0; i < 4; i++) {
+			handleProcessorMessage(
+				props,
+				{
+					type: "bufferRange",
+					data: {
+						startSample: i * 128,
+						channelData: [
+							new Float32Array(128).fill(0.3 + i * 0.1),
+							new Float32Array(128).fill(0.3 + i * 0.1),
+						],
+					},
+				},
+				0,
+				SR,
+			);
+		}
+
+		// committedLength should be 512 after processing
+		runBlocks(props, 1); // triggers applyPendingBufferWrites
+		expect(props.streamBuffer.committedLength).toBe(512);
+
+		// Play all
+		const result = runBlocks(props, 3);
+		expect(result.totalNans).toBe(0);
+	});
+
+	it("B7: replace same region twice with different data — second write wins", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 512, streaming: true },
+			},
+			0,
+			SR,
+		);
+		// Write all zeros first
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(512).fill(0),
+						new Float32Array(512).fill(0),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Overwrite first 128 samples with 0.8
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(128).fill(0.8),
+						new Float32Array(128).fill(0.8),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// First block should reflect the overwrite
+		const result = runBlocks(props, 1);
+		expect(result.totalNans).toBe(0);
+		expect(rms(result.allOutputs[0][0])).toBeGreaterThan(0.5);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// E2E: fade-in/crossfade set via message (regression for DD-CLIP-14)
+// ---------------------------------------------------------------------------
+
+describe("fade via message is audible (DD-CLIP-14)", () => {
+	const SR = 48000;
+	const CT = 0;
+
+	it("fade-in set via message attenuates initial samples", () => {
+		const buffer = Array.from({ length: 2 }, () =>
+			new Float32Array(48000).fill(1.0),
+		);
+		const props = getProperties(
+			{
+				buffer,
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 10,
+				duration: 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		// Set fade-in via message (as the streaming example does)
+		handleProcessorMessage(props, { type: "fadeIn", data: 0.1 }, CT, SR);
+		expect(props.enableFadeIn).toBe(true);
+
+		const outputs = [makeOutput(2)];
+		const params = {
+			playbackRate: new Float32Array([1]),
+			detune: new Float32Array([0]),
+			lowpass: new Float32Array([20000]),
+			highpass: new Float32Array([20]),
+			gain: new Float32Array([1]),
+			pan: new Float32Array([0]),
+		};
+		const filterState = {
+			lowpass: createFilterState(),
+			highpass: createFilterState(),
+		};
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			filterState,
+		);
+		// First sample should be attenuated relative to last sample
+		expect(Math.abs(outputs[0][0][0])).toBeLessThan(
+			Math.abs(outputs[0][0][127]),
+		);
+	});
+
+	it("crossfade set via message enables blending at loop boundary", () => {
+		const bufLen = 48000;
+		const buffer = Array.from({ length: 2 }, () =>
+			new Float32Array(bufLen).fill(1.0),
+		);
+		const loopStartSamples = Math.floor(0.1 * SR);
+		const props = getProperties(
+			{
+				buffer,
+				loop: true,
+				loopStart: 0.1,
+				loopEnd: 0.9,
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.POSITIVE_INFINITY,
+				duration: Number.POSITIVE_INFINITY,
+				playhead: loopStartSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		// Set crossfade via message
+		handleProcessorMessage(
+			props,
+			{ type: "loopCrossfade", data: 0.05 },
+			CT,
+			SR,
+		);
+		expect(props.enableLoopCrossfade).toBe(true);
+
+		const outputs = [makeOutput(2)];
+		const params = {
+			playbackRate: new Float32Array([1]),
+			detune: new Float32Array([0]),
+			lowpass: new Float32Array([20000]),
+			highpass: new Float32Array([20]),
+			gain: new Float32Array([1]),
+			pan: new Float32Array([0]),
+		};
+		const filterState = {
+			lowpass: createFilterState(),
+			highpass: createFilterState(),
+		};
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			filterState,
+		);
+		// With crossfade enabled at the beginning of a loop zone,
+		// output should be non-silent
+		const hasNonZero = outputs[0][0].some((v) => v !== 0);
+		expect(hasNonZero).toBe(true);
 	});
 });

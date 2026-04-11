@@ -2,6 +2,7 @@
 // Sends decoded Float32Array data directly to the ClipProcessor via a
 // transferred MessagePort, bypassing the main thread for audio data.
 
+// @ts-expect-error redeclare self as DedicatedWorkerGlobalScope
 declare const self: DedicatedWorkerGlobalScope;
 
 // ── MP3 frame parser ─────────────────────────────────────────────────
@@ -22,7 +23,7 @@ interface Mp3FrameInfo {
 
 interface ParseResult {
 	frames: Mp3FrameInfo[];
-	leftover: Uint8Array;
+	leftover: Uint8Array<ArrayBuffer>;
 }
 
 function parseMp3Frames(buf: Uint8Array): ParseResult {
@@ -104,6 +105,25 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 	return out;
 }
 
+// ── Throttle stream ──────────────────────────────────────────────────
+
+function createThrottleStream(bytesPerSec: number): TransformStream<Uint8Array, Uint8Array> {
+	let totalBytes = 0;
+	const startTime = performance.now();
+	return new TransformStream({
+		async transform(chunk, controller) {
+			totalBytes += chunk.length;
+			const elapsed = (performance.now() - startTime) / 1000;
+			const expected = totalBytes / bytesPerSec;
+			const delay = expected - elapsed;
+			if (delay > 0) {
+				await new Promise(resolve => setTimeout(resolve, delay * 1000));
+			}
+			controller.enqueue(chunk);
+		},
+	});
+}
+
 // ── Main worker entry ────────────────────────────────────────────────
 
 let abortController: AbortController | null = null;
@@ -111,12 +131,13 @@ let abortController: AbortController | null = null;
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url } = ev.data as {
+		const { port, url, throttle } = ev.data as {
 			port: MessagePort;
 			url: string;
+			throttle?: number;
 		};
 		abortController = new AbortController();
-		startStreaming(port, url, abortController.signal);
+		startStreaming(port, url, abortController.signal, throttle ?? 0);
 	} else if (type === "abort") {
 		abortController?.abort();
 	}
@@ -126,20 +147,13 @@ async function startStreaming(
 	processorPort: MessagePort,
 	url: string,
 	signal: AbortSignal,
+	throttle: number,
 ) {
 	let totalBytes: number | null = null;
 	let bytesReceived = 0;
 	let samplesDecoded = 0;
 	let leftover = new Uint8Array(0);
 	let initialized = false;
-	let decoderDone: (() => void) | null = null;
-	let channels = 2;
-	let mp3SampleRate = 44100;
-
-	// We'll resolve this when decoder is fully flushed
-	const decoderFlushed = new Promise<void>((resolve) => {
-		decoderDone = resolve;
-	});
 
 	const decoder = new AudioDecoder({
 		output(audioData: AudioData) {
@@ -156,8 +170,6 @@ async function startStreaming(
 
 			if (!initialized) {
 				initialized = true;
-				channels = numChannels;
-				mp3SampleRate = audioData.sampleRate;
 
 				// Estimate total samples from Content-Length if available
 				let estimatedTotalSamples: number | null = null;
@@ -213,7 +225,10 @@ async function startStreaming(
 		const contentLength = response.headers.get("content-length");
 		totalBytes = contentLength ? Number.parseInt(contentLength, 10) : null;
 
-		const reader = response.body.getReader();
+		const body = throttle > 0
+			? response.body.pipeThrough(createThrottleStream(throttle))
+			: response.body;
+		const reader = body.getReader();
 		let configuredDecoder = false;
 		let timestampUs = 0;
 
@@ -289,6 +304,5 @@ async function startStreaming(
 			// already closed
 		}
 		processorPort.close();
-		decoderDone?.();
 	}
 }

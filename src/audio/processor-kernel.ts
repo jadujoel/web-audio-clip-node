@@ -770,15 +770,18 @@ export function handleProcessorMessage(
 			return [];
 		case "loopCrossfade":
 			properties.loopCrossfade = data as number;
+			properties.enableLoopCrossfade = properties.loopCrossfade > 0;
 			return [];
 		case "playhead":
 			properties.playhead = Math.floor(data as number);
 			return [];
 		case "fadeIn":
 			properties.fadeInDuration = data as number;
+			properties.enableFadeIn = properties.fadeInDuration > 0;
 			return [];
 		case "fadeOut":
 			properties.fadeOutDuration = data as number;
+			properties.enableFadeOut = properties.fadeOutDuration > 0;
 			return [];
 		case "toggleGain":
 			properties.enableGain =

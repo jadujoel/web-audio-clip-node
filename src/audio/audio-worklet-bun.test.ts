@@ -78,4 +78,79 @@ describe("AudioWorklet Bun integration", () => {
 		// Reaching here without a crash means the worklet survived rate=0
 		expect(true).toBe(true);
 	});
+
+	test("C1: full buffer swap via ClipNode.buffer setter during playback — no crash", async () => {
+		const context = createContext({
+			sampleRate: 48_000,
+			channels: 2,
+			length: 48_000 * 2,
+		});
+
+		await Bun.build({
+			entrypoints: ["src/audio/processor.ts"],
+			outdir: "dist/audio",
+		});
+
+		await context.audioWorklet.addModule("./dist/audio/processor.js");
+
+		const buffer1 = context.createBuffer(2, 48_000, context.sampleRate);
+		buffer1.getChannelData(0).fill(0.25);
+		buffer1.getChannelData(1).fill(0.25);
+
+		const clip = new ClipNode(context);
+		clip.buffer = buffer1;
+		clip.connect(context.destination);
+		clip.start();
+
+		// Swap to a different buffer after a short delay
+		const buffer2 = context.createBuffer(2, 48_000, context.sampleRate);
+		buffer2.getChannelData(0).fill(0.5);
+		buffer2.getChannelData(1).fill(0.5);
+		clip.buffer = buffer2;
+
+		await renderContext(context);
+
+		// Reaching here = no crash, no hang
+		expect(true).toBe(true);
+	});
+
+	test("C2: replaceBufferRange during streaming playback — no crash", async () => {
+		const context = createContext({
+			sampleRate: 48_000,
+			channels: 2,
+			length: 48_000 * 2,
+		});
+
+		await Bun.build({
+			entrypoints: ["src/audio/processor.ts"],
+			outdir: "dist/audio",
+		});
+
+		await context.audioWorklet.addModule("./dist/audio/processor.js");
+
+		const clip = new ClipNode(context);
+		clip.connect(context.destination);
+
+		// Initialize streaming buffer
+		clip.initializeBuffer(48_000, 2, { streaming: true });
+		clip.start();
+
+		// Feed data in chunks
+		const chunkSize = 4800;
+		for (let i = 0; i < 10; i++) {
+			const data = [
+				new Float32Array(chunkSize).fill(0.25),
+				new Float32Array(chunkSize).fill(0.25),
+			];
+			clip.replaceBufferRange(i * chunkSize, data, {
+				totalLength: 48_000,
+				streamEnded: i === 9,
+			});
+		}
+
+		await renderContext(context);
+
+		// Reaching here = no crash, no hang
+		expect(true).toBe(true);
+	});
 });
