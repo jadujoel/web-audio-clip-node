@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipNode } from "../audio/ClipNode";
 import type { ClipNodeState, FrameData } from "../audio/types";
 import { float32ArrayFromAudioBuffer, linFromDb } from "../audio/utils";
-import { getProcessorModuleUrl } from "../audio/workletUrl";
+import { getProcessorBlobUrl } from "../audio/workletUrl";
 import type { ControlKey } from "../controls/controlDefs";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { loadFromCache } from "../data/cache";
@@ -155,7 +155,7 @@ export function useClipNode({
 	const ensureContext = useCallback(async () => {
 		if (ctxRef.current) return ctxRef.current;
 		const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
-		await ctx.audioWorklet.addModule(getProcessorModuleUrl());
+		await ctx.audioWorklet.addModule(getProcessorBlobUrl());
 		ctxRef.current = ctx;
 		return ctx;
 	}, []);
