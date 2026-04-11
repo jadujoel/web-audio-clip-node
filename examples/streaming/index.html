@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipNode – Streaming Example</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #e2e8f0;
+      background: #0f172a;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    p.desc { color: #94a3b8; margin-top: 0; font-size: 0.9rem; }
+    label { display: block; margin-top: 1rem; font-size: 0.85rem; color: #94a3b8; }
+    input[type="text"] {
+      width: 100%; box-sizing: border-box;
+      padding: 0.5rem; margin-top: 0.25rem;
+      border: 1px solid #334155; border-radius: 6px;
+      background: #1e293b; color: #e2e8f0; font-size: 0.9rem;
+    }
+    .buttons { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    button {
+      padding: 0.5rem 1.25rem; border: none; border-radius: 6px;
+      font-size: 0.9rem; cursor: pointer; font-weight: 600;
+    }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #stream { background: #38bdf8; color: #0f172a; }
+    #pause  { background: #facc15; color: #0f172a; }
+    #stop   { background: #fb7185; color: #0f172a; }
+    .progress-wrap {
+      margin-top: 1rem; height: 6px; border-radius: 3px;
+      background: #1e293b; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%; border-radius: 3px;
+      background: #38bdf8; transition: width 0.15s;
+    }
+    #status {
+      margin-top: 0.75rem; font-size: 0.85rem; color: #94a3b8;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClipNode — Streaming</h1>
+  <p class="desc">
+    Stream &amp; decode an MP3 in a Web Worker, feeding decoded audio
+    directly to the AudioWorklet processor via MessagePort.
+  </p>
+
+  <label for="url">Audio URL</label>
+  <input type="text" id="url" value="https://jadujoel.github.io/web-audio-clip-node/example.mp3" />
+
+  <div class="buttons">
+    <button id="stream">▶ Stream &amp; Play</button>
+    <button id="pause" disabled>⏸ Pause</button>
+    <button id="stop" disabled>■ Stop</button>
+  </div>
+
+  <div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
+  <p id="status">Idle</p>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

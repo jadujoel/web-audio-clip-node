@@ -73,6 +73,19 @@ class ClipProcessor extends AudioWorkletProcessor {
 		super(options);
 		this.properties = getProperties(options?.processorOptions, sampleRate);
 		this.port.onmessage = (ev: MessageEvent) => {
+			if (ev.data.type === "transferPort") {
+				const port = ev.data.data as MessagePort;
+				port.onmessage = (portEv: MessageEvent) => {
+					const messages = handleProcessorMessage(
+						this.properties,
+						portEv.data,
+						currentTime,
+						sampleRate,
+					);
+					for (const msg of messages) this.port.postMessage(msg);
+				};
+				return;
+			}
 			const messages = handleProcessorMessage(
 				this.properties,
 				ev.data,

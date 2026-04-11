@@ -1,0 +1,12 @@
+{
+  "name": "streaming-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:worker": "bun build decode-worker.ts --outdir public --target browser --minify",
+    "dev": "bun run build:worker && bun index.html"
+  },
+  "dependencies": {
+    "@jadujoel/web-audio-clip-node": "file:../.."
+  }
+}

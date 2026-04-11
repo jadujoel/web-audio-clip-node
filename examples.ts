@@ -16,9 +16,10 @@ export async function examples() {
 		linkWorkspacePackage("examples/react"),
 		linkWorkspacePackage("examples/esm-bundler"),
 		linkWorkspacePackage("examples/self-hosted"),
+		linkWorkspacePackage("examples/streaming"),
 	]);
 	await Bun.$`bun run --cwd examples/self-hosted setup`;
-	await Bun.$`bun examples/index.html examples/cdn-vanilla/index.html examples/esm-bundler/index.html examples/react/index.html examples/self-hosted/index.html`;
+	await Bun.$`bun examples/index.html examples/cdn-vanilla/index.html examples/esm-bundler/index.html examples/react/index.html examples/self-hosted/index.html examples/streaming/index.html`;
 }
 
 if (import.meta.main) {
