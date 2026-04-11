@@ -23,10 +23,10 @@ export class ClipNode extends AudioWorkletNode {
 	private _fadeOut = 0;
 	private _loopCrossfade = 0;
 	private _duration = -1;
+	private _previousState: ClipNodeState = "initial";
 
 	timesLooped = 0;
 	state: ClipNodeState = "initial";
-	private previousState: ClipNodeState = "initial";
 	cpu = 0;
 
 	constructor(context: BaseAudioContext, options: ClipWorkletOptions = {}) {
@@ -93,9 +93,9 @@ export class ClipNode extends AudioWorkletNode {
 	};
 
 	private setState(newState: ClipNodeState) {
-		this.previousState = this.state;
+		this._previousState = this.state;
 		this.state = newState;
-		if (this.state !== this.previousState) {
+		if (this.state !== this._previousState) {
 			this.onstatechange?.(this.state);
 		}
 	}

@@ -1,8 +1,13 @@
 import { useCallback, useEffect } from "react";
 import type { ControlKey } from "./audio/controlDefs";
-import { controlDefs, loopControlDefs, paramDefs } from "./audio/controlDefs";
+import { controlDefs, loopControlDefs } from "./audio/controlDefs";
 import { ControlSection } from "./components/ControlSection";
+import { DetuneControl } from "./components/DetuneControl";
 import { DisplayPanel } from "./components/DisplayPanel";
+import { FilterControl } from "./components/FilterControl";
+import { GainControl } from "./components/GainControl";
+import { PanControl } from "./components/PanControl";
+import { PlaybackRateControl } from "./components/PlaybackRateControl";
 import { PlayheadSlider } from "./components/PlayheadSlider";
 import { TransportButtons } from "./components/TransportButtons";
 import { useClipNode } from "./hooks/useClipNode";
@@ -158,24 +163,55 @@ export function App() {
 						/>
 					)}
 				</fieldset>
-				<ControlSection
-					legend="Parameters"
-					defs={paramDefs}
-					values={controls.values}
-					snaps={controls.snaps}
-					enabled={controls.enabled}
-					mins={controls.mins}
-					maxs={controls.maxs}
-					maxLocked={controls.maxLocked}
-					tempo={controls.tempo}
-					audioDuration={node.audioDuration}
-					onValueChange={handleValueChange}
-					onToggle={handleToggle}
-					onSnapChange={controls.setSnap}
-					onMinChange={controls.setMin}
-					onMaxChange={controls.setMax}
-					onMaxLockedChange={handleMaxLockedChange}
-				/>
+				<fieldset className="control-group">
+					<legend>Parameters</legend>
+					<PlaybackRateControl
+						value={controls.values.playbackRate}
+						defaultValue={1}
+						enabled={controls.enabled.playbackRate}
+						onChange={(v) => handleValueChange("playbackRate", v)}
+						onToggle={(on) => handleToggle("playbackRate", on)}
+					/>
+					<DetuneControl
+						value={controls.values.detune}
+						defaultValue={0}
+						enabled={controls.enabled.detune}
+						onChange={(v) => handleValueChange("detune", v)}
+						onToggle={(on) => handleToggle("detune", on)}
+					/>
+					<GainControl
+						value={controls.values.gain}
+						defaultValue={0}
+						enabled={controls.enabled.gain}
+						onChange={(v) => handleValueChange("gain", v)}
+						onToggle={(on) => handleToggle("gain", on)}
+					/>
+					<PanControl
+						value={controls.values.pan}
+						defaultValue={0}
+						enabled={controls.enabled.pan}
+						onChange={(v) => handleValueChange("pan", v)}
+						onToggle={(on) => handleToggle("pan", on)}
+					/>
+					<FilterControl
+						label="Lowpass"
+						controlKey="lowpass"
+						value={controls.values.lowpass}
+						defaultValue={16384}
+						enabled={controls.enabled.lowpass}
+						onChange={(v) => handleValueChange("lowpass", v)}
+						onToggle={(on) => handleToggle("lowpass", on)}
+					/>
+					<FilterControl
+						label="Highpass"
+						controlKey="highpass"
+						value={controls.values.highpass}
+						defaultValue={32}
+						enabled={controls.enabled.highpass}
+						onChange={(v) => handleValueChange("highpass", v)}
+						onToggle={(on) => handleToggle("highpass", on)}
+					/>
+				</fieldset>
 			</section>
 		</main>
 	);

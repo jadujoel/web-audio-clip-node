@@ -34,8 +34,6 @@ export interface ControlDef {
 	hasSnap?: boolean;
 	/** When true, max defaults to audio file duration. */
 	maxLockedByDefault?: boolean;
-	/** When true the context menu offers a "Max = file length" checkbox. */
-	hasMaxLock?: boolean;
 }
 
 export const DEFAULT_TEMPO = 120;
@@ -52,7 +50,6 @@ export const controlDefs: ControlDef[] = [
 		hasSnap: true,
 		hasToggle: true,
 		maxLockedByDefault: true,
-		hasMaxLock: true,
 		title: "Start position in the buffer (seconds).",
 	},
 	{
@@ -64,7 +61,6 @@ export const controlDefs: ControlDef[] = [
 		hasSnap: true,
 		hasToggle: true,
 		maxLockedByDefault: true,
-		hasMaxLock: true,
 		title:
 			"How long to play before auto-stopping (seconds). -1 for full length.",
 	},
@@ -94,7 +90,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeIn",
 		label: "FadeIn",
 		min: 0,
-		max: 8,
+		max: 60,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -105,7 +101,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeOut",
 		label: "FadeOut",
 		min: 0,
-		max: 8,
+		max: 60,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -125,7 +121,6 @@ export const loopControlDefs: ControlDef[] = [
 		hasSnap: true,
 		hasToggle: true,
 		maxLockedByDefault: true,
-		hasMaxLock: true,
 	},
 	{
 		key: "loopEnd",
@@ -137,7 +132,6 @@ export const loopControlDefs: ControlDef[] = [
 		hasSnap: true,
 		hasToggle: true,
 		maxLockedByDefault: true,
-		hasMaxLock: true,
 	},
 	{
 		key: "loopCrossfade",
@@ -160,8 +154,6 @@ export const paramDefs: ControlDef[] = [
 		defaultValue: 1,
 		precision: 2,
 		preset: "playbackRate",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "Playback speed. Negative for reverse.",
 	},
@@ -173,8 +165,6 @@ export const paramDefs: ControlDef[] = [
 		defaultValue: 0,
 		precision: 4,
 		preset: "cents",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "Pitch shift in cents.",
 	},
@@ -186,8 +176,6 @@ export const paramDefs: ControlDef[] = [
 		defaultValue: 0,
 		precision: 3,
 		preset: "gain",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "Amplitude in dB.",
 	},
@@ -198,8 +186,6 @@ export const paramDefs: ControlDef[] = [
 		max: 1,
 		defaultValue: 0,
 		preset: "pan",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "-1 full left, 1 full right.",
 	},
@@ -210,8 +196,6 @@ export const paramDefs: ControlDef[] = [
 		max: 16384,
 		defaultValue: 16384,
 		preset: "hertz",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "Lowpass cutoff frequency.",
 	},
@@ -222,8 +206,6 @@ export const paramDefs: ControlDef[] = [
 		max: 16384,
 		defaultValue: 32,
 		preset: "hertz",
-		snap: "preset",
-		hasSnap: true,
 		hasToggle: true,
 		title: "Highpass cutoff frequency.",
 	},
