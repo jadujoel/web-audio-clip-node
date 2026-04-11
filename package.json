@@ -45,6 +45,7 @@
 		"build": "bun build.ts",
 		"build:lib": "bun build.ts --lib",
 		"dev": "bun serve.ts",
+		"examples": "bun examples.ts",
 		"lint": "biome check",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",

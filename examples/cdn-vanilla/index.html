@@ -17,7 +17,7 @@
   <p id="status">Click Play to start (loads a sample tone).</p>
   <script type="module">
     // Import the bundled library from the CDN (single file, no module resolution needed)
-    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
+    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
 
     const status = document.getElementById("status");
     let ctx;
@@ -37,7 +37,7 @@
     document.getElementById("play").addEventListener("click", async () => {
       if (!ctx) {
         ctx = new AudioContext();
-        await ctx.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
+        await ctx.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/processor.js");
         clip = new ClipNode(ctx);
         clip.connect(ctx.destination);
         clip.buffer = createToneBuffer(ctx);
