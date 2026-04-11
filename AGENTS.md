@@ -14,12 +14,6 @@ Since we dont have any users yet we don't need to think about backwards compatib
 
 Whenever you are doing something and find pre-existing errors. Fix them as well.
 
-Whenever working on the studio gui and you add code you also add unit tests and component tests if relevant.
-
-When adding new Studio components, add them to `workspaces/studio/gui/src/ComponentCatalog.tsx` and run `bun run screenshot:catalog` from the gui directory to regenerate catalog PNGs.
-
-When adding controller components, add them to `workspaces/controller/gui/src/ComponentCatalog.tsx` and run `bun run screenshot:catalog` from the controller/gui directory to regenerate catalog PNGs.
-
 When asked to make sure ci passes, you push to github and follow the workflow run in the Actions tab. If it fails, you check the logs, fix the issue, and push again.
 
 When asked to research something, save your findings in a markdown file in the research/ directory.
