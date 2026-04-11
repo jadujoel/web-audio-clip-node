@@ -114,7 +114,21 @@ class ClipProcessor extends AudioWorkletProcessor {
 
 			return result.keepAlive;
 		} catch (e) {
-			console.log(e);
+			this.port.postMessage({
+				type: "processorError",
+				data: {
+					error: String(e),
+					state: this.properties.state,
+					bufferChannels: this.properties.buffer?.length,
+					bufferLength: this.properties.buffer?.[0]?.length,
+					paramKeys: Object.keys(parameters),
+					hasPlaybackRate: !!parameters.playbackRate,
+					hasDetune: !!parameters.detune,
+					hasGain: !!parameters.gain,
+					hasPan: !!parameters.pan,
+					outputChannels: outputs[0]?.length,
+				},
+			});
 			return true;
 		}
 	}

@@ -1,10 +1,10 @@
 import { rm } from "node:fs/promises";
 
-export async function buildProcessor(): Promise<string> {
+export async function buildProcessor(minify = true): Promise<string> {
 	const output = await Bun.build({
 		entrypoints: ["./src/audio/processor.ts"],
 		target: "browser",
-		minify: true,
+		minify,
 		throw: true,
 		sourcemap: "linked",
 		outdir: "dist",

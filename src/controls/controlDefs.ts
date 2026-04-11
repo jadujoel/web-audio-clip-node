@@ -87,6 +87,7 @@ export const controlDefs: ControlDef[] = [
 		snap: "beat",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		title: "Delay before stopping (seconds).",
 	},
 	{
@@ -98,6 +99,7 @@ export const controlDefs: ControlDef[] = [
 		snap: "beat",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		title: "Fade-in duration (seconds).",
 	},
 	{
@@ -109,6 +111,7 @@ export const controlDefs: ControlDef[] = [
 		snap: "beat",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		title: "Fade-out duration (seconds).",
 	},
 ];
