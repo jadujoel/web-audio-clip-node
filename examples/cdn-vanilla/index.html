@@ -5,53 +5,1085 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ClipNode – CDN Vanilla Example</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; }
-    button { font-size: 1rem; padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; }
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-elevated: rgba(8, 22, 39, 0.78);
+      --surface: rgba(19, 38, 63, 0.92);
+      --surface-strong: rgba(29, 55, 88, 0.98);
+      --border: rgba(144, 190, 255, 0.16);
+      --text: #eff6ff;
+      --muted: #a9bdd6;
+      --accent: #7dd3fc;
+      --accent-strong: #38bdf8;
+      --accent-warm: #f59e0b;
+      --danger: #fb7185;
+      --shadow: 0 28px 60px rgba(0, 0, 0, 0.34);
+      --radius-xl: 28px;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --mono: "SFMono-Regular", "Consolas", monospace;
+    }
+
+    body {
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.2), transparent 38%),
+        radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.18), transparent 34%),
+        linear-gradient(180deg, #06101d 0%, #081625 46%, #030712 100%);
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 26px 26px;
+      mask-image: radial-gradient(circle at center, black, transparent 80%);
+      pointer-events: none;
+    }
+
+    .shell {
+      width: min(1080px, calc(100vw - 32px));
+      margin: 32px auto;
+      padding: 28px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: var(--bg-elevated);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 20px;
+    }
+
+    .hero-copy,
+    .hero-card,
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(21, 42, 68, 0.95), rgba(9, 22, 39, 0.9));
+    }
+
+    .hero-copy {
+      padding: 24px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, 0.12);
+      color: var(--accent);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 16px 0 10px;
+      font-size: clamp(2.2rem, 4vw, 3.8rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 60ch;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    .hero-notes {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-note {
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 0.88rem;
+    }
+
+    .hero-card {
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before,
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto auto 18px 18px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(125, 211, 252, 0.28), transparent 70%);
+      filter: blur(10px);
+    }
+
+    .hero-card::after {
+      inset: 22px 14px auto auto;
+      width: 110px;
+      height: 110px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.26), transparent 70%);
+    }
+
+    .wave {
+      position: relative;
+      height: 120px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .wave span {
+      flex: 1;
+      height: var(--h);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(125, 211, 252, 0.95), rgba(56, 189, 248, 0.16));
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.18);
+      animation: pulse 1.8s ease-in-out infinite;
+      animation-delay: var(--delay);
+      transform-origin: center;
+    }
+
+    @keyframes pulse {
+      0%,
+      100% { transform: scaleY(0.82); }
+      50% { transform: scaleY(1.08); }
+    }
+
+    .hero-card h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .hero-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 28ch;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 20px;
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 0.96rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .transport-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      transition:
+        transform 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease,
+        opacity 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-strong), #0ea5e9);
+      box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-danger {
+      background: rgba(251, 113, 133, 0.12);
+      border-color: rgba(251, 113, 133, 0.24);
+      color: #fecdd3;
+    }
+
+    .toggle {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-strong);
+    }
+
+    .status {
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .stat-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.02rem;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    .control {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .control header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      margin-bottom: 10px;
+    }
+
+    .control strong {
+      font-size: 0.95rem;
+    }
+
+    .control output {
+      font-family: var(--mono);
+      color: var(--accent);
+      font-size: 0.92rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-warm);
+      cursor: pointer;
+    }
+
+    .code-note {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: rgba(3, 7, 18, 0.56);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .code-note code {
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    @media (max-width: 860px) {
+      .hero,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .toggle {
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100vw - 20px, 100%);
+        margin: 10px auto;
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+      }
+
+      .hero-copy,
+      .hero-card,
+      .panel {
+        padding: 16px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>ClipNode – CDN</h1>
-  <p>Loads the library directly from jsDelivr. No bundler, no npm.</p>
-  <button id="play" type="button">▶ Play</button>
-  <button id="stop" type="button">■ Stop</button>
-  <p id="status">Click Play to start (loads a sample tone).</p>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">No bundler • AudioWorklet • CDN</div>
+        <h1>ClipNode in one HTML file.</h1>
+        <p>
+          This demo loads the package from jsDelivr, boots the worklet from the CDN,
+          synthesizes its own stereo clip, and foregrounds the things
+          <code>AudioBufferSourceNode</code> does not give you: pause/resume, reusable start,
+          buffer hot-swap, loop callbacks, loop crossfade,
+          real-time playhead control, and sample-accurate fades.
+        </p>
+        <div class="hero-notes">
+          <span class="hero-note">Pause / Resume</span>
+          <span class="hero-note">Reusable start()</span>
+          <span class="hero-note">Buffer hot-swap</span>
+          <span class="hero-note">Loop callback counter</span>
+          <span class="hero-note">Crossfaded loop points</span>
+          <span class="hero-note">Live sample playhead seek</span>
+        </div>
+      </div>
+      <aside class="hero-card" aria-hidden="true">
+        <div class="wave">
+          <span style="--h: 24%; --delay: 0.05s"></span>
+          <span style="--h: 62%; --delay: 0.18s"></span>
+          <span style="--h: 38%; --delay: 0.1s"></span>
+          <span style="--h: 78%; --delay: 0.24s"></span>
+          <span style="--h: 52%; --delay: 0.08s"></span>
+          <span style="--h: 88%; --delay: 0.14s"></span>
+          <span style="--h: 40%; --delay: 0.22s"></span>
+          <span style="--h: 70%; --delay: 0.16s"></span>
+          <span style="--h: 34%; --delay: 0.02s"></span>
+          <span style="--h: 58%; --delay: 0.12s"></span>
+          <span style="--h: 81%; --delay: 0.2s"></span>
+          <span style="--h: 30%; --delay: 0.07s"></span>
+        </div>
+        <h2>What you are hearing</h2>
+        <p>
+          A short synthetic groove with bass, hats, and melodic stabs rendered into an
+          <code>AudioBuffer</code>, then played through <code>ClipNode</code> with loop telemetry and direct
+          playhead control.
+        </p>
+      </aside>
+    </section>
+
+    <section class="layout">
+      <div class="panel">
+        <h2>Transport</h2>
+        <div class="transport-row">
+          <button id="play" class="btn-primary" type="button">Start</button>
+          <button id="pause" class="btn-secondary" type="button" disabled>Pause</button>
+          <button id="stop" class="btn-danger" type="button" disabled>Stop</button>
+          <button id="swapBuffer" class="btn-secondary" type="button" disabled>Swap Buffer</button>
+          <label class="toggle" for="loopEnabled">
+            <input id="loopEnabled" type="checkbox" checked />
+            Loop section
+          </label>
+        </div>
+        <p class="status" id="status">
+          Press Start to create the demo clip, load the worklet from jsDelivr, and begin playback.
+        </p>
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-label">State</span>
+            <span class="stat-value" id="stateValue">initial</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Playhead Seconds</span>
+            <span class="stat-value" id="playheadValue">0.00s</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Playhead Sample</span>
+            <span class="stat-value" id="sampleValue">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Buffer Duration</span>
+            <span class="stat-value" id="durationValue">6.00s</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Loops Triggered</span>
+            <span class="stat-value" id="loopCountValue">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Starts (reused node)</span>
+            <span class="stat-value" id="startCountValue">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Buffer Swaps</span>
+            <span class="stat-value" id="swapCountValue">0</span>
+          </div>
+        </div>
+        <div class="code-note">
+          Worklet module loaded via <code>getProcessorCdnUrl("0.1.6")</code>.
+          The same <code>ClipNode</code> handles pause/resume, repeated <code>start()</code> calls
+          without recreating the node, and live buffer replacement. Controls below update the
+          live instance directly, including <code>clip.playhead</code>, <code>clip.loopCrossfade</code>,
+          and <code>clip.onlooped</code>.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Controls</h2>
+        <div class="controls">
+          <label class="control" for="rate">
+            <header>
+              <strong>Playback Rate</strong>
+              <output id="rateValue" for="rate">1.00x</output>
+            </header>
+            <input id="rate" type="range" min="0.25" max="2" step="0.01" value="1" />
+          </label>
+
+          <label class="control" for="detune">
+            <header>
+              <strong>Detune</strong>
+              <output id="detuneValue" for="detune">0 cents</output>
+            </header>
+            <input id="detune" type="range" min="-1200" max="1200" step="1" value="0" />
+          </label>
+
+          <label class="control" for="gain">
+            <header>
+              <strong>Gain</strong>
+              <output id="gainValue" for="gain">0.95</output>
+            </header>
+            <input id="gain" type="range" min="0" max="1.5" step="0.01" value="0.95" />
+          </label>
+
+          <label class="control" for="pan">
+            <header>
+              <strong>Pan</strong>
+              <output id="panValue" for="pan">0.00</output>
+            </header>
+            <input id="pan" type="range" min="-1" max="1" step="0.01" value="0" />
+          </label>
+
+          <label class="control" for="loopStart">
+            <header>
+              <strong>Loop Start</strong>
+              <output id="loopStartValue" for="loopStart">0.80s</output>
+            </header>
+            <input id="loopStart" type="range" min="0" max="5.8" step="0.01" value="0.8" />
+          </label>
+
+          <label class="control" for="loopEnd">
+            <header>
+              <strong>Loop End</strong>
+              <output id="loopEndValue" for="loopEnd">5.40s</output>
+            </header>
+            <input id="loopEnd" type="range" min="0.2" max="6" step="0.01" value="5.4" />
+          </label>
+
+          <label class="control" for="loopCrossfade">
+            <header>
+              <strong>Loop Crossfade</strong>
+              <output id="loopCrossfadeValue" for="loopCrossfade">0.04s</output>
+            </header>
+            <input id="loopCrossfade" type="range" min="0" max="0.2" step="0.002" value="0.04" />
+          </label>
+
+          <label class="control" for="fadeIn">
+            <header>
+              <strong>Fade In</strong>
+              <output id="fadeInValue" for="fadeIn">0.00s</output>
+            </header>
+            <input id="fadeIn" type="range" min="0" max="0.4" step="0.005" value="0" />
+          </label>
+
+          <label class="control" for="fadeOut">
+            <header>
+              <strong>Fade Out</strong>
+              <output id="fadeOutValue" for="fadeOut">0.08s</output>
+            </header>
+            <input id="fadeOut" type="range" min="0" max="0.4" step="0.005" value="0.08" />
+          </label>
+
+          <label class="control" for="playhead">
+            <header>
+              <strong>Playhead Seek</strong>
+              <output id="playheadControlValue" for="playhead">sample 0</output>
+            </header>
+            <input id="playhead" type="range" min="0" max="288000" step="1" value="0" />
+          </label>
+        </div>
+      </div>
+    </section>
+  </div>
   <script type="module">
-    // Import the bundled library from the CDN (single file, no module resolution needed)
-    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
+    import {
+      ClipNode,
+      getProcessorCdnUrl,
+    } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@0.1.6/dist/lib.bundle.js";
 
-    const status = document.getElementById("status");
-    let ctx;
-    let clip;
+    const version = "0.1.6";
+    const ui = {
+      play: document.getElementById("play"),
+      pause: document.getElementById("pause"),
+      stop: document.getElementById("stop"),
+      swapBuffer: document.getElementById("swapBuffer"),
+      loopEnabled: document.getElementById("loopEnabled"),
+      rate: document.getElementById("rate"),
+      detune: document.getElementById("detune"),
+      gain: document.getElementById("gain"),
+      pan: document.getElementById("pan"),
+      loopStart: document.getElementById("loopStart"),
+      loopEnd: document.getElementById("loopEnd"),
+      loopCrossfade: document.getElementById("loopCrossfade"),
+      fadeIn: document.getElementById("fadeIn"),
+      fadeOut: document.getElementById("fadeOut"),
+      playhead: document.getElementById("playhead"),
+      rateValue: document.getElementById("rateValue"),
+      detuneValue: document.getElementById("detuneValue"),
+      gainValue: document.getElementById("gainValue"),
+      panValue: document.getElementById("panValue"),
+      loopStartValue: document.getElementById("loopStartValue"),
+      loopEndValue: document.getElementById("loopEndValue"),
+      loopCrossfadeValue: document.getElementById("loopCrossfadeValue"),
+      fadeInValue: document.getElementById("fadeInValue"),
+      fadeOutValue: document.getElementById("fadeOutValue"),
+      playheadControlValue: document.getElementById("playheadControlValue"),
+      status: document.getElementById("status"),
+      stateValue: document.getElementById("stateValue"),
+      playheadValue: document.getElementById("playheadValue"),
+      sampleValue: document.getElementById("sampleValue"),
+      durationValue: document.getElementById("durationValue"),
+      loopCountValue: document.getElementById("loopCountValue"),
+      startCountValue: document.getElementById("startCountValue"),
+      swapCountValue: document.getElementById("swapCountValue"),
+    };
 
-    // Generate a simple sine-wave AudioBuffer for demo purposes
-    function createToneBuffer(audioCtx, freq = 440, duration = 2) {
-      const length = audioCtx.sampleRate * duration;
-      const buf = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < length; i++) {
-        data[i] = Math.sin(2 * Math.PI * freq * i / audioCtx.sampleRate);
-      }
-      return buf;
+    const state = {
+      ctx: null,
+      clip: null,
+      duration: 6,
+      loopCount: 0,
+      startCount: 0,
+      swapCount: 0,
+      nodeState: "initial",
+      isSeeking: false,
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
     }
 
-    document.getElementById("play").addEventListener("click", async () => {
-      if (!ctx) {
-        ctx = new AudioContext();
-        await ctx.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/processor.js");
-        clip = new ClipNode(ctx);
-        clip.connect(ctx.destination);
-        clip.buffer = createToneBuffer(ctx);
+    function formatSeconds(value) {
+      return `${Number(value).toFixed(2)}s`;
+    }
+
+    function setStatus(message) {
+      ui.status.textContent = message;
+    }
+
+    function setNodeState(nextState) {
+      state.nodeState = nextState;
+      ui.stateValue.textContent = nextState;
+
+      const active = nextState === "started" || nextState === "scheduled" || nextState === "resumed";
+      const paused = nextState === "paused";
+
+      ui.pause.disabled = !state.clip || (!active && !paused);
+      ui.stop.disabled = !state.clip || (!active && !paused);
+      ui.swapBuffer.disabled = !state.clip;
+      ui.pause.textContent = paused ? "Resume" : "Pause";
+    }
+
+    function syncOutputs() {
+      ui.rateValue.textContent = `${Number(ui.rate.value).toFixed(2)}x`;
+      ui.detuneValue.textContent = `${Math.round(Number(ui.detune.value))} cents`;
+      ui.gainValue.textContent = Number(ui.gain.value).toFixed(2);
+      ui.panValue.textContent = Number(ui.pan.value).toFixed(2);
+      ui.loopStartValue.textContent = formatSeconds(ui.loopStart.value);
+      ui.loopEndValue.textContent = formatSeconds(ui.loopEnd.value);
+      ui.loopCrossfadeValue.textContent = formatSeconds(ui.loopCrossfade.value);
+      ui.fadeInValue.textContent = formatSeconds(ui.fadeIn.value);
+      ui.fadeOutValue.textContent = formatSeconds(ui.fadeOut.value);
+      ui.playheadControlValue.textContent = `sample ${Math.round(Number(ui.playhead.value))}`;
+      ui.durationValue.textContent = formatSeconds(state.duration);
+      ui.loopCountValue.textContent = String(state.loopCount);
+      ui.startCountValue.textContent = String(state.startCount);
+      ui.swapCountValue.textContent = String(state.swapCount);
+    }
+
+    function normalizeLoopRange(changedKey) {
+      const minGap = 0.08;
+      let start = Number(ui.loopStart.value);
+      let end = Number(ui.loopEnd.value);
+
+      if (end - start < minGap) {
+        if (changedKey === "loopStart") {
+          end = clamp(start + minGap, minGap, state.duration);
+          ui.loopEnd.value = String(end);
+        } else {
+          start = clamp(end - minGap, 0, state.duration - minGap);
+          ui.loopStart.value = String(start);
+        }
       }
+    }
+
+    function applyControls() {
+      if (!state.clip) return;
+
+      normalizeLoopRange();
+
+      state.clip.playbackRate.value = Number(ui.rate.value);
+      state.clip.detune.value = Number(ui.detune.value);
+      state.clip.gain.value = Number(ui.gain.value);
+      state.clip.pan.value = Number(ui.pan.value);
+      state.clip.loop = ui.loopEnabled.checked;
+      state.clip.loopStart = Number(ui.loopStart.value);
+      state.clip.loopEnd = Number(ui.loopEnd.value);
+      state.clip.loopCrossfade = Number(ui.loopCrossfade.value);
+      state.clip.fadeIn = Number(ui.fadeIn.value);
+      state.clip.fadeOut = Number(ui.fadeOut.value);
+      state.clip.toggleFadeIn(Number(ui.fadeIn.value) > 0);
+      state.clip.toggleFadeOut(Number(ui.fadeOut.value) > 0);
+      state.clip.toggleLoopStart(true);
+      state.clip.toggleLoopEnd(true);
+      state.clip.toggleLoopCrossfade(Number(ui.loopCrossfade.value) > 0);
+
+      if (state.isSeeking) {
+        state.clip.playhead = Number(ui.playhead.value);
+      }
+    }
+
+    function pseudoNoise(index, seed) {
+      const raw = Math.sin((index + 1) * 12.9898 + seed * 78.233) * 43758.5453123;
+      return (raw - Math.floor(raw)) * 2 - 1;
+    }
+
+    function writeTone(left, right, sampleRate, startTime, duration, options) {
+      const {
+        freq,
+        amp = 0.25,
+        pan = 0,
+        harmonics = [1, 0.45, 0.18],
+        attack = 0.004,
+        release = 0.12,
+        drift = 0,
+      } = options;
+
+      const startSample = Math.floor(startTime * sampleRate);
+      const sampleCount = Math.floor(duration * sampleRate);
+      const leftGain = Math.cos((pan + 1) * Math.PI * 0.25);
+      const rightGain = Math.sin((pan + 1) * Math.PI * 0.25);
+
+      for (let i = 0; i < sampleCount; i += 1) {
+        const index = startSample + i;
+        if (index >= left.length) break;
+
+        const t = i / sampleRate;
+        const attackGain = attack > 0 ? clamp(t / attack, 0, 1) : 1;
+        const releaseGain = release > 0 ? clamp((duration - t) / release, 0, 1) : 1;
+        const envelope = Math.min(attackGain, releaseGain) * Math.exp(-t * 1.6);
+
+        let sample = 0;
+        for (let harmonic = 0; harmonic < harmonics.length; harmonic += 1) {
+          const harmonicFreq = freq * (harmonic + 1 + drift * t * 0.35);
+          sample += harmonics[harmonic] * Math.sin(2 * Math.PI * harmonicFreq * t);
+        }
+
+        sample *= amp * envelope;
+        left[index] += sample * leftGain;
+        right[index] += sample * rightGain;
+      }
+    }
+
+    function writeNoise(left, right, sampleRate, startTime, duration, options) {
+      const { amp = 0.14, pan = 0, seed = 0, color = 0.45 } = options;
+      const startSample = Math.floor(startTime * sampleRate);
+      const sampleCount = Math.floor(duration * sampleRate);
+      const leftGain = Math.cos((pan + 1) * Math.PI * 0.25);
+      const rightGain = Math.sin((pan + 1) * Math.PI * 0.25);
+      let previous = 0;
+
+      for (let i = 0; i < sampleCount; i += 1) {
+        const index = startSample + i;
+        if (index >= left.length) break;
+
+        const t = i / sampleRate;
+        const envelope = Math.exp(-t * 18) * clamp((duration - t) / duration, 0, 1);
+        const white = pseudoNoise(index, seed);
+        previous = previous * color + white * (1 - color);
+        const sample = previous * amp * envelope;
+        left[index] += sample * leftGain;
+        right[index] += sample * rightGain;
+      }
+    }
+
+    function createDemoBuffer(audioCtx) {
+      const duration = 6;
+      const sampleRate = audioCtx.sampleRate;
+      const frameCount = Math.floor(duration * sampleRate);
+      const buffer = audioCtx.createBuffer(2, frameCount, sampleRate);
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
+
+      const kickTimes = [0, 1, 2, 3, 4, 5];
+      const snareTimes = [1, 3, 5];
+      const hatTimes = Array.from({ length: 24 }, (_, step) => step * 0.25);
+
+      for (const time of kickTimes) {
+        writeTone(left, right, sampleRate, time, 0.38, {
+          freq: 50,
+          amp: 0.38,
+          pan: 0,
+          harmonics: [1, 0.25, 0.08],
+          release: 0.24,
+          drift: -0.3,
+        });
+      }
+
+      for (const time of snareTimes) {
+        writeNoise(left, right, sampleRate, time, 0.2, {
+          amp: 0.2,
+          pan: 0.05,
+          seed: time * 31,
+          color: 0.18,
+        });
+        writeTone(left, right, sampleRate, time, 0.12, {
+          freq: 190,
+          amp: 0.11,
+          pan: -0.03,
+          harmonics: [1, 0.1],
+          release: 0.08,
+        });
+      }
+
+      for (const time of hatTimes) {
+        writeNoise(left, right, sampleRate, time, 0.08, {
+          amp: time % 0.5 === 0 ? 0.11 : 0.075,
+          pan: time % 0.5 === 0 ? 0.28 : -0.22,
+          seed: 100 + time * 13,
+          color: 0.08,
+        });
+      }
+
+      const chordRoots = [261.63, 293.66, 329.63];
+      chordRoots.forEach((root, bar) => {
+        const start = bar * 2;
+        const notes = [root, root * 1.25, root * 1.5];
+        notes.forEach((freq, index) => {
+          writeTone(left, right, sampleRate, start + index * 0.04, 1.25, {
+            freq,
+            amp: 0.11,
+            pan: -0.3 + index * 0.28,
+            harmonics: [1, 0.32, 0.12, 0.05],
+            attack: 0.01,
+            release: 0.24,
+          });
+        });
+      });
+
+      const melody = [523.25, 587.33, 659.25, 783.99, 698.46, 659.25, 587.33, 523.25];
+      melody.forEach((freq, index) => {
+        writeTone(left, right, sampleRate, 0.5 + index * 0.5, 0.28, {
+          freq,
+          amp: 0.09,
+          pan: index % 2 === 0 ? -0.35 : 0.35,
+          harmonics: [1, 0.24, 0.06],
+          attack: 0.005,
+          release: 0.12,
+        });
+      });
+
+      return buffer;
+    }
+
+    function createAltBuffer(audioCtx) {
+      const duration = 6;
+      const sampleRate = audioCtx.sampleRate;
+      const frameCount = Math.floor(duration * sampleRate);
+      const buffer = audioCtx.createBuffer(2, frameCount, sampleRate);
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
+
+      const kickTimes = [0, 0.75, 1.5, 2.25, 3, 3.75, 4.5, 5.25];
+      for (const time of kickTimes) {
+        writeTone(left, right, sampleRate, time, 0.22, {
+          freq: 72,
+          amp: 0.32,
+          pan: 0,
+          harmonics: [1, 0.4, 0.15],
+          release: 0.16,
+          drift: -0.15,
+        });
+      }
+
+      const hatTimes = Array.from({ length: 48 }, (_, step) => step * 0.125);
+      for (const time of hatTimes) {
+        writeNoise(left, right, sampleRate, time, 0.04, {
+          amp: 0.07,
+          pan: time % 0.25 === 0 ? -0.4 : 0.4,
+          seed: 200 + time * 17,
+          color: 0.05,
+        });
+      }
+
+      const arpNotes = [392, 523.25, 659.25, 783.99, 659.25, 523.25];
+      arpNotes.forEach((freq, index) => {
+        for (let rep = 0; rep < 4; rep += 1) {
+          writeTone(left, right, sampleRate, rep * 1.5 + index * 0.18, 0.16, {
+            freq,
+            amp: 0.1,
+            pan: -0.5 + index * 0.2,
+            harmonics: [1, 0.3, 0.08],
+            attack: 0.003,
+            release: 0.08,
+          });
+        }
+      });
+
+      return buffer;
+    }
+
+    async function ensureClip() {
+      if (state.clip && state.ctx) return state.clip;
+
+      const ctx = new AudioContext();
+      await ctx.audioWorklet.addModule(getProcessorCdnUrl(version));
+
+      const clip = new ClipNode(ctx);
+      clip.connect(ctx.destination);
+      clip.buffer = createDemoBuffer(ctx);
+
+      state.ctx = ctx;
+      state.clip = clip;
+      state.duration = clip.buffer.duration;
+      state.loopCount = 0;
+
+      ui.loopStart.max = String(Math.max(state.duration - 0.08, 0.08));
+      ui.loopEnd.max = String(state.duration);
+      ui.loopEnd.value = String(Math.min(Number(ui.loopEnd.value), state.duration));
+      ui.playhead.max = String(Math.max(Math.floor(state.duration * ctx.sampleRate), 1));
+
+      clip.onframe = ([, , playhead]) => {
+        ui.playheadValue.textContent = formatSeconds(playhead / ctx.sampleRate);
+        ui.sampleValue.textContent = String(playhead);
+        if (!state.isSeeking) {
+          ui.playhead.value = String(playhead);
+          ui.playheadControlValue.textContent = `sample ${playhead}`;
+        }
+      };
+
+      clip.onlooped = () => {
+        state.loopCount += 1;
+        ui.loopCountValue.textContent = String(state.loopCount);
+        setStatus(`Loop callback fired ${state.loopCount} time${state.loopCount === 1 ? "" : "s"}. Crossfade is ${Number(ui.loopCrossfade.value).toFixed(3)}s.`);
+      };
+
+      clip.onstatechange = (nextState) => {
+        setNodeState(nextState);
+
+        if (nextState === "paused") {
+          setStatus("Paused. Resume to continue from the current playhead.");
+        } else if (nextState === "started" || nextState === "resumed") {
+          setStatus("Playing through ClipNode. Try dragging the playhead while audio is running or increasing loop crossfade.");
+        } else if (nextState === "stopped" || nextState === "ended") {
+          setStatus("Stopped. Press Start to reuse the same node \u2014 no recreation needed.");
+        }
+      };
+
+      applyControls();
+      syncOutputs();
+      setNodeState("initial");
+      return clip;
+    }
+
+    async function startPlayback() {
+      const clip = await ensureClip();
+      await state.ctx.resume();
+
+      if (state.nodeState === "paused") {
+        clip.resume();
+        return;
+      }
+
+      if (state.nodeState === "started" || state.nodeState === "scheduled" || state.nodeState === "resumed") {
+        setStatus("Already playing. Adjust the controls live or stop first.");
+        return;
+      }
+
+      state.loopCount = 0;
+      ui.loopCountValue.textContent = "0";
+      state.startCount += 1;
+      ui.startCountValue.textContent = String(state.startCount);
       clip.start();
-      status.textContent = "Playing…";
+    }
+
+    function stopPlayback() {
+      if (!state.clip) return;
+      state.clip.stop();
+    }
+
+    async function togglePause() {
+      if (!state.clip) return;
+
+      if (state.nodeState === "paused") {
+        await state.ctx.resume();
+        state.clip.resume();
+        return;
+      }
+
+      if (state.nodeState === "started" || state.nodeState === "scheduled" || state.nodeState === "resumed") {
+        state.clip.pause();
+      }
+    }
+
+    ui.play.addEventListener("click", () => {
+      startPlayback().catch((error) => {
+        console.error(error);
+        setStatus(`Could not start playback: ${error instanceof Error ? error.message : String(error)}`);
+      });
     });
 
-    document.getElementById("stop").addEventListener("click", () => {
-      if (clip) {
-        clip.stop();
-        status.textContent = "Stopped.";
-      }
+    ui.pause.addEventListener("click", () => {
+      togglePause().catch((error) => {
+        console.error(error);
+        setStatus(`Pause or resume failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
     });
+
+    ui.stop.addEventListener("click", stopPlayback);
+
+    ui.swapBuffer.addEventListener("click", () => {
+      if (!state.clip || !state.ctx) return;
+      const newBuffer = createAltBuffer(state.ctx);
+      state.clip.buffer = newBuffer;
+      state.duration = newBuffer.duration;
+      state.swapCount += 1;
+      ui.swapCountValue.textContent = String(state.swapCount);
+      ui.playhead.max = String(Math.max(Math.floor(state.duration * state.ctx.sampleRate), 1));
+      ui.loopStart.max = String(Math.max(state.duration - 0.08, 0.08));
+      ui.loopEnd.max = String(state.duration);
+      syncOutputs();
+      setStatus(`Buffer swapped (${state.swapCount}×). The node keeps playing with the new audio — no stop/start required.`);
+    });
+
+    [
+      ui.rate,
+      ui.detune,
+      ui.gain,
+      ui.pan,
+      ui.loopCrossfade,
+      ui.fadeIn,
+      ui.fadeOut,
+      ui.loopEnabled,
+    ].forEach((input) => {
+      input.addEventListener("input", () => {
+        syncOutputs();
+        applyControls();
+      });
+      input.addEventListener("change", () => {
+        syncOutputs();
+        applyControls();
+      });
+    });
+
+    ui.loopStart.addEventListener("input", () => {
+      normalizeLoopRange("loopStart");
+      syncOutputs();
+      applyControls();
+    });
+
+    ui.loopEnd.addEventListener("input", () => {
+      normalizeLoopRange("loopEnd");
+      syncOutputs();
+      applyControls();
+    });
+
+    ui.playhead.addEventListener("pointerdown", () => {
+      state.isSeeking = true;
+    });
+
+    ui.playhead.addEventListener("input", () => {
+      state.isSeeking = true;
+      syncOutputs();
+      applyControls();
+      ui.playheadValue.textContent = formatSeconds(Number(ui.playhead.value) / (state.ctx?.sampleRate ?? 48000));
+      ui.sampleValue.textContent = String(Math.round(Number(ui.playhead.value)));
+    });
+
+    ui.playhead.addEventListener("change", () => {
+      state.isSeeking = false;
+      syncOutputs();
+    });
+
+    ui.playhead.addEventListener("pointerup", () => {
+      state.isSeeking = false;
+    });
+
+    syncOutputs();
   </script>
 </body>
 </html>
