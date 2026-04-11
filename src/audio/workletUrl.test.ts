@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { getProcessorModuleUrl } from "./workletUrl";
+import {
+	getProcessorBlobUrl,
+	getProcessorCdnUrl,
+	getProcessorModuleUrl,
+} from "./workletUrl";
 
 describe("getProcessorModuleUrl", () => {
 	test("resolves relative to the site root in local development", () => {
@@ -18,5 +22,27 @@ describe("getProcessorModuleUrl", () => {
 		expect(
 			getProcessorModuleUrl("https://jadujoel.github.io/clip/index.html"),
 		).toBe("https://jadujoel.github.io/clip/processor.js");
+	});
+});
+
+describe("getProcessorBlobUrl", () => {
+	test("returns a blob: URL", () => {
+		const url = getProcessorBlobUrl();
+		expect(url).toStartWith("blob:");
+	});
+});
+
+describe("getProcessorCdnUrl", () => {
+	test("returns a jsdelivr URL with the given version", () => {
+		const url = getProcessorCdnUrl("1.2.3");
+		expect(url).toBe(
+			"https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@1.2.3/dist/processor.js",
+		);
+	});
+
+	test("uses a default version when none is provided", () => {
+		const url = getProcessorCdnUrl();
+		expect(url).toContain("@jadujoel/web-audio-clip-node@");
+		expect(url).toEndWith("/dist/processor.js");
 	});
 });
