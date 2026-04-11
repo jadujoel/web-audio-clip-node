@@ -2,6 +2,8 @@
 
 Full-featured AudioWorklet-based audio clip player for the Web Audio API.
 
+Example page at https://jadujoel.github.io/web-audio-clip-node/
+
 ## Features
 
 - Playback rate control (-2x to 2x, including reverse)
@@ -18,7 +20,7 @@ Full-featured AudioWorklet-based audio clip player for the Web Audio API.
 ## Install
 
 ```sh
-npm install @jadujoel/web-audio-clip-node
+bun install @jadujoel/web-audio-clip-node
 ```
 
 ## Quick Start (Core API)
@@ -29,12 +31,10 @@ import { ClipNode, getProcessorBlobUrl } from "@jadujoel/web-audio-clip-node";
 const ctx = new AudioContext();
 await ctx.audioWorklet.addModule(getProcessorBlobUrl());
 
-const clip = new ClipNode(ctx, {
-  processorOptions: { sampleRate: ctx.sampleRate },
-});
+const clip = new ClipNode(ctx);
 clip.connect(ctx.destination);
 
-const response = await fetch("audio.mp3");
+const response = await fetch("audio.opus");
 const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
 clip.buffer = buffer;
 clip.start();
@@ -67,9 +67,7 @@ function Player() {
   const ctx = new AudioContext();
   await ctx.audioWorklet.addModule(getProcessorCdnUrl());
 
-  const clip = new ClipNode(ctx, {
-    processorOptions: { sampleRate: ctx.sampleRate },
-  });
+  const clip = new ClipNode(ctx);
   clip.connect(ctx.destination);
 </script>
 ```
