@@ -1,6 +1,6 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
-import { formatTickLabel, formatValueText } from "../audio/formatValueText";
 import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
+import { formatTickLabel, formatValueText } from "../controls/formatValueText";
 import { ContextMenu } from "./ContextMenu";
 import { SnappableSlider } from "./SnappableSlider";
 

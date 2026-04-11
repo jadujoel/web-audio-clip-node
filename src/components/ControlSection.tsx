@@ -1,4 +1,4 @@
-import type { ControlDef, ControlKey } from "../audio/controlDefs";
+import type { ControlDef, ControlKey } from "../controls/controlDefs";
 import { AudioControl } from "./AudioControl";
 
 interface ControlSectionProps {

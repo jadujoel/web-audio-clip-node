@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipNode } from "../audio/ClipNode";
-import { loadFromCache } from "../audio/cache";
-import type { ControlKey } from "../audio/controlDefs";
-import { SAMPLE_RATE } from "../audio/controlDefs";
-import { loadUploadedFile, saveUploadedFile } from "../audio/fileStore";
 import type { ClipNodeState, FrameData } from "../audio/types";
 import { float32ArrayFromAudioBuffer, linFromDb } from "../audio/utils";
+import type { ControlKey } from "../controls/controlDefs";
+import { SAMPLE_RATE } from "../controls/controlDefs";
+import { loadFromCache } from "../data/cache";
+import { loadUploadedFile, saveUploadedFile } from "../data/fileStore";
 
 function applyValue(node: ClipNode, key: ControlKey, value: number) {
 	switch (key) {

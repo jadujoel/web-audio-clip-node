@@ -1,5 +1,5 @@
 import { useCallback, useId } from "react";
-import { SAMPLE_RATE } from "../audio/controlDefs";
+import { SAMPLE_RATE } from "../controls/controlDefs";
 import { SnappableSlider } from "./SnappableSlider";
 
 export interface PlayheadSliderProps {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import type { ControlDef, ControlKey } from "../audio/controlDefs";
+import type { ControlDef, ControlKey } from "../controls/controlDefs";
 import { ControlSection } from "./ControlSection";
 
 afterEach(cleanup);

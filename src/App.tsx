@@ -1,6 +1,4 @@
 import { useCallback, useEffect } from "react";
-import type { ControlKey } from "./audio/controlDefs";
-import { controlDefs, loopControlDefs } from "./audio/controlDefs";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";
 import { DisplayPanel } from "./components/DisplayPanel";
@@ -10,6 +8,8 @@ import { PanControl } from "./components/PanControl";
 import { PlaybackRateControl } from "./components/PlaybackRateControl";
 import { PlayheadSlider } from "./components/PlayheadSlider";
 import { TransportButtons } from "./components/TransportButtons";
+import type { ControlKey } from "./controls/controlDefs";
+import { controlDefs, loopControlDefs } from "./controls/controlDefs";
 import { useClipNode } from "./hooks/useClipNode";
 import { useClipControls } from "./store/clipStore";
 

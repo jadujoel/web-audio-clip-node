@@ -4,7 +4,7 @@ import {
 	buildDefaults,
 	type ControlKey,
 	DEFAULT_TEMPO,
-} from "../audio/controlDefs";
+} from "../controls/controlDefs";
 
 const STORAGE_KEY = "clip-node-state";
 

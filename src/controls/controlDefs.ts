@@ -32,6 +32,7 @@ export interface ControlDef {
 	title?: string;
 	hasToggle?: boolean;
 	hasSnap?: boolean;
+	hasMaxLock?: boolean;
 	/** When true, max defaults to audio file duration. */
 	maxLockedByDefault?: boolean;
 }
@@ -49,6 +50,7 @@ export const controlDefs: ControlDef[] = [
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		maxLockedByDefault: true,
 		title: "Start position in the buffer (seconds).",
 	},
@@ -60,6 +62,7 @@ export const controlDefs: ControlDef[] = [
 		defaultValue: -1,
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		maxLockedByDefault: true,
 		title:
 			"How long to play before auto-stopping (seconds). -1 for full length.",
@@ -120,6 +123,7 @@ export const loopControlDefs: ControlDef[] = [
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		maxLockedByDefault: true,
 	},
 	{
@@ -131,6 +135,7 @@ export const loopControlDefs: ControlDef[] = [
 		snap: "bar",
 		hasSnap: true,
 		hasToggle: true,
+		hasMaxLock: true,
 		maxLockedByDefault: true,
 	},
 	{
