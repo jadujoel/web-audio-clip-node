@@ -4,11 +4,12 @@
 	"author": "joel.lof@icloud.com",
 	"license": "MIT",
 	"scripts": {
-		"dev": "bun serve.ts",
 		"build": "bun build.ts",
+		"dev": "bun serve.ts",
 		"lint": "biome check",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"validate": "bun run build && bun run lint && bun run typecheck && bun test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.11",

@@ -1,4 +1,4 @@
-import { buildProcessor } from './build';
+import { buildProcessor } from "./build.ts";
 import index from "./src/index.html";
 
 export function serve(): Bun.Server<unknown> {
