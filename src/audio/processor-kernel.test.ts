@@ -392,6 +392,23 @@ describe("fill", () => {
 		expect(target[0][2]).toBe(0);
 		expect(target[0][127]).toBe(0);
 	});
+
+	it("handles mono source with stereo target without crashing", () => {
+		const source = makeBuffer(1000, 1); // mono
+		const target = makeOutput(2); // stereo
+		target[0].fill(999);
+		target[1].fill(999);
+		const indexes = [0, 5, 10];
+		fill(target, source, indexes);
+		// Channel 0 should have the source values
+		expect(target[0][0]).toBe(0);
+		expect(target[0][1]).toBe(5);
+		expect(target[0][2]).toBe(10);
+		// Channel 1 should be zeroed (no source channel 1)
+		expect(target[1][0]).toBe(0);
+		expect(target[1][1]).toBe(0);
+		expect(target[1][2]).toBe(0);
+	});
 });
 
 describe("fillWithSilence", () => {
@@ -1210,6 +1227,36 @@ describe("processBlock", () => {
 		);
 		// After mono-to-stereo, output should have 2 channels
 		expect(outputs[0].length).toBe(2);
+	});
+
+	it("mono buffer with stereo output does not crash", () => {
+		const buffer = [new Float32Array(1000).fill(0.5)]; // mono
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)]; // stereo output, mono source
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		// Both channels should have values (mono upmixed to stereo)
+		expect(outputs[0][0][0]).toBe(0.5);
+		expect(outputs[0][1][0]).toBe(0.5);
 	});
 
 	it("playhead and playedSamples updated correctly", () => {

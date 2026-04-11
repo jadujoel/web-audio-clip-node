@@ -2,7 +2,7 @@ import { ClipNode, getProcessorBlobUrl } from "@jadujoel/web-audio-clip-node";
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
-  <h1>ClipNode – Vite + TypeScript</h1>
+  <h1>ClipNode</h1>
   <button id="play">▶ Play</button>
   <button id="stop">■ Stop</button>
   <p id="status">Click Play to start.</p>
@@ -25,9 +25,7 @@ document.getElementById("play")!.addEventListener("click", async () => {
 	if (!ctx) {
 		ctx = new AudioContext();
 		await ctx.audioWorklet.addModule(getProcessorBlobUrl());
-		clip = new ClipNode(ctx, {
-			processorOptions: { sampleRate: ctx.sampleRate },
-		});
+		clip = new ClipNode(ctx);
 		clip.connect(ctx.destination);
 		clip.buffer = createToneBuffer(ctx);
 	}

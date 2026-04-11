@@ -403,13 +403,19 @@ export function fill(
 	source: Float32Array[],
 	indexes: number[],
 ): void {
+	const nc = Math.min(target.length, source.length);
 	for (let i = 0; i < indexes.length; i++) {
-		for (let ch = 0; ch < target.length; ch++) {
+		for (let ch = 0; ch < nc; ch++) {
 			target[ch][i] = source[ch][indexes[i]];
 		}
 	}
+	for (let ch = nc; ch < target.length; ch++) {
+		for (let i = 0; i < target[ch].length; i++) {
+			target[ch][i] = 0;
+		}
+	}
 	for (let i = indexes.length; i < target[0].length; i++) {
-		for (let ch = 0; ch < target.length; ch++) {
+		for (let ch = 0; ch < nc; ch++) {
 			target[ch][i] = 0;
 		}
 	}
@@ -424,11 +430,18 @@ export function fillWithSilence(buffer: Float32Array[]): void {
 }
 
 export function monoToStereo(signal: Float32Array[]): void {
-	const r = new Float32Array(signal[0].length);
-	for (let i = 0; i < signal[0].length; i++) {
-		r[i] = signal[0][i];
+	if (signal.length >= 2) {
+		// Output already has a second channel — copy mono data into it
+		for (let i = 0; i < signal[0].length; i++) {
+			signal[1][i] = signal[0][i];
+		}
+	} else {
+		const r = new Float32Array(signal[0].length);
+		for (let i = 0; i < signal[0].length; i++) {
+			r[i] = signal[0][i];
+		}
+		signal.push(r);
 	}
-	signal.push(r);
 }
 
 export function copy(source: Float32Array[], target: Float32Array[]): void {

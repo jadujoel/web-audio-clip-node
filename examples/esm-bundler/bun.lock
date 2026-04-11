@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 0,
+  "workspaces": {
+    "": {
+      "name": "esm-bundler-example",
+      "dependencies": {
+        "@jadujoel/web-audio-clip-node": "^0.1.2",
+      },
+    },
+  },
+  "packages": {
+    "@jadujoel/web-audio-clip-node": ["@jadujoel/web-audio-clip-node@0.1.2", "", { "peerDependencies": { "react": ">=18", "react-dom": ">=18", "zustand": ">=4" }, "optionalPeers": ["react", "react-dom", "zustand"] }, "sha512-u9r9AYcGul3QYtBwBvc//ZoR7xvigU85Tt4MZ13TTNJE4/s9NAIuOjTOOt/mfkzqa3+Sv+K2QF+3b/dSqYZM5A=="],
+  }
+}

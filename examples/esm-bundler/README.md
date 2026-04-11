@@ -1,8 +1,7 @@
-# ESM Bundler Example (Vite + TypeScript)
+# ESM Bundler Example (Bun + TypeScript)
 
-Uses `npm install` + Vite. The processor is loaded via `getProcessorBlobUrl()` (embedded, zero-config).
+The processor is loaded via `getProcessorBlobUrl()` (embedded, zero-config).
 
 ```sh
-npm install
-npm run dev
+bun run dev
 ```
