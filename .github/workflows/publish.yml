@@ -25,6 +25,9 @@ jobs:
       - name: Test
         run: bun test
 
+      - name: Post-publish smoke test (tarball)
+        run: bun post-publish-test.ts
+
       - uses: actions/setup-node@v6
         with:
           node-version: lts/*
