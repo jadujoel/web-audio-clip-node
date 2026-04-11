@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 interface DragBounds {
 	left: number;
@@ -110,13 +110,6 @@ export function SnappableSlider({
 		[getValueFromRatio, getSnapped, onChange],
 	);
 
-	// Register drag listeners only when dragging
-	useEffect(() => {
-		if (!isDragging.current) return;
-		// This effect re-runs when isDragging changes don't apply here;
-		// We manage drag lifecycle via mouse/touch down/up handlers
-	}, []);
-
 	const startDrag = useCallback(
 		(clientX: number, altKey: boolean) => {
 			if (disabled) return;
@@ -213,25 +206,6 @@ export function SnappableSlider({
 			onChange?.(defaultValue);
 		}
 	}, [defaultValue, onChange, disabled]);
-
-	const handleWheel = useCallback(
-		(e: WheelEvent) => {
-			if (disabled) return;
-			e.preventDefault();
-			const s = e.shiftKey ? resolvedStep / 10 : resolvedStep;
-			const direction = e.deltaY < 0 ? 1 : -1;
-			clampAndEmit(value + direction * s);
-		},
-		[value, resolvedStep, clampAndEmit, disabled],
-	);
-
-	// Attach wheel listener as non-passive so preventDefault works
-	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
-		el.addEventListener("wheel", handleWheel, { passive: false });
-		return () => el.removeEventListener("wheel", handleWheel);
-	}, [handleWheel]);
 
 	const ratio = getRatioFromValue(value);
 	const pct = `${ratio * 100}%`;

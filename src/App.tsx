@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";
 import { DisplayPanel } from "./components/DisplayPanel";
@@ -37,6 +38,52 @@ export function App() {
 			node.applyValue(key, val);
 		},
 		[node.applyValue],
+	);
+
+	const handleTempoChange = useCallback(
+		(nextTempo: number) => {
+			if (!Number.isFinite(nextTempo) || nextTempo <= 0) return;
+
+			const previousTempo = controls.tempo;
+			if (nextTempo === previousTempo) return;
+
+			const changedValues: Partial<Record<ControlKey, number>> = {};
+			for (const key of Object.keys(controls.values) as ControlKey[]) {
+				const snap = controls.snaps[key];
+				if (!isTempoRelativeSnap(snap)) continue;
+
+				const effectiveMax =
+					controls.maxLocked[key] && node.audioDuration != null
+						? node.audioDuration
+						: controls.maxs[key];
+				const nextValue = remapTempoRelativeValue(
+					controls.values[key],
+					snap,
+					previousTempo,
+					nextTempo,
+					controls.mins[key],
+					effectiveMax,
+				);
+
+				if (nextValue !== controls.values[key]) {
+					changedValues[key] = nextValue;
+				}
+			}
+
+			controls.setTempoAndValues(nextTempo, changedValues);
+			node.applyValues(changedValues);
+		},
+		[
+			controls.maxLocked,
+			controls.maxs,
+			controls.mins,
+			controls.setTempoAndValues,
+			controls.snaps,
+			controls.tempo,
+			controls.values,
+			node.applyValues,
+			node.audioDuration,
+		],
 	);
 
 	const handleToggle = useCallback(
@@ -154,7 +201,7 @@ export function App() {
 					value={controls.tempo}
 					onChange={(e) => {
 						const v = Number(e.target.value);
-						if (Number.isFinite(v) && v > 0) controls.setTempo(v);
+						if (Number.isFinite(v) && v > 0) handleTempoChange(v);
 					}}
 					style={{ width: 70 }}
 				/>

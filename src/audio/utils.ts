@@ -6,28 +6,75 @@ export function linFromDb(db: number): number {
 	return 10 ** (db / 20);
 }
 
+const TEMPO_RELATIVE_SNAPS = ["beat", "bar", "8th", "16th"] as const;
+
+export type TempoRelativeSnap = (typeof TEMPO_RELATIVE_SNAPS)[number];
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.min(Math.max(value, min), max);
+}
+
+export function isTempoRelativeSnap(snap: string): snap is TempoRelativeSnap {
+	return TEMPO_RELATIVE_SNAPS.includes(snap as TempoRelativeSnap);
+}
+
+export function getTempoSnapInterval(
+	snap: string,
+	tempo: number,
+): number | null {
+	if (!Number.isFinite(tempo) || tempo <= 0) return null;
+
+	const secondsPerBeat = 60 / tempo;
+	switch (snap) {
+		case "beat":
+			return secondsPerBeat;
+		case "bar":
+			return secondsPerBeat * 4;
+		case "8th":
+			return secondsPerBeat / 2;
+		case "16th":
+			return secondsPerBeat / 4;
+		default:
+			return null;
+	}
+}
+
+export function remapTempoRelativeValue(
+	value: number,
+	snap: string,
+	oldTempo: number,
+	newTempo: number,
+	min: number,
+	max: number,
+): number {
+	if (!isTempoRelativeSnap(snap)) {
+		return clamp(value, min, max);
+	}
+	if (value < 0) {
+		return clamp(value, min, max);
+	}
+
+	const oldInterval = getTempoSnapInterval(snap, oldTempo);
+	const newInterval = getTempoSnapInterval(snap, newTempo);
+	if (oldInterval == null || newInterval == null) {
+		return clamp(value, min, max);
+	}
+
+	const count = Math.round(value / oldInterval);
+	return clamp(count * newInterval, min, max);
+}
+
 export function getSnappedValue(
 	value: number,
 	snap: string,
 	tempo: number,
 ): number {
+	const interval = getTempoSnapInterval(snap, tempo);
+	if (interval != null) {
+		return Math.round(value / interval) * interval;
+	}
+
 	switch (snap) {
-		case "beat": {
-			const spb = 60 / tempo;
-			return Math.round(value / spb) * spb;
-		}
-		case "bar": {
-			const spbar = (60 / tempo) * 4;
-			return Math.round(value / spbar) * spbar;
-		}
-		case "8th": {
-			const sp8 = 60 / tempo / 8;
-			return Math.round(value / sp8) * sp8;
-		}
-		case "16th": {
-			const sp16 = 60 / tempo / 16;
-			return Math.round(value / sp16) * sp16;
-		}
 		case "int":
 			return Math.round(value);
 		default:
@@ -120,26 +167,9 @@ export function generateSnapPoints(
 	min: number,
 	max: number,
 ): number[] {
-	let interval: number;
-	switch (snap) {
-		case "beat":
-			interval = 60 / tempo;
-			break;
-		case "bar":
-			interval = (60 / tempo) * 4;
-			break;
-		case "8th":
-			interval = 60 / tempo / 2;
-			break;
-		case "16th":
-			interval = 60 / tempo / 4;
-			break;
-		case "int":
-			interval = 1;
-			break;
-		default:
-			return [];
-	}
+	const interval =
+		getTempoSnapInterval(snap, tempo) ?? (snap === "int" ? 1 : null);
+	if (interval == null) return [];
 	if (interval <= 0) return [];
 	const points: number[] = [];
 	const start = Math.ceil(min / interval) * interval;

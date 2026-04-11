@@ -24,6 +24,7 @@ export class ClipNode extends AudioWorkletNode {
 	private _loopCrossfade = 0;
 	private _duration = -1;
 	private _previousState: ClipNodeState = "initial";
+	private _bufferWriteCursor = 0;
 
 	timesLooped = 0;
 	state: ClipNodeState = "initial";
@@ -142,6 +143,7 @@ export class ClipNode extends AudioWorkletNode {
 	}
 	set buffer(ab: AudioBuffer) {
 		this._buffer = ab;
+		this._bufferWriteCursor = ab.length;
 		if (this._loopStart >= ab.duration) {
 			this._loopStart = 0;
 		}
@@ -155,6 +157,67 @@ export class ClipNode extends AudioWorkletNode {
 		this.port.postMessage({ type: "buffer", data });
 		this.port.postMessage({ type: "loopStart", data: this._loopStart });
 		this.port.postMessage({ type: "loopEnd", data: this._loopEnd });
+	}
+
+	initializeBuffer(
+		totalLength: number,
+		channels: number,
+		options: { streaming?: boolean } = {},
+	) {
+		this._buffer = this.context.createBuffer(
+			channels,
+			totalLength,
+			this.context.sampleRate,
+		);
+		this._bufferWriteCursor = 0;
+		const duration = totalLength / this.context.sampleRate;
+		if (this._loopStart >= duration) {
+			this._loopStart = 0;
+		}
+		if (this._loopEnd <= this._loopStart || this._loopEnd > duration) {
+			this._loopEnd = duration;
+		}
+		this.port.postMessage({
+			type: "bufferInit",
+			data: {
+				channels,
+				totalLength,
+				streaming: options.streaming ?? true,
+			},
+		});
+		this.port.postMessage({ type: "loopStart", data: this._loopStart });
+		this.port.postMessage({ type: "loopEnd", data: this._loopEnd });
+	}
+
+	replaceBufferRange(
+		startSample: number,
+		channelData: Float32Array[],
+		options: { totalLength?: number | null; streamEnded?: boolean } = {},
+	) {
+		this.port.postMessage({
+			type: "bufferRange",
+			data: {
+				startSample,
+				channelData,
+				totalLength: options.totalLength,
+				streamEnded: options.streamEnded,
+			},
+		});
+		this._bufferWriteCursor = Math.max(
+			this._bufferWriteCursor,
+			startSample + (channelData[0]?.length ?? 0),
+		);
+	}
+
+	appendBufferRange(
+		channelData: Float32Array[],
+		options: { totalLength?: number | null; streamEnded?: boolean } = {},
+	) {
+		this.replaceBufferRange(this._bufferWriteCursor, channelData, options);
+	}
+
+	finalizeBuffer(totalLength?: number) {
+		this.port.postMessage({ type: "bufferEnd", data: { totalLength } });
 	}
 
 	start(when?: number, offset?: number, duration?: number) {

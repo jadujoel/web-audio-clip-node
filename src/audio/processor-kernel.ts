@@ -4,8 +4,11 @@
 import {
 	type BlockParameters,
 	type BlockReturnState,
+	type BufferRangeWrite,
 	type ClipProcessorOptions,
 	State,
+	type StreamBufferSpan,
+	type StreamBufferState,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +16,165 @@ import {
 // ---------------------------------------------------------------------------
 
 export const SAMPLE_BLOCK_SIZE = 128;
+
+function createStreamBufferState(
+	buffer: Float32Array[] = [],
+): StreamBufferState {
+	const totalLength = buffer[0]?.length ?? 0;
+	const hasBuffer = totalLength > 0;
+	return {
+		totalLength: hasBuffer ? totalLength : null,
+		committedLength: hasBuffer ? totalLength : 0,
+		streamEnded: hasBuffer,
+		streaming: false,
+		writtenSpans: hasBuffer ? [{ startSample: 0, endSample: totalLength }] : [],
+		pendingWrites: [],
+		lowWaterThreshold: SAMPLE_BLOCK_SIZE * 4,
+		lowWaterNotified: false,
+		lastUnderrunSample: null,
+	};
+}
+
+function getBufferLength(buffer: Float32Array[]): number {
+	return buffer[0]?.length ?? 0;
+}
+
+function getLogicalBufferLength(
+	properties: Required<ClipProcessorOptions>,
+): number {
+	return (
+		properties.streamBuffer.totalLength ?? getBufferLength(properties.buffer)
+	);
+}
+
+function createSilentBuffer(channels: number, length: number): Float32Array[] {
+	return Array.from({ length: channels }, () => new Float32Array(length));
+}
+
+function mergeWrittenSpan(
+	spans: StreamBufferSpan[],
+	nextSpan: StreamBufferSpan,
+): StreamBufferSpan[] {
+	const merged = [...spans, nextSpan].sort(
+		(a, b) => a.startSample - b.startSample,
+	);
+	const result: StreamBufferSpan[] = [];
+	for (const span of merged) {
+		const previous = result[result.length - 1];
+		if (!previous || span.startSample > previous.endSample) {
+			result.push({ ...span });
+			continue;
+		}
+		previous.endSample = Math.max(previous.endSample, span.endSample);
+	}
+	return result;
+}
+
+function getCommittedLength(spans: StreamBufferSpan[]): number {
+	let committedLength = 0;
+	for (const span of spans) {
+		if (span.startSample > committedLength) break;
+		committedLength = Math.max(committedLength, span.endSample);
+	}
+	return committedLength;
+}
+
+function resetLowWaterState(
+	streamBuffer: StreamBufferState,
+	playhead: number,
+): void {
+	if (
+		streamBuffer.committedLength - Math.floor(playhead) >=
+		streamBuffer.lowWaterThreshold
+	) {
+		streamBuffer.lowWaterNotified = false;
+	}
+}
+
+function ensureBufferCapacity(
+	properties: Required<ClipProcessorOptions>,
+	requiredChannels: number,
+	requiredLength: number,
+): void {
+	const currentLength = getBufferLength(properties.buffer);
+	const currentChannels = properties.buffer.length;
+	if (currentLength >= requiredLength && currentChannels >= requiredChannels) {
+		return;
+	}
+
+	const nextLength = Math.max(currentLength, requiredLength);
+	const nextChannels = Math.max(currentChannels, requiredChannels);
+	const nextBuffer = createSilentBuffer(nextChannels, nextLength);
+	for (let ch = 0; ch < currentChannels; ch++) {
+		nextBuffer[ch].set(properties.buffer[ch].subarray(0, currentLength));
+	}
+	properties.buffer = nextBuffer;
+	if (
+		properties.streamBuffer.totalLength == null ||
+		properties.streamBuffer.totalLength < nextLength
+	) {
+		properties.streamBuffer.totalLength = nextLength;
+	}
+}
+
+function applyBufferRangeWrite(
+	properties: Required<ClipProcessorOptions>,
+	write: BufferRangeWrite,
+): void {
+	const startSample = Math.max(Math.floor(write.startSample), 0);
+	const writeLength = write.channelData[0]?.length ?? 0;
+	const requestedTotalLength = write.totalLength ?? null;
+	const requiredLength = Math.max(
+		startSample + writeLength,
+		requestedTotalLength ?? 0,
+	);
+	ensureBufferCapacity(
+		properties,
+		Math.max(write.channelData.length, properties.buffer.length, 1),
+		requiredLength,
+	);
+
+	for (let ch = 0; ch < write.channelData.length; ch++) {
+		properties.buffer[ch].set(write.channelData[ch], startSample);
+	}
+
+	if (requestedTotalLength != null) {
+		properties.streamBuffer.totalLength = requestedTotalLength;
+	}
+	if (writeLength > 0) {
+		properties.streamBuffer.writtenSpans = mergeWrittenSpan(
+			properties.streamBuffer.writtenSpans,
+			{ startSample, endSample: startSample + writeLength },
+		);
+		properties.streamBuffer.committedLength = getCommittedLength(
+			properties.streamBuffer.writtenSpans,
+		);
+	}
+	if (write.streamEnded === true) {
+		properties.streamBuffer.streamEnded = true;
+	}
+	resetLowWaterState(properties.streamBuffer, properties.playhead);
+}
+
+function applyPendingBufferWrites(
+	properties: Required<ClipProcessorOptions>,
+): void {
+	if (properties.streamBuffer.pendingWrites.length === 0) {
+		return;
+	}
+	for (const write of properties.streamBuffer.pendingWrites) {
+		applyBufferRangeWrite(properties, write);
+	}
+	properties.streamBuffer.pendingWrites = [];
+}
+
+function setWholeBuffer(
+	properties: Required<ClipProcessorOptions>,
+	buffer: Float32Array[],
+): void {
+	properties.buffer = buffer;
+	properties.streamBuffer = createStreamBufferState(buffer);
+}
 
 // ---------------------------------------------------------------------------
 // Properties & offset
@@ -24,6 +186,7 @@ export function getProperties(
 ): Required<ClipProcessorOptions> {
 	const {
 		buffer = [],
+		streamBuffer = createStreamBufferState(buffer),
 		duration = -1,
 		loop = false,
 		loopStart = 0,
@@ -55,6 +218,7 @@ export function getProperties(
 
 	return {
 		buffer,
+		streamBuffer,
 		loop,
 		loopStart,
 		loopEnd,
@@ -89,7 +253,7 @@ function getBufferDurationSeconds(
 	properties: Required<ClipProcessorOptions>,
 	sampleRate: number,
 ): number {
-	return (properties.buffer[0]?.length ?? 0) / sampleRate;
+	return getLogicalBufferLength(properties) / sampleRate;
 }
 
 function normalizeLoopBounds(
@@ -130,14 +294,14 @@ export function setOffset(
 	if (offset < 0) {
 		return setOffset(
 			properties,
-			(properties.buffer[0]?.length ?? 0) + offset,
+			getLogicalBufferLength(properties) + offset,
 			sampleRate,
 		);
 	}
-	if (offset > (properties.buffer[0]?.length ?? 1) - 1) {
+	if (offset > (getLogicalBufferLength(properties) || 1) - 1) {
 		return setOffset(
 			properties,
-			(properties.buffer[0]?.length ?? 0) % offset,
+			getLogicalBufferLength(properties) % offset,
 			sampleRate,
 		);
 	}
@@ -494,7 +658,39 @@ export function handleProcessorMessage(
 	const { type, data } = message;
 	switch (type) {
 		case "buffer":
-			properties.buffer = data as Float32Array[];
+			setWholeBuffer(properties, data as Float32Array[]);
+			normalizeLoopBounds(properties, sampleRate);
+			return [];
+		case "bufferInit": {
+			const init = data as {
+				channels: number;
+				totalLength: number;
+				streaming?: boolean;
+			};
+			properties.buffer = createSilentBuffer(init.channels, init.totalLength);
+			properties.streamBuffer = {
+				...createStreamBufferState(),
+				totalLength: init.totalLength,
+				streamEnded: false,
+				streaming: init.streaming ?? true,
+			};
+			normalizeLoopBounds(properties, sampleRate);
+			return [];
+		}
+		case "bufferRange":
+			properties.streamBuffer.pendingWrites.push(data as BufferRangeWrite);
+			return [];
+		case "bufferEnd": {
+			const endData = data as { totalLength?: number } | undefined;
+			if (endData?.totalLength != null) {
+				properties.streamBuffer.totalLength = endData.totalLength;
+			}
+			properties.streamBuffer.streamEnded = true;
+			return [];
+		}
+		case "bufferReset":
+			properties.buffer = [];
+			properties.streamBuffer = createStreamBufferState();
 			normalizeLoopBounds(properties, sampleRate);
 			return [];
 		case "start":
@@ -538,6 +734,7 @@ export function handleProcessorMessage(
 		case "dispose":
 			properties.state = State.Disposed;
 			properties.buffer = [];
+			properties.streamBuffer = createStreamBufferState();
 			return [{ type: "disposed" }];
 		case "loop": {
 			const loop = data as boolean;
@@ -646,6 +843,8 @@ export function processBlock(
 	let state = props.state;
 	if (state === State.Disposed) return { keepAlive: false, messages };
 
+	applyPendingBufferWrites(props);
+
 	if (state === State.Initial) return { keepAlive: true, messages };
 
 	if (state === State.Ended) {
@@ -677,7 +876,7 @@ export function processBlock(
 	}
 
 	const output0 = outputs[0];
-	const sourceLength = props.buffer[0]?.length ?? 0;
+	const sourceLength = getLogicalBufferLength(props);
 	if (sourceLength === 0) {
 		fillWithSilence(output0);
 		return { keepAlive: true, messages };
@@ -694,7 +893,6 @@ export function processBlock(
 
 	const {
 		buffer,
-		loop,
 		loopStart,
 		loopEnd,
 		loopCrossfade,
@@ -714,6 +912,10 @@ export function processBlock(
 		fadeInDuration,
 		fadeOutDuration,
 	} = props;
+	const hasIncompleteStream =
+		props.streamBuffer.streaming &&
+		props.streamBuffer.committedLength < sourceLength;
+	const loop = props.loop && !hasIncompleteStream;
 
 	const nc = Math.min(buffer.length, output0.length);
 	const durationSamples = props.duration * ctx.sampleRate;
@@ -746,6 +948,35 @@ export function processBlock(
 	}
 
 	const useRateIndexing = props.enablePlaybackRate || needsDetune;
+	const isZeroRateBlock =
+		useRateIndexing &&
+		effectiveRates.length > 0 &&
+		effectiveRates.every((rate) => rate === 0);
+
+	if (
+		props.streamBuffer.streaming &&
+		!props.streamBuffer.streamEnded &&
+		!props.streamBuffer.lowWaterNotified &&
+		props.streamBuffer.committedLength - Math.floor(playhead) <
+			props.streamBuffer.lowWaterThreshold
+	) {
+		messages.push({
+			type: "bufferLowWater",
+			data: {
+				playhead: Math.floor(playhead),
+				committedLength: props.streamBuffer.committedLength,
+			},
+		});
+		props.streamBuffer.lowWaterNotified = true;
+	}
+
+	if (isZeroRateBlock) {
+		fillWithSilence(output0);
+		for (let i = 1; i < outputs.length; i++) {
+			copy(output0, outputs[i]);
+		}
+		return { keepAlive: true, messages };
+	}
 
 	const blockParams: BlockParameters = {
 		bufferLength: sourceLength,
@@ -765,6 +996,28 @@ export function processBlock(
 	} = useRateIndexing
 		? findIndexesWithPlaybackRates(blockParams)
 		: findIndexesNormal(blockParams);
+
+	const underrunSample = indexes.find(
+		(index) =>
+			index >= props.streamBuffer.committedLength && index < sourceLength,
+	);
+	if (
+		underrunSample !== undefined &&
+		!props.streamBuffer.streamEnded &&
+		props.streamBuffer.lastUnderrunSample !== underrunSample
+	) {
+		messages.push({
+			type: "bufferUnderrun",
+			data: {
+				playhead: Math.floor(playhead),
+				committedLength: props.streamBuffer.committedLength,
+				requestedSample: underrunSample,
+			},
+		});
+		props.streamBuffer.lastUnderrunSample = underrunSample;
+	} else if (underrunSample === undefined) {
+		props.streamBuffer.lastUnderrunSample = null;
+	}
 
 	fill(output0, buffer, indexes);
 

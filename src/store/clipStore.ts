@@ -26,6 +26,10 @@ export interface ClipControlsState {
 	setMaxLocked: (key: ControlKey, locked: boolean) => void;
 	setLoop: (checked: boolean) => void;
 	setTempo: (tempo: number) => void;
+	setTempoAndValues: (
+		tempo: number,
+		values: Partial<Record<ControlKey, number>>,
+	) => void;
 	setValues: (values: Record<ControlKey, number>) => void;
 }
 
@@ -56,6 +60,8 @@ export const useClipControls = create<ClipControlsState>()(
 					set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
 				setLoop: (checked) => set({ loop: checked }),
 				setTempo: (tempo) => set({ tempo }),
+				setTempoAndValues: (tempo, values) =>
+					set((s) => ({ tempo, values: { ...s.values, ...values } })),
 				setValues: (values) => set({ values }),
 			})
 		: persist(
@@ -77,6 +83,8 @@ export const useClipControls = create<ClipControlsState>()(
 						set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
 					setLoop: (checked) => set({ loop: checked }),
 					setTempo: (tempo) => set({ tempo }),
+					setTempoAndValues: (tempo, values) =>
+						set((s) => ({ tempo, values: { ...s.values, ...values } })),
 					setValues: (values) => set({ values }),
 				}),
 				{

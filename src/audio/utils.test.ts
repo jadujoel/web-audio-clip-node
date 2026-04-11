@@ -5,7 +5,10 @@ import {
 	float32ArrayFromAudioBuffer,
 	generateSnapPoints,
 	getSnappedValue,
+	getTempoSnapInterval,
+	isTempoRelativeSnap,
 	linFromDb,
+	remapTempoRelativeValue,
 } from "./utils";
 
 describe("dbFromLin / linFromDb", () => {
@@ -50,14 +53,13 @@ describe("getSnappedValue", () => {
 	});
 
 	it("8th snap", () => {
-		// 1 8th = 60/120/8 = 0.0625s
-		const sp8 = 60 / tempo / 8;
-		expect(getSnappedValue(0.07, "8th", tempo)).toBeCloseTo(sp8);
+		const sp8 = 60 / tempo / 2;
+		expect(getSnappedValue(0.14, "8th", tempo)).toBeCloseTo(sp8);
 	});
 
 	it("16th snap", () => {
-		const sp16 = 60 / tempo / 16;
-		expect(getSnappedValue(0.02, "16th", tempo)).toBeCloseTo(sp16);
+		const sp16 = 60 / tempo / 4;
+		expect(getSnappedValue(0.08, "16th", tempo)).toBeCloseTo(sp16);
 	});
 
 	it("int snap: rounds to nearest integer", () => {
@@ -67,6 +69,39 @@ describe("getSnappedValue", () => {
 
 	it("no snap: returns value unchanged", () => {
 		expect(getSnappedValue(1.234, "none", tempo)).toBe(1.234);
+	});
+});
+
+describe("tempo-relative helpers", () => {
+	it("detects tempo-relative snap modes", () => {
+		expect(isTempoRelativeSnap("beat")).toBe(true);
+		expect(isTempoRelativeSnap("bar")).toBe(true);
+		expect(isTempoRelativeSnap("8th")).toBe(true);
+		expect(isTempoRelativeSnap("16th")).toBe(true);
+		expect(isTempoRelativeSnap("none")).toBe(false);
+	});
+
+	it("returns the correct interval for each tempo-relative snap", () => {
+		expect(getTempoSnapInterval("beat", 120)).toBeCloseTo(0.5);
+		expect(getTempoSnapInterval("bar", 120)).toBeCloseTo(2);
+		expect(getTempoSnapInterval("8th", 120)).toBeCloseTo(0.25);
+		expect(getTempoSnapInterval("16th", 120)).toBeCloseTo(0.125);
+	});
+
+	it("remaps a beat-snapped value to preserve beat count", () => {
+		expect(remapTempoRelativeValue(1, "beat", 120, 60, 0, 10)).toBeCloseTo(2);
+	});
+
+	it("remaps a bar-snapped value to preserve bar count", () => {
+		expect(remapTempoRelativeValue(2, "bar", 120, 60, 0, 10)).toBeCloseTo(4);
+	});
+
+	it("clamps remapped values to the effective range", () => {
+		expect(remapTempoRelativeValue(2, "beat", 120, 30, 0, 3)).toBe(3);
+	});
+
+	it("keeps sentinel negative values unchanged", () => {
+		expect(remapTempoRelativeValue(-1, "beat", 120, 60, -1, 10)).toBe(-1);
 	});
 });
 

@@ -450,7 +450,7 @@ describe("SnappableSlider", () => {
 		fireEvent.mouseUp(document);
 	});
 
-	test("wheel up increases value", () => {
+	test("wheel does not change value", () => {
 		const onChange = mock(() => {});
 		const { container } = render(
 			<SnappableSlider
@@ -463,10 +463,10 @@ describe("SnappableSlider", () => {
 		);
 		const slider = q(container, '[role="slider"]');
 		fireEvent.wheel(slider, { deltaY: -1 });
-		expect(onChange).toHaveBeenCalledWith(51);
+		expect(onChange).not.toHaveBeenCalled();
 	});
 
-	test("wheel down decreases value", () => {
+	test("shift+wheel does not change value", () => {
 		const onChange = mock(() => {});
 		const { container } = render(
 			<SnappableSlider
@@ -478,32 +478,12 @@ describe("SnappableSlider", () => {
 			/>,
 		);
 		const slider = q(container, '[role="slider"]');
-		fireEvent.wheel(slider, { deltaY: 1 });
-		expect(onChange).toHaveBeenCalledWith(49);
-	});
-
-	test("wheel with shift uses finer step", () => {
-		const onChange = mock(() => {});
-		const { container } = render(
-			<SnappableSlider
-				min={0}
-				max={100}
-				value={50}
-				step={10}
-				onChange={onChange}
-			/>,
-		);
-		const slider = q(container, '[role="slider"]');
-		// fireEvent.wheel doesn't pass shiftKey through in happy-dom,
-		// so we create and dispatch a proper WheelEvent
 		const wheelEvent = document.createEvent("Event");
 		wheelEvent.initEvent("wheel", true, true);
-		Object.defineProperty(wheelEvent, "deltaY", { value: -1 });
+		Object.defineProperty(wheelEvent, "deltaY", { value: 1 });
 		Object.defineProperty(wheelEvent, "shiftKey", { value: true });
-		Object.defineProperty(wheelEvent, "preventDefault", { value: () => {} });
 		slider.dispatchEvent(wheelEvent);
-		// With shift, step = 10/10 = 1
-		expect(onChange).toHaveBeenCalledWith(51);
+		expect(onChange).not.toHaveBeenCalled();
 	});
 
 	test("drag with mousemove and mouseup cleans up", () => {

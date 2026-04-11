@@ -30,7 +30,9 @@ async function main() {
 	);
 
 	await Bun.sleep(1_500);
+	console.log("Closing context...");
 	await context.close();
+	console.log("Context Closed", context.state);
 }
 
 if (import.meta.main) {

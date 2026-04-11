@@ -44,4 +44,43 @@ describe("AudioWorklet Bun integration", () => {
 
 		expect(true).toBe(true);
 	});
+
+	test("playbackRate can hit zero and resume without crashing the worklet", async () => {
+		const context = new AudioContext({ sampleRate: 48_000 });
+
+		await Bun.build({
+			entrypoints: ["src/audio/processor.ts"],
+			outdir: "dist/audio",
+		});
+
+		await context.audioWorklet.addModule("./dist/audio/processor.js");
+
+		const buffer = context.createBuffer(2, 48_000, context.sampleRate);
+		buffer.getChannelData(0).fill(0.25);
+		buffer.getChannelData(1).fill(0.25);
+
+		const clip = new ClipNode(context);
+		const playheads: number[] = [];
+		clip.onframe = (data) => {
+			playheads.push(data[2]);
+		};
+		clip.buffer = buffer;
+		clip.connect(context.destination);
+		clip.start();
+
+		await Bun.sleep(50);
+		clip.playbackRate.value = 0;
+		await Bun.sleep(50);
+		const zeroWindow = playheads.slice(-5);
+		clip.playbackRate.value = 1;
+		await Bun.sleep(50);
+
+		await context.close();
+
+		expect(zeroWindow.length).toBeGreaterThan(0);
+		expect(new Set(zeroWindow).size).toBeLessThanOrEqual(1);
+		expect(playheads.at(-1) ?? 0).toBeGreaterThanOrEqual(
+			zeroWindow.at(-1) ?? 0,
+		);
+	});
 });

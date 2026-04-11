@@ -12,6 +12,7 @@ export type ClipProcessorState = (typeof State)[keyof typeof State];
 
 export interface ClipProcessorOptions {
 	buffer?: Float32Array[];
+	streamBuffer?: StreamBufferState;
 	loop?: boolean;
 	loopStart?: number;
 	loopEnd?: number;
@@ -101,6 +102,10 @@ export interface ClipProcessorStateMap {
 
 export type ClipProcessorMessageRx =
 	| ClipProcessorBufferMessageRx
+	| ClipProcessorBufferInitMessageRx
+	| ClipProcessorBufferRangeMessageRx
+	| ClipProcessorBufferEndMessageRx
+	| ClipProcessorBufferResetMessageRx
 	| ClipProcessorStartMessageRx
 	| ClipProcessorStopMessageRx
 	| ClipProcessorPauseMessageRx
@@ -118,6 +123,10 @@ export type ClipProcessorMessageRx =
 
 export type ClipProcessorMessageType =
 	| "buffer"
+	| "bufferInit"
+	| "bufferRange"
+	| "bufferEnd"
+	| "bufferReset"
 	| "start"
 	| "stop"
 	| "pause"
@@ -148,6 +157,56 @@ export interface ClipProcessorToggleMessageRx {
 export interface ClipProcessorBufferMessageRx {
 	readonly type: "buffer";
 	readonly data: Float32Array[];
+}
+
+export interface StreamBufferSpan {
+	startSample: number;
+	endSample: number;
+}
+
+export interface BufferRangeWrite {
+	readonly startSample: number;
+	readonly channelData: Float32Array[];
+	readonly totalLength?: number | null;
+	readonly streamEnded?: boolean;
+}
+
+export interface StreamBufferState {
+	totalLength: number | null;
+	committedLength: number;
+	streamEnded: boolean;
+	streaming: boolean;
+	writtenSpans: StreamBufferSpan[];
+	pendingWrites: BufferRangeWrite[];
+	lowWaterThreshold: number;
+	lowWaterNotified: boolean;
+	lastUnderrunSample: number | null;
+}
+
+export interface ClipProcessorBufferInitMessageRx {
+	readonly type: "bufferInit";
+	readonly data: {
+		readonly channels: number;
+		readonly totalLength: number;
+		readonly streaming?: boolean;
+	};
+}
+
+export interface ClipProcessorBufferRangeMessageRx {
+	readonly type: "bufferRange";
+	readonly data: BufferRangeWrite;
+}
+
+export interface ClipProcessorBufferEndMessageRx {
+	readonly type: "bufferEnd";
+	readonly data?: {
+		readonly totalLength?: number;
+	};
+}
+
+export interface ClipProcessorBufferResetMessageRx {
+	readonly type: "bufferReset";
+	readonly data?: never;
 }
 
 export interface ClipProcessorStartMessageRx {

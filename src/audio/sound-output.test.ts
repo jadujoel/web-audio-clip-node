@@ -3736,9 +3736,8 @@ describe("Sound output: edge cases", () => {
 			},
 			defaultFilterState(),
 		);
-		// Rate=0 → all indexes point to same sample → constant value (not silence if sample != 0)
-		// At playhead=100 of a 440Hz sine, the value is non-zero
-		expect(hasSound(outs[0])).toBe(true);
+		expect(hasSound(outs[0])).toBe(false);
+		expect(props.playhead).toBe(100);
 	});
 });
 
@@ -6154,5 +6153,101 @@ describe("Sound output: crossfade update while playing", () => {
 		}
 		expect(maxVal).toBeGreaterThan(0.3);
 		expect(checkNans(out[0])).toBe(0);
+	});
+});
+
+describe("15. Zero Playback Rate", () => {
+	it("15.01 — exact zero playbackRate outputs silence and freezes the playhead", () => {
+		const buffer = makeConstant(SR, 0.5);
+		const props = makeStartedProps({
+			buffer,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+		});
+		const out = [makeOutput(2)];
+		processBlock(
+			props,
+			out,
+			defaultParams({ playbackRate: new Float32Array([0]) }),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			defaultFilterState(),
+		);
+		expect(hasSound(out[0])).toBe(false);
+		expect(props.playhead).toBe(0);
+	});
+
+	it("15.02 — transition 1 → 0 → 1 resumes playback from the same position", () => {
+		const buffer = makeConstant(SR * 2, 0.5);
+		const props = makeStartedProps({
+			buffer,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+		});
+		const fs = defaultFilterState();
+
+		const firstOut = [makeOutput(2)];
+		processBlock(
+			props,
+			firstOut,
+			defaultParams({ playbackRate: new Float32Array([1]) }),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			fs,
+		);
+		const playheadAfterForward = props.playhead;
+		expect(hasSound(firstOut[0])).toBe(true);
+
+		const zeroOut = [makeOutput(2)];
+		processBlock(
+			props,
+			zeroOut,
+			defaultParams({ playbackRate: new Float32Array([0]) }),
+			{ currentTime: 0.002, currentFrame: BLOCK, sampleRate: SR },
+			fs,
+		);
+		expect(hasSound(zeroOut[0])).toBe(false);
+		expect(props.playhead).toBe(playheadAfterForward);
+
+		const resumedOut = [makeOutput(2)];
+		processBlock(
+			props,
+			resumedOut,
+			defaultParams({ playbackRate: new Float32Array([1]) }),
+			{ currentTime: 0.003, currentFrame: BLOCK * 2, sampleRate: SR },
+			fs,
+		);
+		expect(hasSound(resumedOut[0])).toBe(true);
+		expect(props.playhead).toBeGreaterThan(playheadAfterForward);
+	});
+
+	it("15.03 — detune does not override an exact zero playbackRate", () => {
+		const buffer = makeConstant(SR, 0.5);
+		const props = makeStartedProps({
+			buffer,
+			enableGain: false,
+			enablePan: false,
+			enableLowpass: false,
+			enableHighpass: false,
+			enablePlaybackRate: true,
+			enableDetune: true,
+		});
+		const out = [makeOutput(2)];
+		processBlock(
+			props,
+			out,
+			defaultParams({
+				playbackRate: new Float32Array([0]),
+				detune: new Float32Array([1200]),
+			}),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			defaultFilterState(),
+		);
+		expect(hasSound(out[0])).toBe(false);
+		expect(props.playhead).toBe(0);
 	});
 });

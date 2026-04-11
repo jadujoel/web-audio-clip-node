@@ -3554,4 +3554,123 @@ describe("Loop: edge cases", () => {
 		);
 		expect(messages.some((m) => m.type === "ended")).toBe(false);
 	});
+
+	it("G12: streaming buffer ranges render decoded samples then silent underruns", () => {
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		handleProcessorMessage(
+			props,
+			{ type: "bufferInit", data: { channels: 2, totalLength: 512 } },
+			0,
+			SR,
+		);
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(128).fill(0.25),
+						new Float32Array(128).fill(0.5),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		const firstOutputs = [makeOutput(2)];
+		processBlock(
+			props,
+			firstOutputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(firstOutputs[0][0][0]).toBeCloseTo(0.25);
+		expect(firstOutputs[0][1][0]).toBeCloseTo(0.5);
+		expect(props.streamBuffer.committedLength).toBe(128);
+
+		const secondOutputs = [makeOutput(2)];
+		const secondResult = processBlock(
+			props,
+			secondOutputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.002, currentFrame: 128, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(secondOutputs[0][0][0]).toBe(0);
+		expect(props.state).toBe(State.Started);
+		expect(
+			secondResult.messages.some(
+				(message) => message.type === "bufferUnderrun",
+			),
+		).toBe(true);
+	});
+
+	it("G13: exact zero playbackRate outputs silence without moving playhead", () => {
+		const buffer = [
+			new Float32Array(1024).fill(0.5),
+			new Float32Array(1024).fill(0.5),
+		];
+		const props = getProperties(
+			{
+				buffer,
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: true,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([0]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		expect(outputs[0][0].every((sample) => sample === 0)).toBe(true);
+		expect(props.playhead).toBe(0);
+	});
 });

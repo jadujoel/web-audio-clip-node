@@ -355,6 +355,20 @@ export function useClipNode({
 		if (node) applyToggle(node, key, on);
 	}, []);
 
+	const applyValuesToNode = useCallback(
+		(valuesToApply: Partial<Record<ControlKey, number>>) => {
+			const node = nodeRef.current;
+			if (!node) return;
+
+			for (const [key, value] of Object.entries(valuesToApply) as Array<
+				[ControlKey, number]
+			>) {
+				applyValue(node, key, value);
+			}
+		},
+		[],
+	);
+
 	const setLoopOnNode = useCallback((checked: boolean) => {
 		const node = nodeRef.current;
 		if (node) node.loop = checked;
@@ -378,6 +392,7 @@ export function useClipNode({
 		logState,
 		loadSound,
 		applyValue: applyValueToNode,
+		applyValues: applyValuesToNode,
 		applyToggle: applyToggleToNode,
 		setLoopOnNode,
 	};
