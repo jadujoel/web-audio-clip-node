@@ -1,0 +1,16 @@
+{
+  "name": "self-hosted-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "cp node_modules/@jadujoel/web-audio-clip-node/dist/processor.js public/processor.js",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@jadujoel/web-audio-clip-node": "^0.1.1"
+  },
+  "devDependencies": {
+    "vite": "^6"
+  }
+}

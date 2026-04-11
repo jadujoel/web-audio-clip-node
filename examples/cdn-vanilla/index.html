@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipNode – CDN Vanilla Example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; }
+    button { font-size: 1rem; padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>ClipNode – CDN</h1>
+  <p>Loads the library directly from jsDelivr. No bundler, no npm.</p>
+  <button id="play" type="button">▶ Play</button>
+  <button id="stop" type="button">■ Stop</button>
+  <p id="status">Click Play to start (loads a sample tone).</p>
+
+  <script type="module">
+    // Import the bundled library from the CDN (single file, no module resolution needed)
+    import { ClipNode, getProcessorCdnUrl } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@0.1.1/dist/lib.bundle.js";
+
+    const status = document.getElementById("status");
+    let ctx;
+    let clip;
+
+    // Generate a simple sine-wave AudioBuffer for demo purposes
+    function createToneBuffer(audioCtx, freq = 440, duration = 2) {
+      const length = audioCtx.sampleRate * duration;
+      const buf = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        data[i] = Math.sin(2 * Math.PI * freq * i / audioCtx.sampleRate);
+      }
+      return buf;
+    }
+
+    document.getElementById("play").addEventListener("click", async () => {
+      if (!ctx) {
+        ctx = new AudioContext();
+        const processorUrl = getProcessorCdnUrl("0.1.1");
+        await ctx.audioWorklet.addModule(processorUrl);
+        clip = new ClipNode(ctx, {
+          processorOptions: { sampleRate: ctx.sampleRate },
+        });
+        clip.connect(ctx.destination);
+        clip.buffer = createToneBuffer(ctx);
+      }
+      clip.start();
+      status.textContent = "Playing…";
+    });
+
+    document.getElementById("stop").addEventListener("click", () => {
+      if (clip) {
+        clip.stop();
+        status.textContent = "Stopped.";
+      }
+    });
+  </script>
+</body>
+</html>

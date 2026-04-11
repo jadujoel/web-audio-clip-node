@@ -62,10 +62,15 @@ function Player() {
 
 ```html
 <script type="module">
+  import { ClipNode, getProcessorCdnUrl } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@0.1.1/dist/lib.bundle.js";
+
   const ctx = new AudioContext();
-  await ctx.audioWorklet.addModule(
-    "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@0.1.0/dist/processor.js"
-  );
+  await ctx.audioWorklet.addModule(getProcessorCdnUrl());
+
+  const clip = new ClipNode(ctx, {
+    processorOptions: { sampleRate: ctx.sampleRate },
+  });
+  clip.connect(ctx.destination);
 </script>
 ```
 
@@ -82,6 +87,7 @@ function Player() {
 | Entry point | Import path | Contents |
 |-------------|-------------|----------|
 | Core | `@jadujoel/web-audio-clip-node` | `ClipNode`, types, utils, controls, processor kernel |
+| Bundle | `@jadujoel/web-audio-clip-node/bundle` | Single-file ESM bundle for CDN / `<script type="module">` |
 | React | `@jadujoel/web-audio-clip-node/react` | Store, hooks, UI components |
 | Processor | `@jadujoel/web-audio-clip-node/processor` | Standalone worklet script |
 | Styles | `@jadujoel/web-audio-clip-node/styles.css` | CSS for React components |

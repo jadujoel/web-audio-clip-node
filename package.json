@@ -24,6 +24,7 @@
 			"types": "./dist/lib.d.ts",
 			"import": "./dist/lib.js"
 		},
+		"./bundle": "./dist/lib.bundle.js",
 		"./react": {
 			"types": "./dist/lib-react.d.ts",
 			"import": "./dist/lib-react.js"

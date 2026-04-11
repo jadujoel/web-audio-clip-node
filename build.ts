@@ -75,7 +75,26 @@ export async function buildLibrary(): Promise<void> {
 		throw new Error(`tsc exited with code ${exitCode}`);
 	}
 
-	// 5. Copy styles
+	// 5. Bundle single-file ESM for CDN usage (no bare specifiers)
+	const esbuild = Bun.spawn(
+		[
+			"bunx",
+			"esbuild",
+			"src/lib.ts",
+			"--bundle",
+			"--format=esm",
+			"--minify",
+			"--sourcemap",
+			"--outfile=dist/lib.bundle.js",
+		],
+		{ stdio: ["inherit", "inherit", "inherit"] },
+	);
+	const esbuildExit = await esbuild.exited;
+	if (esbuildExit !== 0) {
+		throw new Error(`esbuild exited with code ${esbuildExit}`);
+	}
+
+	// 6. Copy styles
 	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
 }
 

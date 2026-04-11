@@ -1,0 +1,15 @@
+{
+  "name": "esm-bundler-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@jadujoel/web-audio-clip-node": "^0.1.1"
+  },
+  "devDependencies": {
+    "vite": "^6"
+  }
+}
