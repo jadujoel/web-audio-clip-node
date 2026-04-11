@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ControlDef, ControlKey } from "../controls/controlDefs";
+import {
+	buildLinkedControlPairDefaults,
+	transportLinkedControlPairs,
+} from "../controls/linkedControlPairs";
 import { ControlSection } from "./ControlSection";
 
 afterEach(cleanup);
@@ -175,6 +179,120 @@ describe("ControlSection", () => {
 		);
 		const legend = container.querySelector("legend");
 		expect(legend?.textContent).toBe("Test Section");
+	});
+
+	test("renders linked pair toggle and forwards changes", () => {
+		const onLinkedChange = mock(() => {});
+		const linked = buildLinkedControlPairDefaults();
+
+		const linkedDefs: ControlDef[] = [
+			{
+				key: "stopDelay",
+				label: "StopDelay",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasToggle: true,
+			},
+			{
+				key: "fadeOut",
+				label: "FadeOut",
+				min: 0,
+				max: 60,
+				defaultValue: 0,
+				hasToggle: true,
+			},
+		];
+
+		const { container } = render(
+			<ControlSection
+				legend="Transport"
+				defs={linkedDefs}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
+				linked={linked}
+				linkedPairs={transportLinkedControlPairs}
+				tempo={120}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onLinkedChange={onLinkedChange}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+
+		const linkBtn = container.querySelector(".control-link-btn");
+		expect(linkBtn).toBeTruthy();
+		if (!linkBtn) throw new Error("link button not found");
+		expect(linkBtn.getAttribute("aria-pressed")).toBe("false");
+		expect(linkBtn.getAttribute("aria-label")).toBe(
+			"Link StopDelay and FadeOut",
+		);
+		fireEvent.click(linkBtn);
+		expect(onLinkedChange).toHaveBeenCalledWith("fadeOutStopDelay", true);
+	});
+
+	test("link connector shows active state when linked", () => {
+		const linked = {
+			...buildLinkedControlPairDefaults(),
+			fadeOutStopDelay: true,
+		};
+
+		const linkedDefs: ControlDef[] = [
+			{
+				key: "stopDelay",
+				label: "StopDelay",
+				min: 0,
+				max: 4,
+				defaultValue: 0,
+				hasToggle: true,
+			},
+			{
+				key: "fadeOut",
+				label: "FadeOut",
+				min: 0,
+				max: 60,
+				defaultValue: 0,
+				hasToggle: true,
+			},
+		];
+
+		const { container } = render(
+			<ControlSection
+				legend="Transport"
+				defs={linkedDefs}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
+				linked={linked}
+				linkedPairs={transportLinkedControlPairs}
+				tempo={120}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onLinkedChange={() => {}}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+
+		const group = container.querySelector(".control-link-group");
+		expect(group).toBeTruthy();
+		expect(group?.classList.contains("control-link-group--active")).toBe(true);
+		const btn = container.querySelector(".control-link-btn");
+		expect(btn?.getAttribute("aria-pressed")).toBe("true");
+		const lines = container.querySelectorAll(".control-link-line");
+		expect(lines.length).toBe(2);
 	});
 
 	test("renders AudioControl for each def", () => {

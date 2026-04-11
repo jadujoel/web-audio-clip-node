@@ -229,7 +229,13 @@ function areAudioControlPropsEqual(
 		prev.hasSnap === next.hasSnap &&
 		prev.hasMaxLock === next.hasMaxLock &&
 		prev.audioDuration === next.audioDuration &&
-		prev.maxLocked === next.maxLocked
+		prev.maxLocked === next.maxLocked &&
+		prev.onChange === next.onChange &&
+		prev.onToggle === next.onToggle &&
+		prev.onSnapChange === next.onSnapChange &&
+		prev.onMinChange === next.onMinChange &&
+		prev.onMaxChange === next.onMaxChange &&
+		prev.onMaxLockedChange === next.onMaxLockedChange
 	);
 }
 

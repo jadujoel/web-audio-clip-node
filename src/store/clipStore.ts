@@ -5,6 +5,10 @@ import {
 	type ControlKey,
 	DEFAULT_TEMPO,
 } from "../controls/controlDefs";
+import {
+	buildLinkedControlPairDefaults,
+	type LinkedControlPairKey,
+} from "../controls/linkedControlPairs";
 
 const STORAGE_KEY = "clip-node-state";
 
@@ -15,15 +19,25 @@ export interface ClipControlsState {
 	mins: Record<ControlKey, number>;
 	maxs: Record<ControlKey, number>;
 	maxLocked: Record<ControlKey, boolean>;
+	linkedPairs: Record<LinkedControlPairKey, boolean>;
 	loop: boolean;
 	tempo: number;
 
 	setValue: (key: ControlKey, val: number) => void;
+	setValuesPartial: (values: Partial<Record<ControlKey, number>>) => void;
 	setSnap: (key: ControlKey, snap: string) => void;
+	setSnapsPartial: (snaps: Partial<Record<ControlKey, string>>) => void;
 	setEnabled: (key: ControlKey, on: boolean) => void;
+	setEnabledPartial: (enabled: Partial<Record<ControlKey, boolean>>) => void;
 	setMin: (key: ControlKey, val: number) => void;
+	setMinsPartial: (mins: Partial<Record<ControlKey, number>>) => void;
 	setMax: (key: ControlKey, val: number) => void;
+	setMaxsPartial: (maxs: Partial<Record<ControlKey, number>>) => void;
 	setMaxLocked: (key: ControlKey, locked: boolean) => void;
+	setMaxLockedPartial: (
+		maxLocked: Partial<Record<ControlKey, boolean>>,
+	) => void;
+	setLinkedPair: (key: LinkedControlPairKey, on: boolean) => void;
 	setLoop: (checked: boolean) => void;
 	setTempo: (tempo: number) => void;
 	setTempoAndValues: (
@@ -41,23 +55,39 @@ function searchParamsIncludes(key: string) {
 }
 
 const defaults = buildDefaults();
+const linkedPairDefaults = buildLinkedControlPairDefaults();
 
 export const useClipControls = create<ClipControlsState>()(
 	searchParamsIncludes("disable-state")
 		? (set) => ({
 				...defaults,
+				linkedPairs: linkedPairDefaults,
 				loop: false,
 				tempo: DEFAULT_TEMPO,
 				setValue: (key, val) =>
 					set((s) => ({ values: { ...s.values, [key]: val } })),
+				setValuesPartial: (values) =>
+					set((s) => ({ values: { ...s.values, ...values } })),
 				setSnap: (key, snap) =>
 					set((s) => ({ snaps: { ...s.snaps, [key]: snap } })),
+				setSnapsPartial: (snaps) =>
+					set((s) => ({ snaps: { ...s.snaps, ...snaps } })),
 				setEnabled: (key, on) =>
 					set((s) => ({ enabled: { ...s.enabled, [key]: on } })),
+				setEnabledPartial: (enabled) =>
+					set((s) => ({ enabled: { ...s.enabled, ...enabled } })),
 				setMin: (key, val) => set((s) => ({ mins: { ...s.mins, [key]: val } })),
+				setMinsPartial: (mins) =>
+					set((s) => ({ mins: { ...s.mins, ...mins } })),
 				setMax: (key, val) => set((s) => ({ maxs: { ...s.maxs, [key]: val } })),
+				setMaxsPartial: (maxs) =>
+					set((s) => ({ maxs: { ...s.maxs, ...maxs } })),
 				setMaxLocked: (key, locked) =>
 					set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
+				setMaxLockedPartial: (maxLocked) =>
+					set((s) => ({ maxLocked: { ...s.maxLocked, ...maxLocked } })),
+				setLinkedPair: (key, on) =>
+					set((s) => ({ linkedPairs: { ...s.linkedPairs, [key]: on } })),
 				setLoop: (checked) => set({ loop: checked }),
 				setTempo: (tempo) => set({ tempo }),
 				setTempoAndValues: (tempo, values) =>
@@ -67,20 +97,35 @@ export const useClipControls = create<ClipControlsState>()(
 		: persist(
 				(set) => ({
 					...defaults,
+					linkedPairs: linkedPairDefaults,
 					loop: false,
 					tempo: DEFAULT_TEMPO,
 					setValue: (key, val) =>
 						set((s) => ({ values: { ...s.values, [key]: val } })),
+					setValuesPartial: (values) =>
+						set((s) => ({ values: { ...s.values, ...values } })),
 					setSnap: (key, snap) =>
 						set((s) => ({ snaps: { ...s.snaps, [key]: snap } })),
+					setSnapsPartial: (snaps) =>
+						set((s) => ({ snaps: { ...s.snaps, ...snaps } })),
 					setEnabled: (key, on) =>
 						set((s) => ({ enabled: { ...s.enabled, [key]: on } })),
+					setEnabledPartial: (enabled) =>
+						set((s) => ({ enabled: { ...s.enabled, ...enabled } })),
 					setMin: (key, val) =>
 						set((s) => ({ mins: { ...s.mins, [key]: val } })),
+					setMinsPartial: (mins) =>
+						set((s) => ({ mins: { ...s.mins, ...mins } })),
 					setMax: (key, val) =>
 						set((s) => ({ maxs: { ...s.maxs, [key]: val } })),
+					setMaxsPartial: (maxs) =>
+						set((s) => ({ maxs: { ...s.maxs, ...maxs } })),
 					setMaxLocked: (key, locked) =>
 						set((s) => ({ maxLocked: { ...s.maxLocked, [key]: locked } })),
+					setMaxLockedPartial: (maxLocked) =>
+						set((s) => ({ maxLocked: { ...s.maxLocked, ...maxLocked } })),
+					setLinkedPair: (key, on) =>
+						set((s) => ({ linkedPairs: { ...s.linkedPairs, [key]: on } })),
 					setLoop: (checked) => set({ loop: checked }),
 					setTempo: (tempo) => set({ tempo }),
 					setTempoAndValues: (tempo, values) =>
@@ -96,6 +141,7 @@ export const useClipControls = create<ClipControlsState>()(
 						mins: state.mins,
 						maxs: state.maxs,
 						maxLocked: state.maxLocked,
+						linkedPairs: state.linkedPairs,
 						loop: state.loop,
 						tempo: state.tempo,
 					}),

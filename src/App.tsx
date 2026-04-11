@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";
@@ -11,8 +11,24 @@ import { PlayheadSlider } from "./components/PlayheadSlider";
 import { TransportButtons } from "./components/TransportButtons";
 import type { ControlKey } from "./controls/controlDefs";
 import { controlDefs, loopControlDefs } from "./controls/controlDefs";
+import {
+	getActiveLinkedControls,
+	getLinkedControlPairForControl,
+	getLinkedControlUpdates,
+	loopLinkedControlPairs,
+	transportLinkedControlPairs,
+} from "./controls/linkedControlPairs";
 import { useClipNode } from "./hooks/useClipNode";
 import { useClipControls } from "./store/clipStore";
+
+function buildControlUpdates<T>(
+	keys: readonly ControlKey[],
+	value: T,
+): Partial<Record<ControlKey, T>> {
+	return Object.fromEntries(
+		keys.map((key) => [key, value] satisfies [ControlKey, T]),
+	) as Partial<Record<ControlKey, T>>;
+}
 
 export function App() {
 	const controls = useClipControls();
@@ -22,6 +38,8 @@ export function App() {
 		loop: controls.loop,
 		setValue: controls.setValue,
 	});
+	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
+	const [isEditingTempo, setIsEditingTempo] = useState(false);
 
 	// Persist audioDuration into maxs state for locked controls (for localStorage persistence)
 	useEffect(() => {
@@ -33,11 +51,49 @@ export function App() {
 		}
 	}, [node.audioDuration, controls.maxLocked, controls.setMax]);
 
+	useEffect(() => {
+		if (isEditingTempo) return;
+		setTempoDraft(String(controls.tempo));
+	}, [controls.tempo, isEditingTempo]);
+
 	const handleValueChange = useCallback(
 		(key: ControlKey, val: number) => {
+			const linkedPair = getLinkedControlPairForControl(key);
+			if (linkedPair && controls.linkedPairs[linkedPair.key]) {
+				const effectiveMaxs = { ...controls.maxs };
+				for (const linkedKey of linkedPair.controls) {
+					if (controls.maxLocked[linkedKey] && node.audioDuration != null) {
+						effectiveMaxs[linkedKey] = node.audioDuration;
+					}
+				}
+
+				const nextValues = getLinkedControlUpdates({
+					pair: linkedPair,
+					changedKey: key,
+					nextValue: val,
+					values: controls.values,
+					mins: controls.mins,
+					maxs: effectiveMaxs,
+				});
+
+				controls.setValuesPartial(nextValues);
+				node.applyValues(nextValues);
+				return;
+			}
+
 			node.applyValue(key, val);
 		},
-		[node.applyValue],
+		[
+			controls.linkedPairs,
+			controls.maxLocked,
+			controls.maxs,
+			controls.mins,
+			controls.setValuesPartial,
+			controls.values,
+			node.applyValue,
+			node.applyValues,
+			node.audioDuration,
+		],
 	);
 
 	const handleTempoChange = useCallback(
@@ -86,12 +142,52 @@ export function App() {
 		],
 	);
 
+	const commitTempoDraft = useCallback(() => {
+		const nextTempo = Number(tempoDraft.trim());
+		setIsEditingTempo(false);
+
+		if (!Number.isFinite(nextTempo) || nextTempo <= 0) {
+			setTempoDraft(String(controls.tempo));
+			return;
+		}
+
+		handleTempoChange(nextTempo);
+		setTempoDraft(String(nextTempo));
+	}, [controls.tempo, handleTempoChange, tempoDraft]);
+
+	const handleSnapChange = useCallback(
+		(key: ControlKey, snap: string) => {
+			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
+			controls.setSnapsPartial(buildControlUpdates(linkedKeys, snap));
+		},
+		[controls.linkedPairs, controls.setSnapsPartial],
+	);
+
 	const handleToggle = useCallback(
 		(key: ControlKey, on: boolean) => {
-			controls.setEnabled(key, on);
-			node.applyToggle(key, on);
+			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
+			controls.setEnabledPartial(buildControlUpdates(linkedKeys, on));
+			for (const linkedKey of linkedKeys) {
+				node.applyToggle(linkedKey, on);
+			}
 		},
-		[controls.setEnabled, node.applyToggle],
+		[controls.linkedPairs, controls.setEnabledPartial, node.applyToggle],
+	);
+
+	const handleMinChange = useCallback(
+		(key: ControlKey, val: number) => {
+			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
+			controls.setMinsPartial(buildControlUpdates(linkedKeys, val));
+		},
+		[controls.linkedPairs, controls.setMinsPartial],
+	);
+
+	const handleMaxChange = useCallback(
+		(key: ControlKey, val: number) => {
+			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
+			controls.setMaxsPartial(buildControlUpdates(linkedKeys, val));
+		},
+		[controls.linkedPairs, controls.setMaxsPartial],
 	);
 
 	const handleLoopChange = useCallback(
@@ -104,12 +200,20 @@ export function App() {
 
 	const handleMaxLockedChange = useCallback(
 		(key: ControlKey, locked: boolean) => {
-			controls.setMaxLocked(key, locked);
+			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
+			controls.setMaxLockedPartial(buildControlUpdates(linkedKeys, locked));
 			if (locked && node.audioDuration != null) {
-				controls.setMax(key, node.audioDuration);
+				controls.setMaxsPartial(
+					buildControlUpdates(linkedKeys, node.audioDuration),
+				);
 			}
 		},
-		[controls.setMaxLocked, controls.setMax, node.audioDuration],
+		[
+			controls.linkedPairs,
+			controls.setMaxLockedPartial,
+			controls.setMaxsPartial,
+			node.audioDuration,
+		],
 	);
 
 	const handlePlayheadChange = useCallback(
@@ -198,10 +302,20 @@ export function App() {
 					min={20}
 					max={999}
 					step={1}
-					value={controls.tempo}
-					onChange={(e) => {
-						const v = Number(e.target.value);
-						if (Number.isFinite(v) && v > 0) handleTempoChange(v);
+					value={tempoDraft}
+					onFocus={() => setIsEditingTempo(true)}
+					onChange={(e) => setTempoDraft(e.target.value)}
+					onBlur={commitTempoDraft}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							commitTempoDraft();
+							e.currentTarget.blur();
+						}
+						if (e.key === "Escape") {
+							setIsEditingTempo(false);
+							setTempoDraft(String(controls.tempo));
+							e.currentTarget.blur();
+						}
 					}}
 					style={{ width: 70 }}
 				/>
@@ -222,13 +336,16 @@ export function App() {
 					mins={controls.mins}
 					maxs={controls.maxs}
 					maxLocked={controls.maxLocked}
+					linked={controls.linkedPairs}
+					linkedPairs={transportLinkedControlPairs}
 					tempo={controls.tempo}
 					audioDuration={node.audioDuration}
 					onValueChange={handleValueChange}
 					onToggle={handleToggle}
-					onSnapChange={controls.setSnap}
-					onMinChange={controls.setMin}
-					onMaxChange={controls.setMax}
+					onLinkedChange={controls.setLinkedPair}
+					onSnapChange={handleSnapChange}
+					onMinChange={handleMinChange}
+					onMaxChange={handleMaxChange}
 					onMaxLockedChange={handleMaxLockedChange}
 				/>
 				<fieldset className="control-group">
@@ -252,13 +369,16 @@ export function App() {
 							mins={controls.mins}
 							maxs={controls.maxs}
 							maxLocked={controls.maxLocked}
+							linked={controls.linkedPairs}
+							linkedPairs={loopLinkedControlPairs}
 							tempo={controls.tempo}
 							audioDuration={node.audioDuration}
 							onValueChange={handleValueChange}
 							onToggle={handleToggle}
-							onSnapChange={controls.setSnap}
-							onMinChange={controls.setMin}
-							onMaxChange={controls.setMax}
+							onLinkedChange={controls.setLinkedPair}
+							onSnapChange={handleSnapChange}
+							onMinChange={handleMinChange}
+							onMaxChange={handleMaxChange}
 							onMaxLockedChange={handleMaxLockedChange}
 						/>
 					)}
