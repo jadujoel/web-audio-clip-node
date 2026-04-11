@@ -259,6 +259,38 @@ describe("SnappableSlider", () => {
 		expect(fill.style.width).toBe("0%");
 	});
 
+	test("reuses drag bounds for a single drag gesture", () => {
+		const onChange = mock(() => {});
+		const { container } = render(
+			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
+		);
+		const slider = q(container, '[role="slider"]') as HTMLDivElement;
+		const getBoundingClientRect = mock(() => ({
+			left: 10,
+			top: 0,
+			right: 210,
+			bottom: 20,
+			width: 200,
+			height: 20,
+			x: 10,
+			y: 0,
+			toJSON() {
+				return {};
+			},
+		}));
+		Object.defineProperty(slider, "getBoundingClientRect", {
+			value: getBoundingClientRect,
+			configurable: true,
+		});
+
+		fireEvent.mouseDown(slider, { button: 0, clientX: 20 });
+		fireEvent.mouseMove(document, { clientX: 80 });
+		fireEvent.mouseMove(document, { clientX: 140 });
+		fireEvent.mouseUp(document);
+
+		expect(getBoundingClientRect).toHaveBeenCalledTimes(1);
+		expect(onChange).toHaveBeenCalled();
+	});
 	test("enableSnap with snaps: value snaps to closest snap point", () => {
 		const onChange = mock(() => {});
 		const { container } = render(

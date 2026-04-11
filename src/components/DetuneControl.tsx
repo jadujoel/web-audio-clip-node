@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { memo, useCallback, useId, useRef, useState } from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -10,7 +10,7 @@ interface DetuneControlProps {
 	onToggle: (enabled: boolean) => void;
 }
 
-export function DetuneControl({
+function DetuneControlInner({
 	value,
 	defaultValue,
 	enabled,
@@ -109,3 +109,5 @@ export function DetuneControl({
 		</div>
 	);
 }
+
+export const DetuneControl = memo(DetuneControlInner);

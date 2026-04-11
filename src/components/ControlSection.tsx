@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ControlDef, ControlKey } from "../controls/controlDefs";
 import { AudioControl } from "./AudioControl";
 
@@ -20,7 +21,7 @@ interface ControlSectionProps {
 	onMaxLockedChange: (key: ControlKey, locked: boolean) => void;
 }
 
-export function ControlSection({
+function ControlSectionInner({
 	legend,
 	defs,
 	values,
@@ -75,3 +76,26 @@ export function ControlSection({
 		</fieldset>
 	);
 }
+
+function areControlSectionPropsEqual(
+	prev: ControlSectionProps,
+	next: ControlSectionProps,
+) {
+	return (
+		prev.legend === next.legend &&
+		prev.defs === next.defs &&
+		prev.values === next.values &&
+		prev.snaps === next.snaps &&
+		prev.enabled === next.enabled &&
+		prev.mins === next.mins &&
+		prev.maxs === next.maxs &&
+		prev.maxLocked === next.maxLocked &&
+		prev.tempo === next.tempo &&
+		prev.audioDuration === next.audioDuration
+	);
+}
+
+export const ControlSection = memo(
+	ControlSectionInner,
+	areControlSectionPropsEqual,
+);

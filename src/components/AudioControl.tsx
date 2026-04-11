@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useId, useMemo, useRef, useState } from "react";
 import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
 import { formatTickLabel, formatValueText } from "../controls/formatValueText";
 import { ContextMenu } from "./ContextMenu";
@@ -30,7 +30,7 @@ export interface AudioControlProps {
 	onMaxLockedChange?: (locked: boolean) => void;
 }
 
-export function AudioControl({
+function AudioControlInner({
 	label,
 	controlKey,
 	min: propMin,
@@ -207,3 +207,30 @@ export function AudioControl({
 		</div>
 	);
 }
+
+function areAudioControlPropsEqual(
+	prev: AudioControlProps,
+	next: AudioControlProps,
+) {
+	return (
+		prev.label === next.label &&
+		prev.controlKey === next.controlKey &&
+		prev.min === next.min &&
+		prev.max === next.max &&
+		prev.value === next.value &&
+		prev.defaultValue === next.defaultValue &&
+		prev.step === next.step &&
+		prev.tempo === next.tempo &&
+		prev.snap === next.snap &&
+		prev.preset === next.preset &&
+		prev.title === next.title &&
+		prev.enabled === next.enabled &&
+		prev.hasToggle === next.hasToggle &&
+		prev.hasSnap === next.hasSnap &&
+		prev.hasMaxLock === next.hasMaxLock &&
+		prev.audioDuration === next.audioDuration &&
+		prev.maxLocked === next.maxLocked
+	);
+}
+
+export const AudioControl = memo(AudioControlInner, areAudioControlPropsEqual);

@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { memo, useCallback, useId, useRef, useState } from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -17,7 +17,7 @@ function formatHz(value: number): string {
 	return `${Math.round(value)} Hz`;
 }
 
-export function FilterControl({
+function FilterControlInner({
 	label,
 	controlKey: _controlKey,
 	value,
@@ -117,3 +117,5 @@ export function FilterControl({
 		</div>
 	);
 }
+
+export const FilterControl = memo(FilterControlInner);

@@ -19,5 +19,5 @@ export function serve(): Bun.Server<unknown> {
 
 if (import.meta.main) {
 	const server = serve();
-	console.log(`Server running at ${server.hostname}:${server.port}`);
+	console.log(`Server running at http://${server.hostname}:${server.port}`);
 }

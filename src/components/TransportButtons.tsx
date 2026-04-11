@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ClipNodeState } from "../audio/types";
 
 interface TransportButtonsProps {
@@ -11,7 +12,7 @@ interface TransportButtonsProps {
 	onLoadSound: () => void;
 }
 
-export function TransportButtons({
+function TransportButtonsInner({
 	nodeState,
 	onStart,
 	onStop,
@@ -76,3 +77,5 @@ export function TransportButtons({
 		</section>
 	);
 }
+
+export const TransportButtons = memo(TransportButtonsInner);

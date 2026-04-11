@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ClipNodeState } from "../audio/types";
 
 interface DisplayPanelProps {
@@ -11,7 +12,7 @@ interface DisplayPanelProps {
 	timeTaken: string;
 }
 
-export function DisplayPanel({
+function DisplayPanelInner({
 	nodeState,
 	statusMessage,
 	soundName,
@@ -50,3 +51,5 @@ export function DisplayPanel({
 		</section>
 	);
 }
+
+export const DisplayPanel = memo(DisplayPanelInner);

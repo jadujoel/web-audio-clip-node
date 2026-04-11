@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { memo, useCallback, useId, useRef, useState } from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -10,7 +10,7 @@ interface GainControlProps {
 	onToggle: (enabled: boolean) => void;
 }
 
-export function GainControl({
+function GainControlInner({
 	value,
 	defaultValue,
 	enabled,
@@ -108,3 +108,5 @@ export function GainControl({
 		</div>
 	);
 }
+
+export const GainControl = memo(GainControlInner);

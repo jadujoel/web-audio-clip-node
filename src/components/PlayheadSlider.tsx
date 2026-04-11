@@ -1,4 +1,4 @@
-import { useCallback, useId } from "react";
+import { memo, useCallback, useId } from "react";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -19,7 +19,7 @@ function formatTime(seconds: number): string {
 	return `${m}:${s.toFixed(2).padStart(5, "0")}`;
 }
 
-export function PlayheadSlider({
+function PlayheadSliderInner({
 	value,
 	audioDuration,
 	disabled = false,
@@ -57,3 +57,5 @@ export function PlayheadSlider({
 		</div>
 	);
 }
+
+export const PlayheadSlider = memo(PlayheadSliderInner);

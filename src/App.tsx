@@ -65,6 +65,59 @@ export function App() {
 		[controls.setMaxLocked, controls.setMax, node.audioDuration],
 	);
 
+	const handlePlayheadChange = useCallback(
+		(v: number) => handleValueChange("playhead", v),
+		[handleValueChange],
+	);
+	const handlePlaybackRateChange = useCallback(
+		(v: number) => handleValueChange("playbackRate", v),
+		[handleValueChange],
+	);
+	const handlePlaybackRateToggle = useCallback(
+		(on: boolean) => handleToggle("playbackRate", on),
+		[handleToggle],
+	);
+	const handleDetuneChange = useCallback(
+		(v: number) => handleValueChange("detune", v),
+		[handleValueChange],
+	);
+	const handleDetuneToggle = useCallback(
+		(on: boolean) => handleToggle("detune", on),
+		[handleToggle],
+	);
+	const handleGainChange = useCallback(
+		(v: number) => handleValueChange("gain", v),
+		[handleValueChange],
+	);
+	const handleGainToggle = useCallback(
+		(on: boolean) => handleToggle("gain", on),
+		[handleToggle],
+	);
+	const handlePanChange = useCallback(
+		(v: number) => handleValueChange("pan", v),
+		[handleValueChange],
+	);
+	const handlePanToggle = useCallback(
+		(on: boolean) => handleToggle("pan", on),
+		[handleToggle],
+	);
+	const handleLowpassChange = useCallback(
+		(v: number) => handleValueChange("lowpass", v),
+		[handleValueChange],
+	);
+	const handleLowpassToggle = useCallback(
+		(on: boolean) => handleToggle("lowpass", on),
+		[handleToggle],
+	);
+	const handleHighpassChange = useCallback(
+		(v: number) => handleValueChange("highpass", v),
+		[handleValueChange],
+	);
+	const handleHighpassToggle = useCallback(
+		(on: boolean) => handleToggle("highpass", on),
+		[handleToggle],
+	);
+
 	return (
 		<main>
 			<DisplayPanel
@@ -110,7 +163,7 @@ export function App() {
 				value={controls.values.playhead}
 				audioDuration={node.audioDuration}
 				disabled={node.nodeState === "initial" || node.nodeState === "disposed"}
-				onChange={(v) => handleValueChange("playhead", v)}
+				onChange={handlePlayheadChange}
 			/>
 			<section id="controls">
 				<ControlSection
@@ -169,29 +222,29 @@ export function App() {
 						value={controls.values.playbackRate}
 						defaultValue={1}
 						enabled={controls.enabled.playbackRate}
-						onChange={(v) => handleValueChange("playbackRate", v)}
-						onToggle={(on) => handleToggle("playbackRate", on)}
+						onChange={handlePlaybackRateChange}
+						onToggle={handlePlaybackRateToggle}
 					/>
 					<DetuneControl
 						value={controls.values.detune}
 						defaultValue={0}
 						enabled={controls.enabled.detune}
-						onChange={(v) => handleValueChange("detune", v)}
-						onToggle={(on) => handleToggle("detune", on)}
+						onChange={handleDetuneChange}
+						onToggle={handleDetuneToggle}
 					/>
 					<GainControl
 						value={controls.values.gain}
 						defaultValue={0}
 						enabled={controls.enabled.gain}
-						onChange={(v) => handleValueChange("gain", v)}
-						onToggle={(on) => handleToggle("gain", on)}
+						onChange={handleGainChange}
+						onToggle={handleGainToggle}
 					/>
 					<PanControl
 						value={controls.values.pan}
 						defaultValue={0}
 						enabled={controls.enabled.pan}
-						onChange={(v) => handleValueChange("pan", v)}
-						onToggle={(on) => handleToggle("pan", on)}
+						onChange={handlePanChange}
+						onToggle={handlePanToggle}
 					/>
 					<FilterControl
 						label="Lowpass"
@@ -199,8 +252,8 @@ export function App() {
 						value={controls.values.lowpass}
 						defaultValue={16384}
 						enabled={controls.enabled.lowpass}
-						onChange={(v) => handleValueChange("lowpass", v)}
-						onToggle={(on) => handleToggle("lowpass", on)}
+						onChange={handleLowpassChange}
+						onToggle={handleLowpassToggle}
 					/>
 					<FilterControl
 						label="Highpass"
@@ -208,8 +261,8 @@ export function App() {
 						value={controls.values.highpass}
 						defaultValue={32}
 						enabled={controls.enabled.highpass}
-						onChange={(v) => handleValueChange("highpass", v)}
-						onToggle={(on) => handleToggle("highpass", on)}
+						onChange={handleHighpassChange}
+						onToggle={handleHighpassToggle}
 					/>
 				</fieldset>
 			</section>

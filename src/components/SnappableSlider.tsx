@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+interface DragBounds {
+	left: number;
+	width: number;
+}
+
 export interface SnappableSliderProps {
 	min: number;
 	max: number;
@@ -38,6 +43,7 @@ export function SnappableSlider({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isDragging = useRef(false);
 	const isOptionKeyHeld = useRef(false);
+	const dragBoundsRef = useRef<DragBounds | null>(null);
 	const [altHeld, setAltHeld] = useState(false);
 
 	const resolvedStep = step ?? (max - min) / 100;
@@ -93,7 +99,9 @@ export function SnappableSlider({
 		(clientX: number) => {
 			const el = containerRef.current;
 			if (!el) return;
-			const { left, width } = el.getBoundingClientRect();
+			const bounds = dragBoundsRef.current ?? el.getBoundingClientRect();
+			const { left, width } = bounds;
+			if (width <= 0) return;
 			const ratio = Math.min(Math.max((clientX - left) / width, 0), 1);
 			const raw = getValueFromRatio(ratio);
 			const snapped = getSnapped(raw);
@@ -112,14 +120,19 @@ export function SnappableSlider({
 	const startDrag = useCallback(
 		(clientX: number, altKey: boolean) => {
 			if (disabled) return;
+			const el = containerRef.current;
+			if (!el) return;
+			dragBoundsRef.current = el.getBoundingClientRect();
 			isDragging.current = true;
 			isOptionKeyHeld.current = altKey;
 			setAltHeld(altKey);
 			updateFromClientX(clientX);
 
 			const handleMove = (e: MouseEvent) => {
-				isOptionKeyHeld.current = e.altKey;
-				setAltHeld(e.altKey);
+				if (isOptionKeyHeld.current !== e.altKey) {
+					isOptionKeyHeld.current = e.altKey;
+					setAltHeld(e.altKey);
+				}
 				updateFromClientX(e.clientX);
 			};
 			const handleTouchMove = (e: TouchEvent) =>
@@ -127,6 +140,7 @@ export function SnappableSlider({
 			const handleUp = () => {
 				isDragging.current = false;
 				isOptionKeyHeld.current = false;
+				dragBoundsRef.current = null;
 				setAltHeld(false);
 				document.removeEventListener("mousemove", handleMove);
 				document.removeEventListener("mouseup", handleUp);

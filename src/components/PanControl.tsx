@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { memo, useCallback, useId, useRef, useState } from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -16,7 +16,7 @@ function formatPan(value: number): string {
 	return value < 0 ? `L${pct}` : `R${pct}`;
 }
 
-export function PanControl({
+function PanControlInner({
 	value,
 	defaultValue,
 	enabled,
@@ -114,3 +114,5 @@ export function PanControl({
 		</div>
 	);
 }
+
+export const PanControl = memo(PanControlInner);

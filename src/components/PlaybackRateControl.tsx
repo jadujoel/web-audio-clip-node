@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { memo, useCallback, useId, useRef, useState } from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -10,7 +10,7 @@ interface PlaybackRateControlProps {
 	onToggle: (enabled: boolean) => void;
 }
 
-export function PlaybackRateControl({
+function PlaybackRateControlInner({
 	value,
 	defaultValue,
 	enabled,
@@ -110,3 +110,5 @@ export function PlaybackRateControl({
 		</div>
 	);
 }
+
+export const PlaybackRateControl = memo(PlaybackRateControlInner);
