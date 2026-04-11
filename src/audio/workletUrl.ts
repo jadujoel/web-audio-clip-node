@@ -1,10 +1,8 @@
 import { processorCode } from "./processor-code";
+import { VERSION } from "./version";
 
 const PACKAGE_NAME = "@jadujoel/web-audio-clip-node";
-const PACKAGE_VERSION: string =
-	typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0";
-
-declare const __VERSION__: string | undefined;
+const PACKAGE_VERSION: string = VERSION;
 
 /** Blob URL from embedded processor code. Zero-config, default for npm users. */
 export function getProcessorBlobUrl(): string {

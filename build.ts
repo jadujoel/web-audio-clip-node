@@ -45,7 +45,7 @@ async function buildProcessorCodeModule(): Promise<string> {
 	const code = await buildProcessor();
 	await Bun.write(
 		"src/audio/processor-code.ts",
-		`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const processorCode = ${JSON.stringify(code)};\n`,
+		`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const processorCode =\n\t${JSON.stringify(code)};\n`,
 	);
 	return code;
 }
@@ -59,28 +59,14 @@ export async function buildLibrary(): Promise<void> {
 	// 2. Write standalone processor.js for CDN usage
 	await Bun.write("dist/processor.js", processorSource);
 
-	// 3. Read package version for CDN URL default
+	// 3. Generate version module from package.json
 	const { version } = await Bun.file("package.json").json();
+	await Bun.write(
+		"src/audio/version.ts",
+		`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const VERSION = ${JSON.stringify(version)};\n`,
+	);
 
-	// 4. Build ESM library (core + react)
-	await Bun.build({
-		entrypoints: ["./src/lib.ts", "./src/lib-react.ts"],
-		outdir: "dist",
-		target: "browser",
-		minify: false,
-		throw: true,
-		sourcemap: "linked",
-		external: ["react", "react-dom", "react/jsx-runtime", "zustand"],
-		define: {
-			__VERSION__: JSON.stringify(version),
-		},
-		naming: "[name].js",
-	});
-
-	// 5. Copy styles
-	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
-
-	// 6. Generate .d.ts files
+	// 4. Emit JS + .d.ts via tsc
 	const tsc = Bun.spawn(["bunx", "tsc", "--project", "tsconfig.build.json"], {
 		stdio: ["inherit", "inherit", "inherit"],
 	});
@@ -88,6 +74,9 @@ export async function buildLibrary(): Promise<void> {
 	if (exitCode !== 0) {
 		throw new Error(`tsc exited with code ${exitCode}`);
 	}
+
+	// 5. Copy styles
+	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
 }
 
 if (import.meta.main) {

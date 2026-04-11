@@ -6,7 +6,12 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!!**/dist"]
+		"includes": [
+			"**",
+			"!!**/dist",
+			"!!src/audio/processor-code.ts",
+			"!!src/audio/version.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,
