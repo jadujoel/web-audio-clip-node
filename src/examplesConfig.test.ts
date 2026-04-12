@@ -17,7 +17,7 @@ describe("examples config", () => {
 			"utf8",
 		);
 		const streamingSource = await readFile(
-			join(import.meta.dir, "../examples/streaming/main.ts"),
+			join(import.meta.dir, "../examples/streaming/src/App.tsx"),
 			"utf8",
 		);
 

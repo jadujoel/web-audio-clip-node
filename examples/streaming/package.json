@@ -7,6 +7,13 @@
     "dev": "bun run build:worker && bun index.html"
   },
   "dependencies": {
-    "@jadujoel/web-audio-clip-node": "file:../.."
+    "@jadujoel/web-audio-clip-node": "file:../..",
+    "react": "^19",
+    "react-dom": "^19",
+    "zustand": "^5"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
   }
 }
