@@ -14,7 +14,7 @@ export interface StreamingClipNodeOptions {
 	defaultFormat: StreamFormat | null;
 	targetSampleRate: number;
 	/** Injectable worker factory — used for testing without mocking globals. */
-	createWorker?: (format: StreamFormat) => Worker;
+	createWorker?: (format: StreamFormat) => Worker | Promise<Worker>;
 }
 
 export interface CoordinatorStreamingOptions {
@@ -50,7 +50,7 @@ export class StreamingClipNode extends ClipNode {
 		this._startStream(value);
 	}
 
-	private _startStream(url: string): void {
+	private async _startStream(url: string): Promise<void> {
 		// Tear down any previous worker
 		if (this._worker) {
 			this._worker.postMessage({ type: "abort" });
@@ -64,7 +64,7 @@ export class StreamingClipNode extends ClipNode {
 
 		const workerFactory =
 			this._streamOptions.createWorker ?? createStreamingWorker;
-		const worker = workerFactory(format);
+		const worker = await workerFactory(format);
 		this._worker = worker;
 
 		const channel = new MessageChannel();
@@ -130,11 +130,11 @@ export class Coordinator {
 	private _context: BaseAudioContext;
 	private _moduleLoaded = false;
 	private _nodes = new Set<ClipNode>();
-	private _workerFactory?: (format: StreamFormat) => Worker;
+	private _workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>;
 
 	private constructor(
 		context: BaseAudioContext,
-		workerFactory?: (format: StreamFormat) => Worker,
+		workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>,
 	) {
 		this._context = context;
 		this._workerFactory = workerFactory;
@@ -142,7 +142,9 @@ export class Coordinator {
 
 	static fromContext(
 		context: BaseAudioContext,
-		options?: { workerFactory?: (format: StreamFormat) => Worker },
+		options?: {
+			workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>;
+		},
 	): Coordinator {
 		return new Coordinator(context, options?.workerFactory);
 	}

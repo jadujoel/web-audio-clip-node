@@ -110,6 +110,7 @@ describe("Coordinator.StreamingClipNode", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.unknown";
+		await Promise.resolve();
 
 		expect(capturedFormats[0]).toBe("OggOpus");
 	});
@@ -128,6 +129,7 @@ describe("Coordinator.dispose", () => {
 			format: "OggOpus",
 		});
 		streaming.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 		expect(regular).toBeInstanceOf(ClipNode);
 
 		const worker = lastWorker;
@@ -150,6 +152,7 @@ describe("StreamingClipNode.url setter", () => {
 		});
 		const url = "https://example.com/audio.opus";
 		node.url = url;
+		await Promise.resolve();
 
 		const worker = lastWorker;
 		const initMsg = worker.messages.find((m) => m.type === "init");
@@ -169,9 +172,11 @@ describe("StreamingClipNode.url setter", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio1.opus";
+		await Promise.resolve();
 		const firstWorker = lastWorker;
 
 		node.url = "https://example.com/audio2.opus";
+		await Promise.resolve();
 
 		expect(firstWorker.terminated).toBe(true);
 		expect(lastWorker).not.toBe(firstWorker);
@@ -201,6 +206,7 @@ describe("StreamingClipNode.start - deferred until first decoded", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		const worker = lastWorker;
 		node.start();
@@ -229,6 +235,7 @@ describe("StreamingClipNode.stop", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		const worker = lastWorker;
 		node.stop();
@@ -247,6 +254,7 @@ describe("StreamingClipNode.stop", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		const worker = lastWorker;
 		node.stop();
@@ -268,6 +276,7 @@ describe("StreamingClipNode callbacks", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		let errorMsg = "";
 		node.onerror = (msg) => {
@@ -289,6 +298,7 @@ describe("StreamingClipNode callbacks", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		let received = -1;
 		node.onprogress = (bytes) => {
@@ -310,6 +320,7 @@ describe("StreamingClipNode callbacks", () => {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		let done = false;
 		node.ondone = () => {
@@ -339,6 +350,7 @@ describe("StreamingClipNode format auto-detection", () => {
 		});
 		const node = coordinator.StreamingClipNode();
 		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
 
 		expect(capturedFormats[0]).toBe("OggOpus");
 	});

@@ -28,8 +28,22 @@ export function getStreamingWorkerUrl(format: StreamFormat): string {
 	return new URL(`./workers/${file}`, import.meta.url).href;
 }
 
-export function createStreamingWorker(format: StreamFormat): Worker {
-	return new Worker(getStreamingWorkerUrl(format), { type: "classic" });
+export async function createStreamingWorker(
+	format: StreamFormat,
+): Promise<Worker> {
+	const url = getStreamingWorkerUrl(format);
+	// Cross-origin worker scripts are blocked by browsers.
+	// Fetch the script and load it via a blob URL instead.
+	if (new URL(url).origin !== location.origin) {
+		const res = await fetch(url);
+		const text = await res.text();
+		const blob = new Blob([text], { type: "application/javascript" });
+		const blobUrl = URL.createObjectURL(blob);
+		const worker = new Worker(blobUrl, { type: "classic" });
+		URL.revokeObjectURL(blobUrl);
+		return worker;
+	}
+	return new Worker(url, { type: "classic" });
 }
 
 export function detectStreamFormat(url: string): StreamFormat {
