@@ -33,6 +33,10 @@ Bun.serve({
 		try {
 			const stat = statSync(filePath);
 			if (stat.isDirectory()) {
+				// Redirect to trailing slash so relative paths resolve correctly
+				if (!pathname.endsWith("/")) {
+					return Response.redirect(`${pathname}/`, 301);
+				}
 				filePath = join(filePath, "index.html");
 			}
 		} catch {

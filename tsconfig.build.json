@@ -7,5 +7,5 @@
 		"noEmit": false
 	},
 	"include": ["src"],
-	"exclude": ["src/**/*.test.*", "src/workers/**", "src/sounds/**"]
+	"exclude": ["src/**/*.test.*", "src/sounds/**"]
 }
