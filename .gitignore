@@ -14,3 +14,4 @@ examples/streaming/.tmp-html-build
 examples/streaming/.tmp-build
 test-results
 playwright-report
+x.html
