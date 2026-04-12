@@ -1,4 +1,5 @@
-import { readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export async function buildProcessor(minify = true): Promise<string> {
 	const output = await Bun.build({
@@ -21,6 +22,7 @@ const reactProductionDefine = {
 };
 
 const distDir = "dist";
+const webpageDir = "webpage";
 
 function withJsExtension(specifier: string): string {
 	if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
@@ -82,11 +84,121 @@ export function createAppBuildConfig(outdir = distDir): Bun.BuildConfig {
 }
 
 export async function build(): Promise<void> {
-	await rm(distDir, { force: true, recursive: true });
-	await buildProcessor();
-	await Bun.build(createAppBuildConfig());
-	// Copy static assets for GitHub Pages
-	await Bun.write("dist/example.mp3", Bun.file("src/example.mp3"));
+	await buildLibrary();
+	await buildWebpage();
+}
+
+async function linkWorkspacePackage(exampleDir: string) {
+	const nodeModulesDir = join(exampleDir, "node_modules");
+	const packageDir = join(nodeModulesDir, "@jadujoel", "web-audio-clip-node");
+
+	await rm(packageDir, { force: true, recursive: true });
+	await mkdir(packageDir, { recursive: true });
+	await cp(join(process.cwd(), "dist"), join(packageDir, "dist"), {
+		recursive: true,
+	});
+	await cp(
+		join(process.cwd(), "package.json"),
+		join(packageDir, "package.json"),
+	);
+	await cp(join(process.cwd(), "README.md"), join(packageDir, "README.md"));
+	await cp(join(process.cwd(), "LICENSE"), join(packageDir, "LICENSE"));
+}
+
+async function copySounds(outputRoot: string): Promise<void> {
+	const soundsDir = "src/sounds";
+	const outDir = join(outputRoot, "sounds");
+	await mkdir(outDir, { recursive: true });
+	for (const entry of await readdir(soundsDir)) {
+		await cp(join(soundsDir, entry), join(outDir, entry));
+	}
+}
+
+export async function buildWebpage(): Promise<void> {
+	await rm(webpageDir, { force: true, recursive: true });
+
+	// Link library to examples that use package imports
+	await Promise.all([
+		linkWorkspacePackage("examples/playground"),
+		linkWorkspacePackage("examples/react"),
+		linkWorkspacePackage("examples/esm-bundler"),
+		linkWorkspacePackage("examples/self-hosted"),
+	]);
+
+	// Self-hosted needs processor.js copied
+	await Bun.$`bun run --cwd examples/self-hosted setup`;
+
+	// Streaming needs ts-ebml + worker builds
+	await Bun.$`npm install --prefix examples/streaming --no-package-lock --no-save ts-ebml@3.0.2`;
+	await Bun.$`bun run --cwd examples/streaming build:worker`;
+
+	// Build all examples in parallel
+	await Promise.all([
+		// Landing page
+		Bun.build({
+			entrypoints: ["./examples/index.html"],
+			outdir: webpageDir,
+			target: "browser",
+			minify: true,
+			throw: true,
+		}),
+		// CDN Vanilla — static copy
+		cp("examples/cdn-vanilla", join(webpageDir, "cdn-vanilla"), {
+			recursive: true,
+		}),
+		// Playground — full interactive demo
+		Bun.build({
+			entrypoints: ["./examples/playground/index.html"],
+			outdir: join(webpageDir, "playground"),
+			target: "browser",
+			minify: true,
+			throw: true,
+			define: reactProductionDefine,
+		}),
+		// React — minimal React integration
+		Bun.build({
+			entrypoints: ["./examples/react/index.html"],
+			outdir: join(webpageDir, "react"),
+			target: "browser",
+			minify: true,
+			throw: true,
+			define: reactProductionDefine,
+		}),
+		// ESM Bundler
+		Bun.build({
+			entrypoints: ["./examples/esm-bundler/index.html"],
+			outdir: join(webpageDir, "esm-bundler"),
+			target: "browser",
+			minify: true,
+			throw: true,
+		}),
+		// Self-Hosted
+		Bun.build({
+			entrypoints: ["./examples/self-hosted/index.html"],
+			outdir: join(webpageDir, "self-hosted"),
+			target: "browser",
+			minify: true,
+			throw: true,
+		}),
+		// Streaming
+		Bun.build({
+			entrypoints: ["./examples/streaming/index.html"],
+			outdir: join(webpageDir, "streaming"),
+			target: "browser",
+			minify: true,
+			throw: true,
+			define: reactProductionDefine,
+		}),
+	]);
+
+	// Copy self-hosted processor.js into its webpage output
+	await cp(
+		"examples/self-hosted/public/processor.js",
+		join(webpageDir, "self-hosted", "processor.js"),
+	);
+
+	// Copy sound assets
+	await copySounds(webpageDir);
 }
 
 async function buildProcessorCodeModule(): Promise<string> {
@@ -147,12 +259,55 @@ export async function buildLibrary(): Promise<void> {
 	// 6. Copy styles
 	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
 	await Bun.write("dist/styles.css.d.ts", Bun.file("src/styles.css.d.ts"));
+
+	// 7. Bundle streaming decode workers
+	await buildStreamingWorkers();
+}
+
+const streamingWorkerEntrypoints = [
+	{
+		entry: "./src/workers/mp3-decode-worker.ts",
+		output: "mp3-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/ogg-opus-decode-worker.ts",
+		output: "ogg-opus-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/raw-opus-framed-decode-worker.ts",
+		output: "raw-opus-framed-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/webm-opus-decode-worker.ts",
+		output: "webm-opus-decode-worker.min.js",
+	},
+] as const;
+
+async function buildStreamingWorkers(): Promise<void> {
+	await mkdir("dist/workers", { recursive: true });
+	for (const worker of streamingWorkerEntrypoints) {
+		const result = await Bun.build({
+			entrypoints: [worker.entry],
+			target: "browser",
+			minify: true,
+		});
+		if (!result.success) {
+			throw new Error(
+				`Worker build failed for ${worker.entry}: ${result.logs.join("\n")}`,
+			);
+		}
+		const code = await result.outputs[0].text();
+		await Bun.write(join("dist/workers", worker.output), code);
+	}
 }
 
 if (import.meta.main) {
 	if (process.argv.includes("--lib")) {
 		await buildLibrary();
 		console.log("Library build completed.");
+	} else if (process.argv.includes("--webpage")) {
+		await buildWebpage();
+		console.log("Webpage build completed.");
 	} else {
 		await build();
 		console.log("Build completed.");

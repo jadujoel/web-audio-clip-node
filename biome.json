@@ -9,6 +9,7 @@
 		"includes": [
 			"**",
 			"!!**/dist",
+			"!!**/webpage",
 			"!!src/audio/processor-code.ts",
 			"!!src/audio/version.ts",
 			"!!examples"

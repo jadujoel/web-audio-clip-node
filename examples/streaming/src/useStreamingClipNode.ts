@@ -1,26 +1,38 @@
-import { useCallback, useRef, useState, type RefObject } from "react";
+import {
+	useCallback,
+	useRef,
+	useState,
+	type RefObject,
+} from "./react-runtime";
 import {
 	ClipNode,
+	float32ArrayFromAudioBuffer,
 	getProcessorBlobUrl,
+	getStreamingWorkerUrl,
 	linFromDb,
-} from "@jadujoel/web-audio-clip-node";
-import type { ControlKey } from "@jadujoel/web-audio-clip-node";
-import type {
-	ClipNodeState,
-	FrameData,
-} from "@jadujoel/web-audio-clip-node";
-import { mp3WorkerCode } from "../generated/mp3-worker-code";
-import { opusWorkerCode } from "../generated/opus-worker-code";
+} from "./clip-node-lib";
+import type { ControlKey } from "./clip-node-lib";
+import type { ClipNodeState, FrameData } from "./clip-node-lib";
+import type { StreamingWorkerFormat } from "./clip-node-lib";
 import {
 	clampSeekTargetSamples,
 	secondsFromSamples,
 } from "./streamTimeline";
-import { detectStreamFormat, type StreamFormat } from "./streamFormat";
+import {
+	detectStreamFormat,
+	type StreamFormat,
+	usesBufferedContainerDecode,
+} from "./streamFormat";
 
-function getWorkerBlobUrl(format: StreamFormat): string {
-	const code = format === "opus" ? opusWorkerCode : mp3WorkerCode;
-	const blob = new Blob([code], { type: "application/javascript" });
-	return URL.createObjectURL(blob);
+const streamFormatToWorkerFormat: Record<StreamFormat, StreamingWorkerFormat> = {
+	mp3: "mp3",
+	"ogg-opus": "ogg-opus",
+	"raw-opus-framed": "raw-opus-framed",
+	"webm-opus": "webm-opus",
+};
+
+function getWorkerUrl(format: StreamFormat): string {
+	return getStreamingWorkerUrl(streamFormatToWorkerFormat[format]);
 }
 
 function applyValueToClip(node: ClipNode, key: ControlKey, value: number) {
@@ -139,6 +151,39 @@ export function useStreamingClipNode({
 	const [audioDuration, setAudioDuration] = useState<number | null>(null);
 	const [seekableDuration, setSeekableDuration] = useState<number | null>(null);
 	const [seekableSamples, setSeekableSamples] = useState<number | null>(null);
+
+	const configureClip = useCallback(
+		(ctx: AudioContext, clip: ClipNode) => {
+			clip.loop = loop;
+			clip.connect(ctx.destination);
+
+			for (const key of Object.keys(values) as ControlKey[]) {
+				applyValueToClip(clip, key, values[key]);
+			}
+			for (const key of Object.keys(enabled) as ControlKey[]) {
+				if (!enabled[key]) {
+					applyToggleToClip(clip, key, false);
+				}
+			}
+
+			clip.onstatechange = (s) => setNodeState(s);
+			clip.onlooped = () => {
+				timesLoopedRef.current = clip.timesLooped.toString();
+			};
+			clip.onframe = (data) => {
+				frameRef.current = data;
+			};
+
+			setInfoLatency(
+				ctx.outputLatency != null
+					? `base: ${Math.round(ctx.baseLatency * ctx.sampleRate)} | output: ${Math.round(ctx.outputLatency * ctx.sampleRate)}`
+					: "unknown",
+			);
+
+			clipRef.current = clip;
+		},
+		[enabled, loop, values],
+	);
 	const [infoLatency, setInfoLatency] = useState("unknown");
 	const statusRef = useRef<string | null>("Idle");
 	const finalDurationRef = useRef<number | null>(null);
@@ -183,55 +228,100 @@ export function useStreamingClipNode({
 				clipRef.current = null;
 			}
 
-			const ctx = await ensureContext();
-			await ctx.resume();
-			finalDurationRef.current = null;
-			timelineSampleRateRef.current = ctx.sampleRate;
-			setAudioDuration(null);
-			setSeekableDuration(null);
-			setSeekableSamples(null);
+			try {
+				const ctx = await ensureContext();
+				await ctx.resume();
+				const selectedFormat = format ?? detectStreamFormat(url);
+				finalDurationRef.current = null;
+				timelineSampleRateRef.current = ctx.sampleRate;
+				setAudioDuration(null);
+				setSeekableDuration(null);
+				setSeekableSamples(null);
+				setProgress(0);
 
-			// Create ClipNode (no buffer — streaming mode)
-			const clip = new ClipNode(ctx);
-			clip.loop = loop;
-			clip.connect(ctx.destination);
+				if (usesBufferedContainerDecode(selectedFormat)) {
+					const absoluteUrl = new URL(url, location.href).href;
+					const response = await fetch(absoluteUrl);
+					if (!response.ok) {
+						throw new Error(
+							`Fetch failed: ${response.status} ${response.statusText}`,
+						);
+					}
+					if (!response.body) {
+						throw new Error("Response has no body");
+					}
 
-			// Apply current control values
-			for (const key of Object.keys(values) as ControlKey[]) {
-				applyValueToClip(clip, key, values[key]);
-			}
-			for (const key of Object.keys(enabled) as ControlKey[]) {
-				if (!enabled[key]) {
-					applyToggleToClip(clip, key, false);
+					const contentLength = response.headers.get("content-length");
+					const totalBytes = contentLength
+						? Number.parseInt(contentLength, 10)
+						: null;
+					const reader = response.body.getReader();
+					const chunks: Uint8Array[] = [];
+					let bytesReceived = 0;
+
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						chunks.push(value);
+						bytesReceived += value.length;
+						if (totalBytes != null) {
+							setProgress(bytesReceived / totalBytes);
+							setStatus(
+								`Downloading container… ${((bytesReceived / 1024) | 0)} / ${((totalBytes / 1024) | 0)} KB`,
+							);
+						} else {
+							setStatus(`Downloading container… ${((bytesReceived / 1024) | 0)} KB`);
+						}
+					}
+
+					const combined = new Uint8Array(bytesReceived);
+					let offset = 0;
+					for (const chunk of chunks) {
+						combined.set(chunk, offset);
+						offset += chunk.length;
+					}
+
+					setStatus("Decoding container audio…");
+					const decoded = await ctx.decodeAudioData(combined.buffer);
+					const clip = new ClipNode(ctx, {
+						processorOptions: {
+							buffer: float32ArrayFromAudioBuffer(decoded),
+						},
+					});
+					configureClip(ctx, clip);
+					finalDurationRef.current = decoded.duration;
+					setAudioDuration(decoded.duration);
+					setSeekableDuration(decoded.duration);
+					setSeekableSamples(decoded.length);
+					setProgress(1);
+					clip.start();
+					setStatus(
+						`Buffered & playing… ${decoded.sampleRate} Hz, ${decoded.numberOfChannels} ch`,
+					);
+					return;
 				}
-			}
 
-			clip.onstatechange = (s) => setNodeState(s);
-			clip.onlooped = () => {
-				timesLoopedRef.current = clip.timesLooped.toString();
-			};
-			clip.onframe = (data) => {
-				frameRef.current = data;
-			};
+				// Create ClipNode (no buffer — streaming mode)
+				const clip = new ClipNode(ctx);
+				configureClip(ctx, clip);
 
-			setInfoLatency(
-				ctx.outputLatency != null
-					? `base: ${Math.round(ctx.baseLatency * ctx.sampleRate)} | output: ${Math.round(ctx.outputLatency * ctx.sampleRate)}`
-					: "unknown",
-			);
+				// Create MessageChannel: port1 → Worker, port2 → Processor
+				const channel = new MessageChannel();
+				clip.transferPort(channel.port2);
 
-			clipRef.current = clip;
+				// Create and start decode worker
+				const worker = new Worker(getWorkerUrl(selectedFormat));
+				workerRef.current = worker;
+				worker.onerror = (event: ErrorEvent) => {
+					setStatus(
+						`Error: worker startup failed${event.message ? ` (${event.message})` : ""}`,
+					);
+				};
+				worker.onmessageerror = () => {
+					setStatus("Error: worker message channel failed.");
+				};
 
-			// Create MessageChannel: port1 → Worker, port2 → Processor
-			const channel = new MessageChannel();
-			clip.transferPort(channel.port2);
-
-			// Create and start decode worker
-			const selectedFormat = format ?? detectStreamFormat(url);
-			const worker = new Worker(getWorkerBlobUrl(selectedFormat));
-			workerRef.current = worker;
-
-			worker.onmessage = (ev: MessageEvent) => {
+				worker.onmessage = (ev: MessageEvent) => {
 				const { type } = ev.data;
 				switch (type) {
 					case "streamMeta": {
@@ -324,25 +414,37 @@ export function useStreamingClipNode({
 				}
 			};
 
-			const absoluteUrl = new URL(url, location.href).href;
-			worker.postMessage(
-				{
-					type: "init",
-					port: channel.port1,
-					url: absoluteUrl,
-					throttle,
-					targetSampleRate: ctx.sampleRate,
-				},
-				[channel.port1],
-			);
+				const absoluteUrl = new URL(url, location.href).href;
+				worker.postMessage(
+					{
+						type: "init",
+						port: channel.port1,
+						url: absoluteUrl,
+						throttle,
+						targetSampleRate: ctx.sampleRate,
+					},
+					[channel.port1],
+				);
 
-			setStatus(
-				throttle > 0
-					? `Starting stream… (${(throttle / 1024).toFixed(0)} KB/s)`
-					: "Starting stream…",
-			);
-			setProgress(0);
-			setNodeState("initial");
+				setStatus(
+					throttle > 0
+						? `Starting stream… (${(throttle / 1024).toFixed(0)} KB/s)`
+						: "Starting stream…",
+				);
+				setNodeState("initial");
+			} catch (error) {
+				if (workerRef.current) {
+					workerRef.current.terminate();
+					workerRef.current = null;
+				}
+				if (clipRef.current) {
+					clipRef.current.disconnect();
+					clipRef.current = null;
+				}
+				setStatus(
+					`Error: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
 		},
 		[ensureContext, loop, values, enabled, setStatus],
 	);

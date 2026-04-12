@@ -5,9 +5,19 @@ const workers = [
 		exportName: "mp3WorkerCode",
 	},
 	{
-		entry: "./opus-decode-worker.ts",
-		output: "./generated/opus-worker-code.ts",
-		exportName: "opusWorkerCode",
+		entry: "./ogg-opus-decode-worker.ts",
+		output: "./generated/ogg-opus-worker-code.ts",
+		exportName: "oggOpusWorkerCode",
+	},
+	{
+		entry: "./raw-opus-framed-decode-worker.ts",
+		output: "./generated/raw-opus-framed-worker-code.ts",
+		exportName: "rawOpusFramedWorkerCode",
+	},
+	{
+		entry: "./webm-opus-decode-worker.ts",
+		output: "./generated/webm-opus-worker-code.ts",
+		exportName: "webmOpusWorkerCode",
 	},
 ] as const;
 

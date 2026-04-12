@@ -14,7 +14,7 @@ async function main() {
 	await context.audioWorklet.addModule("./dist/audio/processor.js");
 	console.log("AudioWorkletProcessor module loaded successfully.");
 
-	const srcFile = "./src/lml.webm";
+	const srcFile = "./src/sounds/lml.webm";
 	const convert = Bun.$`ffmpeg -i ${srcFile} -f wav -`;
 	const wavData = await convert.arrayBuffer();
 	const audioBuffer = await context.decodeAudioData(wavData);

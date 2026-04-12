@@ -1,146 +1,30 @@
+import { useCallback, useEffect, useState } from "react";
 import {
-	memo,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "./react-runtime";
+	type ControlKey,
+	controlDefs,
+	getActiveLinkedControls,
+	getLinkedControlPairForControl,
+	getLinkedControlUpdates,
+	isTempoRelativeSnap,
+	loopControlDefs,
+	loopLinkedControlPairs,
+	remapTempoRelativeValue,
+	transportLinkedControlPairs,
+} from "@jadujoel/web-audio-clip-node";
 import {
 	ControlSection,
 	DetuneControl,
+	DisplayPanel,
 	FilterControl,
 	GainControl,
 	PanControl,
 	PlaybackRateControl,
 	PlayheadSlider,
+	TransportButtons,
 	useClipControls,
-} from "./clip-node-lib";
-import type { ControlKey } from "./clip-node-lib";
-import type { ClipNodeState, FrameData } from "./clip-node-lib";
-import {
-	controlDefs,
-	loopControlDefs,
-	transportLinkedControlPairs,
-	loopLinkedControlPairs,
-	getActiveLinkedControls,
-	getLinkedControlPairForControl,
-	getLinkedControlUpdates,
-	isTempoRelativeSnap,
-	remapTempoRelativeValue,
-} from "./clip-node-lib";
-import { useStreamingClipNode } from "./useStreamingClipNode";
-import type { RefObject } from "./react-runtime";
-import {
-	getDefaultUrlForFormat,
-	type StreamFormat,
-} from "./streamFormat";
-
-/**
- * Reads frame data from a ref via its own RAF loop and updates DOM directly,
- * avoiding React re-renders on every animation frame.
- */
-function StreamingDisplayPanelInner({
-	nodeState,
-	frameRef,
-	timesLoopedRef,
-	latency,
-}: {
-	nodeState: ClipNodeState;
-	frameRef: RefObject<FrameData | null>;
-	timesLoopedRef: RefObject<string>;
-	latency: string;
-}) {
-	const timeEl = useRef<HTMLOutputElement>(null);
-	const frameEl = useRef<HTMLOutputElement>(null);
-	const loopsEl = useRef<HTMLOutputElement>(null);
-	const ttEl = useRef<HTMLOutputElement>(null);
-
-	useEffect(() => {
-		let raf: number;
-		const tick = () => {
-			const f = frameRef.current;
-			if (f) {
-				const [ct, cf, , tt] = f;
-				if (timeEl.current) timeEl.current.textContent = ct.toPrecision(4);
-				if (frameEl.current)
-					frameEl.current.textContent = cf.toString();
-				if (ttEl.current) ttEl.current.textContent = tt.toFixed(4);
-			}
-			if (loopsEl.current)
-				loopsEl.current.textContent = timesLoopedRef.current;
-			raf = requestAnimationFrame(tick);
-		};
-		raf = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(raf);
-	}, [frameRef, timesLoopedRef]);
-
-	return (
-		<section id="display">
-			<code>Sound:</code>
-			<output>Stream</output>
-			<code>State:</code>
-			<output>{nodeState}</output>
-			<code>Time:</code>
-			<output ref={timeEl}>0</output>
-			<code>Loops:</code>
-			<output ref={loopsEl}>0</output>
-			<details className="display-details">
-				<summary>Debug</summary>
-				<div className="display-details__row">
-					<code>Frame:</code>
-					<output ref={frameEl}>0</output>
-					<code>Latency:</code>
-					<output>{latency}</output>
-					<code>TimeTaken:</code>
-					<output ref={ttEl}>unknown</output>
-				</div>
-			</details>
-		</section>
-	);
-}
-const StreamingDisplayPanel = memo(StreamingDisplayPanelInner);
-
-/**
- * Isolates playhead updates from the parent component tree.
- * Reads the playhead position from frameRef via its own RAF loop,
- * so only this small subtree re-renders at 60fps.
- */
-function StreamingPlayheadInner({
-	frameRef,
-	audioDuration,
-	disabled,
-	onChange,
-}: {
-	frameRef: RefObject<FrameData | null>;
-	audioDuration: number | null;
-	disabled: boolean;
-	onChange: (v: number) => void;
-}) {
-	const [value, setValue] = useState(0);
-
-	useEffect(() => {
-		let raf: number;
-		const tick = () => {
-			const f = frameRef.current;
-			if (f) {
-				setValue(f[2]);
-			}
-			raf = requestAnimationFrame(tick);
-		};
-		raf = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(raf);
-	}, [frameRef]);
-
-	return (
-		<PlayheadSlider
-			value={value}
-			audioDuration={audioDuration}
-			disabled={disabled}
-			onChange={onChange}
-		/>
-	);
-}
-const StreamingPlayhead = memo(StreamingPlayheadInner);
+	useClipNode,
+} from "@jadujoel/web-audio-clip-node/react";
+import "@jadujoel/web-audio-clip-node/styles.css";
 
 function buildControlUpdates<T>(
 	keys: readonly ControlKey[],
@@ -153,49 +37,15 @@ function buildControlUpdates<T>(
 
 export function App() {
 	const controls = useClipControls();
-	const node = useStreamingClipNode({
+	const node = useClipNode({
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
 		setValue: controls.setValue,
 	});
-
-	const [format, setFormat] = useState<StreamFormat>("mp3");
-	const [url, setUrl] = useState(getDefaultUrlForFormat("mp3"));
-	const [throttle, setThrottle] = useState(0);
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
-	const progressRef = useRef<HTMLDivElement>(null);
 
-	const handleFormatChange = useCallback((nextFormat: StreamFormat) => {
-		setFormat(nextFormat);
-		setUrl((prevUrl: string) => {
-			const trimmed = prevUrl.trim();
-			if (!trimmed) {
-				return getDefaultUrlForFormat(nextFormat);
-			}
-			const knownDefaults: StreamFormat[] = [
-				"mp3",
-				"ogg-opus",
-				"raw-opus-framed",
-				"webm-opus",
-			];
-			return knownDefaults.some(
-				(format) => trimmed === getDefaultUrlForFormat(format),
-			)
-				? getDefaultUrlForFormat(nextFormat)
-				: prevUrl;
-		});
-	}, []);
-
-	// Sync progress bar width
-	useEffect(() => {
-		if (progressRef.current) {
-			progressRef.current.style.width = `${Math.min(100, node.progress * 100).toFixed(1)}%`;
-		}
-	}, [node.progress]);
-
-	// Persist audioDuration into maxs state for locked controls
 	useEffect(() => {
 		if (node.audioDuration == null) return;
 		for (const key of Object.keys(controls.maxLocked) as ControlKey[]) {
@@ -210,8 +60,6 @@ export function App() {
 		setTempoDraft(String(controls.tempo));
 	}, [controls.tempo, isEditingTempo]);
 
-	// ── Control handlers (same pattern as main App.tsx) ──
-
 	const handleValueChange = useCallback(
 		(key: ControlKey, val: number) => {
 			const linkedPair = getLinkedControlPairForControl(key);
@@ -222,6 +70,7 @@ export function App() {
 						effectiveMaxs[linkedKey] = node.audioDuration;
 					}
 				}
+
 				const nextValues = getLinkedControlUpdates({
 					pair: linkedPair,
 					changedKey: key,
@@ -230,10 +79,12 @@ export function App() {
 					mins: controls.mins,
 					maxs: effectiveMaxs,
 				});
+
 				controls.setValuesPartial(nextValues);
 				node.applyValues(nextValues);
 				return;
 			}
+
 			node.applyValue(key, val);
 		},
 		[
@@ -252,6 +103,7 @@ export function App() {
 	const handleTempoChange = useCallback(
 		(nextTempo: number) => {
 			if (!Number.isFinite(nextTempo) || nextTempo <= 0) return;
+
 			const previousTempo = controls.tempo;
 			if (nextTempo === previousTempo) return;
 
@@ -259,6 +111,7 @@ export function App() {
 			for (const key of Object.keys(controls.values) as ControlKey[]) {
 				const snap = controls.snaps[key];
 				if (!isTempoRelativeSnap(snap)) continue;
+
 				const effectiveMax =
 					controls.maxLocked[key] && node.audioDuration != null
 						? node.audioDuration
@@ -271,10 +124,12 @@ export function App() {
 					controls.mins[key],
 					effectiveMax,
 				);
+
 				if (nextValue !== controls.values[key]) {
 					changedValues[key] = nextValue;
 				}
 			}
+
 			controls.setTempoAndValues(nextTempo, changedValues);
 			node.applyValues(changedValues);
 		},
@@ -294,10 +149,12 @@ export function App() {
 	const commitTempoDraft = useCallback(() => {
 		const nextTempo = Number(tempoDraft.trim());
 		setIsEditingTempo(false);
+
 		if (!Number.isFinite(nextTempo) || nextTempo <= 0) {
 			setTempoDraft(String(controls.tempo));
 			return;
 		}
+
 		handleTempoChange(nextTempo);
 		setTempoDraft(String(nextTempo));
 	}, [controls.tempo, handleTempoChange, tempoDraft]);
@@ -364,8 +221,8 @@ export function App() {
 	);
 
 	const handlePlayheadChange = useCallback(
-		(v: number) => node.seekPlayhead(v),
-		[node],
+		(v: number) => handleValueChange("playhead", v),
+		[handleValueChange],
 	);
 	const handlePlaybackRateChange = useCallback(
 		(v: number) => handleValueChange("playbackRate", v),
@@ -416,165 +273,28 @@ export function App() {
 		[handleToggle],
 	);
 
-	const isStreaming =
-		node.nodeState !== "initial" &&
-		node.nodeState !== "stopped" &&
-		node.nodeState !== "ended" &&
-		node.nodeState !== "disposed";
-
 	return (
 		<main>
-			{/* ── Streaming-specific header ── */}
-			<h1 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-				ClipNode — Streaming
-			</h1>
-			<p style={{ color: "#94a3b8", marginTop: 0, fontSize: "0.9rem" }}>
-				Stream &amp; decode MP3, Ogg Opus, framed raw Opus, or WebM Opus in a Web Worker, feeding decoded audio
-				directly to the AudioWorklet processor via MessagePort.
-			</p>
-
-			<label
-				htmlFor="format-select"
-				style={{ display: "block", marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}
-			>
-				Format
-			</label>
-			<select
-				id="format-select"
-				value={format}
-				onChange={(e) => handleFormatChange(e.target.value as StreamFormat)}
-				style={{
-					width: "100%",
-					boxSizing: "border-box",
-					padding: "0.5rem",
-					marginTop: "0.25rem",
-					border: "1px solid var(--color-border-subtle, #334155)",
-					borderRadius: "6px",
-					background: "var(--color-surface, #1e293b)",
-					color: "var(--color-text, #e2e8f0)",
-					fontSize: "0.9rem",
-				}}
-			>
-				<option value="mp3">MP3</option>
-				<option value="ogg-opus">Opus (Ogg)</option>
-				<option value="raw-opus-framed">Opus (framed raw)</option>
-				<option value="webm-opus">Opus (WebM)</option>
-			</select>
-
-			<label
-				htmlFor="url"
-				style={{ display: "block", marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}
-			>
-				Audio URL
-			</label>
-			<input
-				type="text"
-				id="url"
-				value={url}
-				onChange={(e) => setUrl(e.target.value)}
-				style={{
-					width: "100%",
-					boxSizing: "border-box",
-					padding: "0.5rem",
-					marginTop: "0.25rem",
-					border: "1px solid var(--color-border-subtle, #334155)",
-					borderRadius: "6px",
-					background: "var(--color-surface, #1e293b)",
-					color: "var(--color-text, #e2e8f0)",
-					fontSize: "0.9rem",
-				}}
-			/>
-
-			<label
-				htmlFor="throttle-select"
-				style={{ display: "block", marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}
-			>
-				Network Speed
-			</label>
-			<select
-				id="throttle-select"
-				value={throttle}
-				onChange={(e) => setThrottle(Number(e.target.value))}
-				style={{
-					width: "100%",
-					boxSizing: "border-box",
-					padding: "0.5rem",
-					marginTop: "0.25rem",
-					border: "1px solid var(--color-border-subtle, #334155)",
-					borderRadius: "6px",
-					background: "var(--color-surface, #1e293b)",
-					color: "var(--color-text, #e2e8f0)",
-					fontSize: "0.9rem",
-				}}
-			>
-				<option value={0}>Normal (unlimited)</option>
-				<option value={204800}>Slow (~200 KB/s)</option>
-				<option value={51200}>Turtle (~50 KB/s)</option>
-			</select>
-
-			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-				<button type="button" onClick={() => node.stream(url, throttle, format)}>
-					▶ Stream &amp; Play
-				</button>
-				<button type="button" onClick={node.pause} disabled={!isStreaming}>
-					⏸ Pause
-				</button>
-				<button type="button" onClick={node.stop} disabled={!isStreaming}>
-					■ Stop
-				</button>
-			</div>
-
-			<div
-				style={{
-					marginTop: "1rem",
-					height: 6,
-					borderRadius: 3,
-					background: "var(--color-track, #1e293b)",
-					overflow: "hidden",
-				}}
-			>
-				<div
-					ref={progressRef}
-					style={{
-						height: "100%",
-						width: "0%",
-						borderRadius: 3,
-						background: "var(--color-accent, #38bdf8)",
-						transition: "width 0.15s",
-					}}
-				/>
-			</div>
-			<p
-				style={{
-					marginTop: "0.75rem",
-					fontSize: "0.85rem",
-					color: "#94a3b8",
-					minHeight: "1.2em",
-				}}
-			>
-				{node.statusMessage}
-			</p>
-			{node.seekableDuration != null && (
-				<p
-					style={{
-						marginTop: "0.25rem",
-						fontSize: "0.8rem",
-						color: "#64748b",
-					}}
-				>
-					Decoded seekable: {node.seekableDuration.toFixed(2)}s
-				</p>
-			)}
-
-			{/* ── Display panel ── */}
-			<StreamingDisplayPanel
+			<DisplayPanel
 				nodeState={node.nodeState}
-				frameRef={node.frameRef}
-				timesLoopedRef={node.timesLoopedRef}
+				statusMessage={node.statusMessage}
+				soundName={node.soundName}
+				currentTime={node.infoCurrentTime}
+				currentFrame={node.infoCurrentFrame}
+				timesLooped={node.infoTimesLooped}
 				latency={node.infoLatency}
+				timeTaken={node.infoTimeTaken}
 			/>
-
-			{/* ── Tempo ── */}
+			<TransportButtons
+				nodeState={node.nodeState}
+				onStart={node.start}
+				onStop={node.stop}
+				onPause={node.pause}
+				onResume={node.resume}
+				onDispose={node.dispose}
+				onLog={node.logState}
+				onLoadSound={node.loadSound}
+			/>
 			<fieldset className="control-group tempo-group">
 				<legend>Tempo</legend>
 				<label htmlFor="tempo" className="tempo-label">
@@ -604,18 +324,12 @@ export function App() {
 					style={{ width: 70 }}
 				/>
 			</fieldset>
-
-			{/* ── Playhead ── */}
-			<StreamingPlayhead
-				frameRef={node.frameRef}
+			<PlayheadSlider
+				value={controls.values.playhead}
 				audioDuration={node.audioDuration}
-				disabled={
-					node.nodeState === "initial" || node.nodeState === "disposed"
-				}
+				disabled={node.nodeState === "initial" || node.nodeState === "disposed"}
 				onChange={handlePlayheadChange}
 			/>
-
-			{/* ── Controls (reused from library) ── */}
 			<section id="controls">
 				<ControlSection
 					legend="Transport"

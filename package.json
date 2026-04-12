@@ -29,6 +29,10 @@
 			"types": "./dist/lib-react.d.ts",
 			"import": "./dist/lib-react.js"
 		},
+		"./streaming": {
+			"types": "./dist/streaming.d.ts",
+			"import": "./dist/streaming.js"
+		},
 		"./processor": "./dist/processor.js",
 		"./styles.css": {
 			"types": "./dist/styles.css.d.ts",
@@ -47,10 +51,16 @@
 	"scripts": {
 		"build": "bun build.ts",
 		"build:lib": "bun build.ts --lib",
+		"build:webpage": "bun build.ts --webpage",
 		"dev": "bun serve.ts",
 		"examples": "bun examples.ts",
 		"lint": "biome check",
+		"serve-webpage": "bun serve-webpage.ts",
 		"test": "bun test",
+		"test:e2e": "bunx playwright test",
+		"test:e2e:chromium": "bunx playwright test --project=chromium",
+		"test:e2e:firefox": "bunx playwright test --project=firefox",
+		"test:e2e:webkit": "bunx playwright test --project=webkit",
 		"typecheck": "tsc --noEmit",
 		"validate": "bun run build && bun run lint && bun run typecheck && bun test",
 		"prepublishOnly": "bun run build:lib"
@@ -73,6 +83,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.11",
+		"@playwright/test": "1.59.1",
 		"@testing-library/dom": "10.4.1",
 		"@testing-library/react": "16.3.2",
 		"@types/react": "19.2.14",

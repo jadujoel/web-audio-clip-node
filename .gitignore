@@ -6,5 +6,11 @@ bun.lockb
 ignore
 .vscode
 dist
+webpage
 research
 tasks
+examples/streaming/.smoke-dist
+examples/streaming/.tmp-html-build
+examples/streaming/.tmp-build
+test-results
+playwright-report

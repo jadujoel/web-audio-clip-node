@@ -1,4 +1,4 @@
-// Opus Decode Worker — runs fetch → Ogg/Opus demux → AudioDecoder off the main thread.
+// Ogg Opus Decode Worker — runs fetch → Ogg/Opus demux → AudioDecoder off the main thread.
 // Sends decoded Float32Array data directly to the ClipProcessor via a
 // transferred MessagePort, bypassing the main thread for audio data.
 

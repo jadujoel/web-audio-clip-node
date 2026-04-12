@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot } from "./react-dom-runtime";
 import { App } from "./App";
 
 const root = document.getElementById("root");

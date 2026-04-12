@@ -12,6 +12,8 @@
 		"src/index.html",
 		"src/index.tsx",
 		"src/App.tsx",
-		"src/App.test.tsx"
+		"src/App.test.tsx",
+		"src/workers/**",
+		"src/sounds/**"
 	]
 }
