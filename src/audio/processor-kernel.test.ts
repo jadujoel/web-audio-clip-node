@@ -3880,7 +3880,7 @@ describe("Loop: edge cases", () => {
 		expect(messages.some((m) => m.type === "ended")).toBe(false);
 	});
 
-	it("G12: streaming buffer ranges render decoded samples then silent underruns", () => {
+	it("G12: streaming buffer ranges render decoded samples then hold at commit edge", () => {
 		const props = getProperties(
 			{
 				state: State.Started,
@@ -3953,11 +3953,12 @@ describe("Loop: edge cases", () => {
 		);
 		expect(secondOutputs[0][0][0]).toBe(0);
 		expect(props.state).toBe(State.Started);
+		expect(props.playhead).toBe(128);
 		expect(
 			secondResult.messages.some(
 				(message) => message.type === "bufferUnderrun",
 			),
-		).toBe(true);
+		).toBe(false);
 	});
 
 	it("G13: exact zero playbackRate outputs silence without moving playhead", () => {
@@ -4541,7 +4542,7 @@ describe("Buffer swap during playback", () => {
 		expect(rms(after.allOutputs[0][0])).toBeGreaterThan(0.8);
 	});
 
-	it("B4: playhead reaches uncommitted region → underrun, then clears after writing data", () => {
+	it("B4: playhead reaching uncommitted region holds until new data arrives", () => {
 		const props = makePlayingProps();
 		handleProcessorMessage(
 			props,
@@ -4569,14 +4570,15 @@ describe("Buffer swap during playback", () => {
 			SR,
 		);
 
-		// Play 1 block (consumes 128 samples), then run another will be underrun
+		// Play 1 block (consumes 128 samples), then next block should hold.
 		const first = runBlocks(props, 1);
 		expect(first.totalNans).toBe(0);
 
 		const second = runBlocks(props, 1);
 		expect(second.allMessages.some((m) => m.type === "bufferUnderrun")).toBe(
-			true,
+			false,
 		);
+		expect(props.playhead).toBe(128);
 
 		// Write more data
 		handleProcessorMessage(
@@ -4598,6 +4600,7 @@ describe("Buffer swap during playback", () => {
 		// Should be able to proceed now
 		const third = runBlocks(props, 1);
 		expect(third.totalNans).toBe(0);
+		expect(rms(third.allOutputs[0][0])).toBeGreaterThan(0.1);
 	});
 
 	it("B5: all data written before playhead catches up — no underrun", () => {
@@ -5048,6 +5051,44 @@ describe("Streaming Loop", () => {
 		expect(props.state).toBe(State.Started);
 		// Playhead should be within committed range
 		expect(props.playhead).toBeLessThan(512);
+	});
+
+	it("H8: bufferEnd before final range does not end early and resumes when tail arrives", () => {
+		const props = makeStreamingProps({ loop: false });
+		initStreamingBuffer(props, 512, 384);
+
+		handleProcessorMessage(
+			props,
+			{ type: "bufferEnd", data: { totalLength: 512 } },
+			0,
+			SR,
+		);
+
+		const beforeTail = simulateBlocks(props, 4);
+		expect(beforeTail.messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+		expect(props.playhead).toBe(384);
+
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 384,
+					channelData: [
+						new Float32Array(128).fill(0.75),
+						new Float32Array(128).fill(0.25),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		const afterTail = simulateBlocks(props, 2);
+		expect(afterTail.allOutputs[0][0][0]).toBeCloseTo(0.75, 5);
+		expect(afterTail.messages.some((m) => m.type === "ended")).toBe(true);
+		expect(props.state).toBe(State.Ended);
 	});
 });
 

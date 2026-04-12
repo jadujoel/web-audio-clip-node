@@ -22,7 +22,9 @@ export function estimateTotalSamplesFromContentLength({
 	const durationSeconds = (totalBytes * 8) / safeBitrate;
 	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
 	const totalSamples = Math.ceil(durationSeconds * targetSampleRate);
-	return Number.isFinite(totalSamples) && totalSamples > 0 ? totalSamples : null;
+	return Number.isFinite(totalSamples) && totalSamples > 0
+		? totalSamples
+		: null;
 }
 
 export function secondsFromSamples(
@@ -68,7 +70,10 @@ export function clampSeekTargetSamples(
 	) {
 		return { value: requested, clamped: false };
 	}
-	const clampedValue = Math.min(requested, Math.max(0, Math.floor(seekableSamples)));
+	const clampedValue = Math.min(
+		requested,
+		Math.max(0, Math.floor(seekableSamples)),
+	);
 	return {
 		value: clampedValue,
 		clamped: clampedValue !== requested,

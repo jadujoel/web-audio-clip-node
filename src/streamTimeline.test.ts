@@ -14,7 +14,6 @@ describe("streamTimeline", () => {
 			sourceSampleRate: 44_100,
 			targetSampleRate: 48_000,
 		});
-		// 128000 bytes at 128kbps = 8 seconds -> 384000 samples at 48kHz.
 		expect(estimated).toBe(384_000);
 	});
 
@@ -25,7 +24,6 @@ describe("streamTimeline", () => {
 			sourceSampleRate: 48_000,
 			targetSampleRate: 48_000,
 		});
-		// 48000 bytes * 8 / 192000 bps = 2 seconds -> 96000 samples
 		expect(estimated).toBe(96_000);
 	});
 

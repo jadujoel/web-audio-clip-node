@@ -53,7 +53,10 @@ export class ClipNode extends AudioWorkletNode {
 		}
 	}
 
-	constructor(public context: BaseAudioContext, options: ClipWorkletOptions = {}) {
+	constructor(
+		public context: BaseAudioContext,
+		options: ClipWorkletOptions = {},
+	) {
 		super(context, "ClipProcessor", {
 			numberOfInputs: options.numberOfInputs ?? 0,
 			outputChannelCount: options.outputChannelCount ?? [2],

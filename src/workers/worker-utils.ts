@@ -1,37 +1,12 @@
+import { estimateTotalSamplesFromContentLength } from "../streamTimeline";
+
+export { estimateTotalSamplesFromContentLength };
+
 export function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 	const out = new Uint8Array(a.length + b.length);
 	out.set(a);
 	out.set(b, a.length);
 	return out;
-}
-
-const FALLBACK_BITRATE_BPS = 128_000;
-
-interface EstimateTotalSamplesInput {
-	totalBytes: number | null;
-	bitrate: number | null;
-	sourceSampleRate: number;
-	targetSampleRate: number;
-}
-
-export function estimateTotalSamplesFromContentLength({
-	totalBytes,
-	bitrate,
-	sourceSampleRate,
-	targetSampleRate,
-}: EstimateTotalSamplesInput): number | null {
-	if (totalBytes == null || totalBytes <= 0) return null;
-	if (sourceSampleRate <= 0 || targetSampleRate <= 0) return null;
-	const safeBitrate =
-		bitrate != null && Number.isFinite(bitrate) && bitrate > 0
-			? bitrate
-			: FALLBACK_BITRATE_BPS;
-	const durationSeconds = (totalBytes * 8) / safeBitrate;
-	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
-	const totalSamples = Math.ceil(durationSeconds * targetSampleRate);
-	return Number.isFinite(totalSamples) && totalSamples > 0
-		? totalSamples
-		: null;
 }
 
 export function resampleChannel(

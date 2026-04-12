@@ -1,4 +1,4 @@
-import type { StreamFormat } from "./clip-node-lib";
+import type { StreamFormat } from "./streaming";
 
 export function getDefaultUrlForFormat(format: StreamFormat): string {
 	if (format === "Aac") {

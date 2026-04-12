@@ -32,7 +32,7 @@ import {
 import { useStreamingClipNode } from "./useStreamingClipNode";
 import type { RefObject } from "./react-runtime";
 import type { StreamFormat } from "./clip-node-lib";
-import { getDefaultUrlForFormat } from "./streamFormat";
+import { getDefaultUrlForFormat } from "./clip-node-lib";
 
 /**
  * Reads frame data from a ref via its own RAF loop and updates DOM directly,

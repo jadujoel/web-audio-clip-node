@@ -16,10 +16,7 @@ import {
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
 import type { LoopMode, StreamFormat } from "./clip-node-lib";
-import {
-	clampSeekTargetSamples,
-	secondsFromSamples,
-} from "./streamTimeline";
+import { clampSeekTargetSamples, secondsFromSamples } from "./clip-node-lib";
 
 function getWorkerUrl(format: StreamFormat): string {
 	return getStreamingWorkerUrl(format);

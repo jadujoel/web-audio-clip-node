@@ -191,6 +191,7 @@ export interface BufferRangeWrite {
 export interface StreamBufferState {
 	totalLength: number | null;
 	committedLength: number;
+	endRequested: boolean;
 	streamEnded: boolean;
 	streaming: boolean;
 	writtenSpans: StreamBufferSpan[];

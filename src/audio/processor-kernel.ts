@@ -26,6 +26,7 @@ function createStreamBufferState(
 	return {
 		totalLength: hasBuffer ? totalLength : null,
 		committedLength: hasBuffer ? totalLength : 0,
+		endRequested: hasBuffer,
 		streamEnded: hasBuffer,
 		streaming: false,
 		writtenSpans: hasBuffer ? [{ startSample: 0, endSample: totalLength }] : [],
@@ -78,6 +79,19 @@ function getCommittedLength(spans: StreamBufferSpan[]): number {
 		committedLength = Math.max(committedLength, span.endSample);
 	}
 	return committedLength;
+}
+
+function reconcileStreamEndedState(streamBuffer: StreamBufferState): void {
+	if (!streamBuffer.endRequested) {
+		streamBuffer.streamEnded = false;
+		return;
+	}
+	if (streamBuffer.totalLength == null) {
+		streamBuffer.streamEnded = true;
+		return;
+	}
+	streamBuffer.streamEnded =
+		streamBuffer.committedLength >= streamBuffer.totalLength;
 }
 
 function resetLowWaterState(
@@ -152,8 +166,9 @@ function applyBufferRangeWrite(
 		);
 	}
 	if (write.streamEnded === true) {
-		properties.streamBuffer.streamEnded = true;
+		properties.streamBuffer.endRequested = true;
 	}
+	reconcileStreamEndedState(properties.streamBuffer);
 	resetLowWaterState(properties.streamBuffer, properties.playhead);
 }
 
@@ -753,6 +768,7 @@ export function handleProcessorMessage(
 			properties.streamBuffer = {
 				...createStreamBufferState(),
 				totalLength: init.totalLength,
+				endRequested: false,
 				streamEnded: false,
 				streaming: init.streaming ?? true,
 			};
@@ -767,7 +783,8 @@ export function handleProcessorMessage(
 			if (endData?.totalLength != null) {
 				properties.streamBuffer.totalLength = endData.totalLength;
 			}
-			properties.streamBuffer.streamEnded = true;
+			properties.streamBuffer.endRequested = true;
+			reconcileStreamEndedState(properties.streamBuffer);
 			return [];
 		}
 		case "bufferReset":
@@ -1019,10 +1036,9 @@ export function processBlock(
 
 	// When looping during an incomplete stream, clamp effective length to committed data
 	// to avoid reading silence/unwritten regions.
-	const effectiveSourceLength =
-		hasIncompleteStream && loop
-			? Math.max(props.streamBuffer.committedLength, 0)
-			: sourceLength;
+	const effectiveSourceLength = hasIncompleteStream
+		? Math.max(props.streamBuffer.committedLength, 0)
+		: sourceLength;
 
 	// Guard against degenerate tiny loops that would produce audible artifacts
 	const MIN_LOOP_SAMPLES = SAMPLE_BLOCK_SIZE * 2;
@@ -1119,6 +1135,12 @@ export function processBlock(
 	} = useRateIndexing
 		? findIndexesWithPlaybackRates(blockParams)
 		: findIndexesNormal(blockParams);
+	const waitingForFinalCommit =
+		props.streamBuffer.streaming &&
+		props.streamBuffer.endRequested &&
+		!props.streamBuffer.streamEnded;
+	const hasUnfinishedStreamTail =
+		props.streamBuffer.streaming && hasIncompleteStream;
 
 	const underrunSample = indexes.find(
 		(index) =>
@@ -1269,7 +1291,7 @@ export function processBlock(
 		props.timesLooped++;
 		messages.push({ type: "looped", data: props.timesLooped });
 	}
-	if (ended) {
+	if (ended && !waitingForFinalCommit && !hasUnfinishedStreamTail) {
 		props.state = State.Ended;
 		messages.push({ type: "ended" });
 	}
