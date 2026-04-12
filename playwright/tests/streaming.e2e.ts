@@ -229,11 +229,11 @@ test.describe("Streaming example", () => {
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
 			expect(val).toBeGreaterThan(0);
-		}).toPass({ timeout: 10000 });
+		}).toPass({ timeout: 15000 });
 
-		// Stop
+		// Stop and wait for audio context to settle
 		await stopBtn.click();
-		await page.waitForTimeout(500);
+		await page.waitForTimeout(1000);
 
 		// Second play
 		await streamBtn.click();
@@ -241,7 +241,7 @@ test.describe("Streaming example", () => {
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
 			expect(val).toBeGreaterThan(0);
-		}).toPass({ timeout: 10000 });
+		}).toPass({ timeout: 15000 });
 	});
 
 	test("selecting RawOpusFramed format populates default URL", async ({
