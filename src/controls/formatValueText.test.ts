@@ -110,4 +110,26 @@ describe("formatTickLabel", () => {
 	it("default → number only, no 's'", () => {
 		expect(formatTickLabel(Math.PI, "duration", "none", 120)).toBe("3.142");
 	});
+
+	it("returns dash for undefined value", () => {
+		expect(
+			formatTickLabel(undefined as unknown as number, "gain", "none", 120),
+		).toBe("—");
+	});
+
+	it("returns dash for NaN value", () => {
+		expect(formatTickLabel(Number.NaN, "gain", "none", 120)).toBe("—");
+	});
+});
+
+describe("formatValueText edge cases", () => {
+	it("returns dash for undefined value", () => {
+		expect(
+			formatValueText(undefined as unknown as number, "gain", "none", 120),
+		).toBe("—");
+	});
+
+	it("returns dash for NaN value", () => {
+		expect(formatValueText(Number.NaN, "gain", "none", 120)).toBe("—");
+	});
 });

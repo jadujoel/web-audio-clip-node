@@ -153,6 +153,21 @@ export const useClipControls = create<ClipControlsState>()(
 						loopMode: state.loopMode,
 						tempo: state.tempo,
 					}),
+					merge: (persisted, current) => {
+						const p = persisted as Partial<ClipControlsState> | undefined;
+						if (!p) return current;
+						return {
+							...current,
+							...p,
+							values: { ...current.values, ...p.values },
+							snaps: { ...current.snaps, ...p.snaps },
+							enabled: { ...current.enabled, ...p.enabled },
+							mins: { ...current.mins, ...p.mins },
+							maxs: { ...current.maxs, ...p.maxs },
+							maxLocked: { ...current.maxLocked, ...p.maxLocked },
+							linkedPairs: { ...current.linkedPairs, ...p.linkedPairs },
+						};
+					},
 				},
 			),
 );

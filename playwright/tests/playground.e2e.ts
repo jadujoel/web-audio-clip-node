@@ -126,4 +126,40 @@ test.describe("Playground example", () => {
 			).toBeVisible();
 		}
 	});
+
+	test("loads without errors when localStorage has stale state missing keys", async ({
+		page,
+	}) => {
+		// Seed localStorage with a partial state that is missing newer keys
+		// (simulates a user who visited before new controls were added)
+		await page.evaluate(() => {
+			const stale = {
+				state: {
+					values: { gain: -3, pan: 0.5, playbackRate: 1, detune: 0 },
+					snaps: {},
+					enabled: {},
+					mins: {},
+					maxs: {},
+					maxLocked: {},
+					linkedPairs: {},
+					loop: false,
+					loopMode: "forward",
+					tempo: 120,
+				},
+				version: 0,
+			};
+			localStorage.setItem("clip-node-state", JSON.stringify(stale));
+		});
+
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(err.message));
+
+		await page.reload();
+		await page.waitForLoadState("networkidle");
+
+		await expect(page).toHaveTitle(/playground/i);
+		await expect(page.locator("section#display")).toBeVisible();
+		await expect(page.locator("section#buttons")).toBeVisible();
+		expect(errors).toEqual([]);
+	});
 });

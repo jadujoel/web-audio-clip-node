@@ -4,6 +4,7 @@ export function formatValueText(
 	snap: string,
 	tempo: number,
 ): string {
+	if (value == null || Number.isNaN(value)) return "—";
 	switch (key) {
 		case "gain":
 			return `${value.toFixed(1)} dB`;
@@ -56,6 +57,7 @@ export function formatTickLabel(
 	snap: string,
 	tempo: number,
 ): string {
+	if (value == null || Number.isNaN(value)) return "—";
 	switch (key) {
 		case "gain":
 			return value.toFixed(1);
