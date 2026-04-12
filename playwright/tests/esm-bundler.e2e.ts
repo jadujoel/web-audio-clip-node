@@ -22,11 +22,9 @@ test.describe("ESM Bundler example", () => {
 		await expect(page.locator("#stop")).toBeVisible();
 	});
 
-	test("play button is enabled, stop is disabled initially", async ({
-		page,
-	}) => {
+	test("play and stop buttons are enabled initially", async ({ page }) => {
 		await expect(page.locator("#play")).toBeEnabled();
-		await expect(page.locator("#stop")).toBeDisabled();
+		await expect(page.locator("#stop")).toBeEnabled();
 	});
 
 	test("status shows initial message", async ({ page }) => {

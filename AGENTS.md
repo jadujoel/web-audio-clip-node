@@ -6,8 +6,6 @@ when done with a task, move to done.
 
 When done with a task make sure there are no type or lint errors.
 
-Whenever updating something related to infra its best you the agent run the terraform apply and also smoke tests in ci to make sure you got it right.
-
 whenever fixing something, add an end to end test to cover the fixed issue and prevent regressions.
 
 Since we dont have any users yet we don't need to think about backwards compatibility right now.
@@ -20,13 +18,13 @@ When asked to research something, save your findings in a markdown file in the r
 
 When asked to critique something, write your critique next to the file asked to critique in a file named {filename}.critique.md
 
-When asked to "test everything", you should run linting, type checking, unit tests, component tests, end-to-end tests, smoke tests. Make sure latest infra is deployed, as well as commit and push to ci and follow the workflow run to make sure it passes.
+When asked to "test everything", you should run linting, type checking, unit tests, component tests, end-to-end tests, smoke tests. Commit and push to ci and follow the workflow run to make sure it passes.
 
 When asked to create a thorough plan
 - do the research step and discover the gold standard for how to do the thing you're planning
 - do the planning step based on the research
-- critique the plan
-- create a final plan based on the critiques of the plan, then remove drafts to avoid confusion
+- Critique the plan.
+- Create a final plan based on the critiques of the plan, then remove drafts.
 
 When asked to implement todo
 - Read through the issues in todo
