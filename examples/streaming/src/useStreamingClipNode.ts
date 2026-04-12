@@ -6,33 +6,23 @@ import {
 } from "./react-runtime";
 import {
 	ClipNode,
+	detectStreamFormat,
 	float32ArrayFromAudioBuffer,
 	getProcessorBlobUrl,
 	getStreamingWorkerUrl,
 	linFromDb,
+	usesBufferedContainerDecode,
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
-import type { StreamingWorkerFormat } from "./clip-node-lib";
+import type { StreamFormat } from "./clip-node-lib";
 import {
 	clampSeekTargetSamples,
 	secondsFromSamples,
 } from "./streamTimeline";
-import {
-	detectStreamFormat,
-	type StreamFormat,
-	usesBufferedContainerDecode,
-} from "./streamFormat";
-
-const streamFormatToWorkerFormat: Record<StreamFormat, StreamingWorkerFormat> = {
-	mp3: "mp3",
-	"ogg-opus": "ogg-opus",
-	"raw-opus-framed": "raw-opus-framed",
-	"webm-opus": "webm-opus",
-};
 
 function getWorkerUrl(format: StreamFormat): string {
-	return getStreamingWorkerUrl(streamFormatToWorkerFormat[format]);
+	return getStreamingWorkerUrl(format);
 }
 
 function applyValueToClip(node: ClipNode, key: ControlKey, value: number) {

@@ -26,6 +26,8 @@ export {
 export type { ControlKey, ClipNodeState, FrameData } from "../../../src/lib";
 export {
 	createStreamingWorker,
+	detectStreamFormat,
 	getStreamingWorkerUrl,
+	usesBufferedContainerDecode,
 } from "../../../src/streaming";
-export type { StreamingWorkerFormat } from "../../../src/streaming";
+export type { StreamFormat } from "../../../src/streaming";

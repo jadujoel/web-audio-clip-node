@@ -30,10 +30,8 @@ import {
 } from "./clip-node-lib";
 import { useStreamingClipNode } from "./useStreamingClipNode";
 import type { RefObject } from "./react-runtime";
-import {
-	getDefaultUrlForFormat,
-	type StreamFormat,
-} from "./streamFormat";
+import type { StreamFormat } from "./clip-node-lib";
+import { getDefaultUrlForFormat } from "./streamFormat";
 
 /**
  * Reads frame data from a ref via its own RAF loop and updates DOM directly,
@@ -160,8 +158,8 @@ export function App() {
 		setValue: controls.setValue,
 	});
 
-	const [format, setFormat] = useState<StreamFormat>("mp3");
-	const [url, setUrl] = useState(getDefaultUrlForFormat("mp3"));
+	const [format, setFormat] = useState<StreamFormat>("Mp3");
+	const [url, setUrl] = useState(getDefaultUrlForFormat("Mp3"));
 	const [throttle, setThrottle] = useState(0);
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
@@ -175,10 +173,10 @@ export function App() {
 				return getDefaultUrlForFormat(nextFormat);
 			}
 			const knownDefaults: StreamFormat[] = [
-				"mp3",
-				"ogg-opus",
-				"raw-opus-framed",
-				"webm-opus",
+				"Mp3",
+				"OggOpus",
+				"RawOpusFramed",
+				"WebmOpus",
 			];
 			return knownDefaults.some(
 				(format) => trimmed === getDefaultUrlForFormat(format),
@@ -455,10 +453,10 @@ export function App() {
 					fontSize: "0.9rem",
 				}}
 			>
-				<option value="mp3">MP3</option>
-				<option value="ogg-opus">Opus (Ogg)</option>
-				<option value="raw-opus-framed">Opus (framed raw)</option>
-				<option value="webm-opus">Opus (WebM)</option>
+				<option value="Mp3">MP3</option>
+				<option value="OggOpus">Opus (Ogg)</option>
+				<option value="RawOpusFramed">Opus (framed raw)</option>
+				<option value="WebmOpus">Opus (WebM)</option>
 			</select>
 
 			<label
