@@ -23,19 +23,32 @@ function getMime(path: string): string {
 
 Bun.serve({
 	port,
-  routes: {
-    "/": {
-      GET() {
-        return new Response(Bun.file("webpage/index.html"));
-      }
-    },
-    "/*": {
-      GET(req) {
-        const pathname = new URL(req.url).pathname;
-        return new Response(Bun.file(`webpage/${pathname}`));
-      }
-    }
-  },
+	routes: {
+		"/": {
+			GET() {
+				return new Response(Bun.file("webpage/index.html"));
+			},
+		},
+		"/*": {
+			GET(req) {
+				let pathname = new URL(req.url).pathname;
+				if (!extname(pathname)) {
+					if (!pathname.endsWith("/")) {
+						return new Response(null, {
+							status: 302,
+							headers: {
+								Location: `${pathname}/`,
+							},
+						});
+					}
+					pathname += "/index.html";
+				}
+				console.log("Request for", pathname);
+				const filePath = `webpage${pathname}`;
+				return new Response(Bun.file(filePath));
+			},
+		},
+	},
 	async fetch() {
 		return new Response("Not Found", { status: 404 });
 	},
