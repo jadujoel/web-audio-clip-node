@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { LoopMode } from "../audio/types";
 import {
 	buildDefaults,
 	type ControlKey,
@@ -21,6 +22,7 @@ export interface ClipControlsState {
 	maxLocked: Record<ControlKey, boolean>;
 	linkedPairs: Record<LinkedControlPairKey, boolean>;
 	loop: boolean;
+	loopMode: LoopMode;
 	tempo: number;
 
 	setValue: (key: ControlKey, val: number) => void;
@@ -39,6 +41,7 @@ export interface ClipControlsState {
 	) => void;
 	setLinkedPair: (key: LinkedControlPairKey, on: boolean) => void;
 	setLoop: (checked: boolean) => void;
+	setLoopMode: (mode: LoopMode) => void;
 	setTempo: (tempo: number) => void;
 	setTempoAndValues: (
 		tempo: number,
@@ -63,6 +66,7 @@ export const useClipControls = create<ClipControlsState>()(
 				...defaults,
 				linkedPairs: linkedPairDefaults,
 				loop: false,
+				loopMode: "forward" as LoopMode,
 				tempo: DEFAULT_TEMPO,
 				setValue: (key, val) =>
 					set((s) => ({ values: { ...s.values, [key]: val } })),
@@ -89,6 +93,7 @@ export const useClipControls = create<ClipControlsState>()(
 				setLinkedPair: (key, on) =>
 					set((s) => ({ linkedPairs: { ...s.linkedPairs, [key]: on } })),
 				setLoop: (checked) => set({ loop: checked }),
+				setLoopMode: (mode) => set({ loopMode: mode }),
 				setTempo: (tempo) => set({ tempo }),
 				setTempoAndValues: (tempo, values) =>
 					set((s) => ({ tempo, values: { ...s.values, ...values } })),
@@ -99,6 +104,7 @@ export const useClipControls = create<ClipControlsState>()(
 					...defaults,
 					linkedPairs: linkedPairDefaults,
 					loop: false,
+					loopMode: "forward" as LoopMode,
 					tempo: DEFAULT_TEMPO,
 					setValue: (key, val) =>
 						set((s) => ({ values: { ...s.values, [key]: val } })),
@@ -127,6 +133,7 @@ export const useClipControls = create<ClipControlsState>()(
 					setLinkedPair: (key, on) =>
 						set((s) => ({ linkedPairs: { ...s.linkedPairs, [key]: on } })),
 					setLoop: (checked) => set({ loop: checked }),
+					setLoopMode: (mode) => set({ loopMode: mode }),
 					setTempo: (tempo) => set({ tempo }),
 					setTempoAndValues: (tempo, values) =>
 						set((s) => ({ tempo, values: { ...s.values, ...values } })),
@@ -143,6 +150,7 @@ export const useClipControls = create<ClipControlsState>()(
 						maxLocked: state.maxLocked,
 						linkedPairs: state.linkedPairs,
 						loop: state.loop,
+						loopMode: state.loopMode,
 						tempo: state.tempo,
 					}),
 				},

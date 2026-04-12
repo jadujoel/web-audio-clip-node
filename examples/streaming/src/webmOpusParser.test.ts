@@ -4,7 +4,7 @@ import {
 	createWebmOpusParserState,
 	processWebmOpusElements,
 	type WebmElementDetail,
-} from "../webm-opus-parser";
+} from "../../../src/workers/webm-opus-parser";
 
 function detail<T extends object>(base: T): T & WebmElementDetail {
 	return {

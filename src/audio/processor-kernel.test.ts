@@ -16,6 +16,7 @@ import {
 	type OutboundMessage,
 	panFilter,
 	processBlock,
+	SAMPLE_BLOCK_SIZE,
 	setOffset,
 } from "./processor-kernel";
 import type { BlockParameters, ClipProcessorOptions } from "./types";
@@ -1767,6 +1768,62 @@ describe("processBlock", () => {
 		expect(props.playhead).toBeGreaterThan(0);
 	});
 
+	it("crossfade output never exceeds input amplitude (equal-power)", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		// Fill buffer with constant amplitude 1 — crossfade between two regions
+		// of identical amplitude should never exceed ~1.0.
+		for (const ch of buffer) ch.fill(1);
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const loopCrossfade = 0.05;
+		const loopStartSamples = Math.floor(loopStart * SR);
+		const xfadeNumSamples = Math.floor(loopCrossfade * SR);
+
+		// Walk through crossfade zone at loop start
+		for (
+			let ph = loopStartSamples + 1;
+			ph < loopStartSamples + xfadeNumSamples;
+			ph += SAMPLE_BLOCK_SIZE
+		) {
+			const props = getProperties(
+				{
+					state: State.Started,
+					startWhen: 0,
+					stopWhen: 100,
+					duration: 100,
+					buffer,
+					loop: true,
+					loopStart,
+					loopEnd,
+					loopCrossfade,
+					enableLoopCrossfade: true,
+					playhead: ph,
+					enableLowpass: false,
+					enableHighpass: false,
+					enableGain: false,
+					enablePan: false,
+					enablePlaybackRate: false,
+				},
+				SR,
+			);
+			const outputs = [makeOutput(2)];
+			processBlock(
+				props,
+				outputs,
+				makeProcessParams(),
+				{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+				makeFilterState(),
+			);
+			for (const ch of outputs[0]) {
+				for (let i = 0; i < ch.length; i++) {
+					// Allow small floating-point tolerance above 1.0
+					expect(Math.abs(ch[i])).toBeLessThanOrEqual(1.001);
+				}
+			}
+		}
+	});
+
 	it("enableLoopStart=false uses 0 for loopStart", () => {
 		const buffer = makeBuffer(4800);
 		for (const ch of buffer) ch.fill(1);
@@ -2603,7 +2660,7 @@ describe("Loop: crossfade via processBlock", () => {
 		);
 	}
 
-	it("C1: xfade-out zone near loopStart — output > 1.0 (blended)", () => {
+	it("C1: xfade-out zone near loopStart — output bounded (constant-gain)", () => {
 		const bufLen = 48000;
 		const buffer = makeUniformBuffer(bufLen);
 		const loopStartSamples = Math.floor(0.1 * SR);
@@ -2631,13 +2688,12 @@ describe("Loop: crossfade via processBlock", () => {
 			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
 			{ lowpass: createFilterState(), highpass: createFilterState() },
 		);
-		// In the crossfade-out zone, buffer[ch][loopEnd + offset] * g is added to 1.0
-		// So some output values should exceed 1.0
-		const hasBlended = outputs[0][0].some((v) => v > 1.0);
-		expect(hasBlended).toBe(true);
+		// With constant-gain crossfade (sin²+cos²=1), output should stay bounded
+		const allBounded = outputs[0][0].every((v) => Math.abs(v) <= 1.001);
+		expect(allBounded).toBe(true);
 	});
 
-	it("C2: xfade-in zone approaching loopEnd — output > 1.0 (blended)", () => {
+	it("C2: xfade-in zone approaching loopEnd — output bounded (constant-gain)", () => {
 		const bufLen = 48000;
 		const buffer = makeUniformBuffer(bufLen);
 		const loopEndSamples = Math.floor(0.9 * SR);
@@ -2666,8 +2722,8 @@ describe("Loop: crossfade via processBlock", () => {
 			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
 			{ lowpass: createFilterState(), highpass: createFilterState() },
 		);
-		const hasBlended = outputs[0][0].some((v) => v > 1.0);
-		expect(hasBlended).toBe(true);
+		const allBounded = outputs[0][0].every((v) => Math.abs(v) <= 1.001);
+		expect(allBounded).toBe(true);
 	});
 
 	it("C3: enableLoopCrossfade=false — no crossfade despite params", () => {
@@ -4797,5 +4853,201 @@ describe("Streaming Loop", () => {
 		expect(props.state).toBe(State.Started);
 		// Playhead should be within committed range
 		expect(props.playhead).toBeLessThan(512);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Ping-pong looping
+// ---------------------------------------------------------------------------
+
+describe("Ping-pong looping", () => {
+	const SR = 48000;
+
+	it("PP1: findIndexesNormal reverses at loopEnd and again at loopStart", () => {
+		// Start near loopEnd, should bounce back
+		const p: BlockParameters = {
+			playhead: 990,
+			bufferLength: 1000,
+			loop: true,
+			loopMode: "ping-pong",
+			playbackDirection: 1,
+			loopStartSamples: 0,
+			loopEndSamples: 1000,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		expect(r.looped).toBe(true);
+		expect(r.playbackDirection).toBe(-1);
+		// Playhead should have reversed: went up to 999, then started going back
+		expect(r.playhead).toBeLessThan(1000);
+		// Indexes should first increase then decrease
+		const turnIdx = r.indexes.findIndex((v, i, arr) => i > 0 && v < arr[i - 1]);
+		expect(turnIdx).toBeGreaterThan(0);
+		expect(turnIdx).toBeLessThan(128);
+	});
+
+	it("PP2: direction carries across blocks", () => {
+		// Go backward from somewhere in the middle
+		const p: BlockParameters = {
+			playhead: 200,
+			bufferLength: 1000,
+			loop: true,
+			loopMode: "ping-pong",
+			playbackDirection: -1,
+			loopStartSamples: 100,
+			loopEndSamples: 900,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([1]),
+		};
+		const r = findIndexesNormal(p);
+		// Going backward from 200 toward 100, should reverse at 100
+		expect(r.looped).toBe(true);
+		expect(r.playbackDirection).toBe(1);
+		// After reversing at loopStart=100, head should be going forward
+		expect(r.playhead).toBeGreaterThanOrEqual(100);
+	});
+
+	it("PP3: ping-pong with playback rates reverses at boundaries", () => {
+		const p: BlockParameters = {
+			playhead: 895,
+			bufferLength: 1000,
+			loop: true,
+			loopMode: "ping-pong",
+			playbackDirection: 1,
+			loopStartSamples: 0,
+			loopEndSamples: 900,
+			durationSamples: 100000,
+			playbackRates: new Float32Array([2]),
+		};
+		const r = findIndexesWithPlaybackRates(p);
+		expect(r.looped).toBe(true);
+		expect(r.playbackDirection).toBe(-1);
+		// Indexes should first increase then decrease
+		const afterTurn = r.indexes.findIndex(
+			(v, i, arr) => i > 0 && v < arr[i - 1],
+		);
+		expect(afterTurn).toBeGreaterThan(0);
+	});
+
+	it("PP4: full processBlock with ping-pong flips direction", () => {
+		const bufLen = 48000;
+		const buffer = [
+			new Float32Array(bufLen).fill(0.5),
+			new Float32Array(bufLen).fill(0.5),
+		];
+		const props = getProperties(
+			{
+				buffer,
+				loop: true,
+				loopMode: "ping-pong",
+				state: State.Started,
+				playhead: 47900,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+			},
+			SR,
+		);
+		expect(props.playbackDirection).toBe(1);
+
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+
+		// Direction should have flipped to backward after hitting loopEnd
+		expect(props.playbackDirection).toBe(-1);
+		expect(props.playhead).toBeLessThan(48000);
+	});
+
+	it("PP5: multiple bounces across many blocks", () => {
+		const bufLen = 48000;
+		const buffer = [
+			new Float32Array(bufLen).fill(1),
+			new Float32Array(bufLen).fill(1),
+		];
+		const props = getProperties(
+			{
+				buffer,
+				loop: true,
+				loopMode: "ping-pong",
+				loopStart: 0.1,
+				loopEnd: 0.9,
+				state: State.Started,
+				playhead: Math.floor(0.1 * SR),
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+			},
+			SR,
+		);
+		const loopStart = Math.floor(0.1 * SR);
+		const loopEnd = Math.floor(0.9 * SR);
+
+		// Run many blocks to cycle through multiple bounces
+		let bounces = 0;
+		let prevDir = props.playbackDirection;
+		for (let b = 0; b < 1000; b++) {
+			processBlock(
+				props,
+				[makeOutput(2)],
+				{
+					playbackRate: new Float32Array([1]),
+					detune: new Float32Array([0]),
+					lowpass: new Float32Array([20000]),
+					highpass: new Float32Array([20]),
+					gain: new Float32Array([1]),
+					pan: new Float32Array([0]),
+				},
+				{
+					currentTime: (b * 128) / SR,
+					currentFrame: b * 128,
+					sampleRate: SR,
+				},
+				{ lowpass: createFilterState(), highpass: createFilterState() },
+			);
+			if (props.playbackDirection !== prevDir) {
+				bounces++;
+				prevDir = props.playbackDirection;
+			}
+			// Playhead should always stay within bounds
+			expect(props.playhead).toBeGreaterThanOrEqual(loopStart);
+			expect(props.playhead).toBeLessThanOrEqual(loopEnd);
+		}
+		// Should have bounced at least a few times across 1000 blocks
+		expect(bounces).toBeGreaterThanOrEqual(2);
+	});
+
+	it("PP6: loopMode message sets mode and resets direction", () => {
+		const props = getProperties(
+			{
+				buffer: [new Float32Array(1000)],
+				loop: true,
+			},
+			SR,
+		);
+		expect(props.loopMode).toBe("forward");
+		expect(props.playbackDirection).toBe(1);
+
+		handleProcessorMessage(
+			props,
+			{ type: "loopMode", data: "ping-pong" },
+			SR,
+			0,
+		);
+		expect(props.loopMode).toBe("ping-pong");
+		expect(props.playbackDirection).toBe(1);
 	});
 });

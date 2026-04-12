@@ -1,4 +1,9 @@
-import type { ClipNodeState, ClipWorkletOptions, FrameData } from "./types";
+import type {
+	ClipNodeState,
+	ClipWorkletOptions,
+	FrameData,
+	LoopMode,
+} from "./types";
 import { audioBufferFromFloat32Array } from "./utils";
 
 export class ClipNode extends AudioWorkletNode {
@@ -17,6 +22,7 @@ export class ClipNode extends AudioWorkletNode {
 	private _loopStart = 0;
 	private _loopEnd = 0;
 	private _loop = false;
+	private _loopMode: LoopMode = "forward";
 	private _offset = 0;
 	private _playhead = 0;
 	private _fadeIn = 0;
@@ -256,6 +262,16 @@ export class ClipNode extends AudioWorkletNode {
 		if (this._loop !== value) {
 			this._loop = value;
 			this.port.postMessage({ type: "loop", data: value });
+		}
+	}
+
+	get loopMode(): LoopMode {
+		return this._loopMode;
+	}
+	set loopMode(value: LoopMode) {
+		if (this._loopMode !== value) {
+			this._loopMode = value;
+			this.port.postMessage({ type: "loopMode", data: value });
 		}
 	}
 

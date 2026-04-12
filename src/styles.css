@@ -85,26 +85,11 @@ main {
 	display: inline-block;
 }
 
-.display-details {
+.display-details__row {
 	width: 100%;
 	margin-top: 6px;
 	border-top: 1px solid var(--color-border-subtle);
-	padding-top: 4px;
-}
-
-.display-details summary {
-	cursor: pointer;
-	color: #888;
-	font-size: var(--font-size-sm);
-	user-select: none;
-	padding: 2px 0;
-}
-
-.display-details[open] > :not(summary) {
 	padding-top: 6px;
-}
-
-.display-details__row {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;

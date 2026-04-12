@@ -14,12 +14,14 @@ export interface ClipProcessorOptions {
 	buffer?: Float32Array[];
 	streamBuffer?: StreamBufferState;
 	loop?: boolean;
+	loopMode?: LoopMode;
 	loopStart?: number;
 	loopEnd?: number;
 	loopCrossfade?: number;
 	offset?: number;
 	duration?: number;
 	playhead?: number;
+	playbackDirection?: 1 | -1;
 	state?: ClipProcessorState;
 	startWhen?: number;
 	stopWhen?: number;
@@ -45,6 +47,8 @@ export interface ClipProcessorOptions {
 export interface ClipWorkletOptions extends AudioWorkletNodeOptions {
 	processorOptions?: ClipProcessorOptions;
 }
+
+export type LoopMode = "forward" | "ping-pong";
 
 export type ClipNodeState =
 	| "initial"
@@ -112,6 +116,7 @@ export type ClipProcessorMessageRx =
 	| ClipProcessorResumeMessageRx
 	| ClipProcessorDisposeMessageRx
 	| ClipProcessorLoopMessageRx
+	| ClipProcessorLoopModeMessageRx
 	| ClipProcessorLoopStartMessageRx
 	| ClipProcessorLoopEndMessageRx
 	| ClipProcessorPlayheadMessageRx
@@ -133,6 +138,7 @@ export type ClipProcessorMessageType =
 	| "resume"
 	| "dispose"
 	| "loop"
+	| "loopMode"
 	| "loopStart"
 	| "loopEnd"
 	| "playhead"
@@ -243,6 +249,11 @@ export interface ClipProcessorLoopMessageRx {
 	readonly data: boolean;
 }
 
+export interface ClipProcessorLoopModeMessageRx {
+	readonly type: "loopMode";
+	readonly data: LoopMode;
+}
+
 export interface ClipProcessorLoopStartMessageRx {
 	readonly type: "loopStart";
 	readonly data: number;
@@ -281,6 +292,8 @@ export interface BlockParameters {
 	readonly playhead: number;
 	readonly durationSamples: number;
 	readonly loop: boolean;
+	readonly loopMode?: LoopMode;
+	readonly playbackDirection?: 1 | -1;
 	readonly loopStartSamples: number;
 	readonly loopEndSamples: number;
 	readonly bufferLength: number;
@@ -292,4 +305,5 @@ export interface BlockReturnState {
 	readonly ended: boolean;
 	readonly looped: boolean;
 	readonly indexes: number[];
+	readonly playbackDirection: 1 | -1;
 }

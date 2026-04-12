@@ -1,5 +1,6 @@
 import { memo, useCallback, useId, useMemo, useRef, useState } from "react";
 import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
+import { DEFAULT_TEMPO } from "../controls/controlDefs";
 import { formatTickLabel, formatValueText } from "../controls/formatValueText";
 import { ContextMenu } from "./ContextMenu";
 import { SnappableSlider } from "./SnappableSlider";
@@ -38,7 +39,7 @@ function AudioControlInner({
 	value,
 	defaultValue,
 	step,
-	tempo = 120,
+	tempo = DEFAULT_TEMPO,
 	snap = "none",
 	preset,
 	title,

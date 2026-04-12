@@ -82,17 +82,14 @@ function StreamingDisplayPanelInner({
 			<output ref={timeEl}>0</output>
 			<code>Loops:</code>
 			<output ref={loopsEl}>0</output>
-			<details className="display-details">
-				<summary>Debug</summary>
-				<div className="display-details__row">
-					<code>Frame:</code>
-					<output ref={frameEl}>0</output>
-					<code>Latency:</code>
-					<output>{latency}</output>
-					<code>TimeTaken:</code>
-					<output ref={ttEl}>unknown</output>
-				</div>
-			</details>
+			<div className="display-details__row">
+				<code>Frame:</code>
+				<output ref={frameEl}>0</output>
+				<code>Latency:</code>
+				<output>{latency}</output>
+				<code>TimeTaken:</code>
+				<output ref={ttEl}>unknown</output>
+			</div>
 		</section>
 	);
 }
@@ -118,10 +115,20 @@ function StreamingPlayheadInner({
 
 	useEffect(() => {
 		let raf: number;
+		// Track the last emitted value so we can suppress small backwards jumps
+		// caused by stale frame data arriving between processor cycles.
+		let last = 0;
 		const tick = () => {
 			const f = frameRef.current;
 			if (f) {
-				setValue(f[2]);
+				const next = f[2];
+				// Allow forward movement always. Allow large backwards jumps
+				// (seek or loop boundary). Suppress small backwards jitter
+				// (threshold: 256 samples ≈ two 128-sample processing blocks).
+				if (next >= last || last - next > 256) {
+					last = next;
+					setValue(next);
+				}
 			}
 			raf = requestAnimationFrame(tick);
 		};
@@ -173,10 +180,16 @@ export function App() {
 				return getDefaultUrlForFormat(nextFormat);
 			}
 			const knownDefaults: StreamFormat[] = [
+				"Aac",
+				"Flac",
 				"Mp3",
+				"Mp4Aac",
+				"OggFlac",
 				"OggOpus",
+				"OggVorbis",
 				"RawOpusFramed",
 				"WebmOpus",
+				"WebmVorbis",
 			];
 			return knownDefaults.some(
 				(format) => trimmed === getDefaultUrlForFormat(format),
@@ -427,7 +440,7 @@ export function App() {
 				ClipNode — Streaming
 			</h1>
 			<p style={{ color: "#94a3b8", marginTop: 0, fontSize: "0.9rem" }}>
-				Stream &amp; decode MP3, Ogg Opus, framed raw Opus, or WebM Opus in a Web Worker, feeding decoded audio
+				Stream &amp; decode MP3, AAC, AAC (MP4/M4A), FLAC, Ogg Opus, Ogg Vorbis, framed raw Opus, WebM Opus, or WebM Vorbis in a Web Worker, feeding decoded audio
 				directly to the AudioWorklet processor via MessagePort.
 			</p>
 
@@ -454,9 +467,15 @@ export function App() {
 				}}
 			>
 				<option value="Mp3">MP3</option>
+				<option value="Aac">AAC (ADTS)</option>
+				<option value="Mp4Aac">AAC (MP4/M4A)</option>
+				<option value="Flac">FLAC (Lossless)</option>
+				<option value="OggFlac">FLAC (OGG)</option>
 				<option value="OggOpus">Opus (Ogg)</option>
+				<option value="OggVorbis">Vorbis (Ogg)</option>
 				<option value="RawOpusFramed">Opus (framed raw)</option>
 				<option value="WebmOpus">Opus (WebM)</option>
+				<option value="WebmVorbis">Vorbis (WebM)</option>
 			</select>
 
 			<label
@@ -515,7 +534,7 @@ export function App() {
 					▶ Stream &amp; Play
 				</button>
 				<button type="button" onClick={node.pause} disabled={!isStreaming}>
-					⏸ Pause
+					{node.nodeState === "paused" ? "▶ Resume" : "⏸ Pause"}
 				</button>
 				<button type="button" onClick={node.stop} disabled={!isStreaming}>
 					■ Stop

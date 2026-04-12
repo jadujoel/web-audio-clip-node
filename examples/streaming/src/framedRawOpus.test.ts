@@ -3,7 +3,7 @@ import {
 	FRAMED_RAW_OPUS_MAGIC,
 	createFramedRawOpusStreamState,
 	parseFramedRawOpusStream,
-} from "../framed-raw-opus";
+} from "../../../src/workers/framed-raw-opus";
 
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
 	const total = parts.reduce((sum, part) => sum + part.length, 0);

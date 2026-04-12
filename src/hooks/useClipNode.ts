@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipNode } from "../audio/ClipNode";
-import type { ClipNodeState, FrameData } from "../audio/types";
+import type { ClipNodeState, FrameData, LoopMode } from "../audio/types";
 import { float32ArrayFromAudioBuffer, linFromDb } from "../audio/utils";
 import { getProcessorBlobUrl } from "../audio/workletUrl";
 import type { ControlKey } from "../controls/controlDefs";
@@ -110,6 +110,7 @@ interface UseClipNodeParams {
 	values: Record<ControlKey, number>;
 	enabled: Record<ControlKey, boolean>;
 	loop: boolean;
+	loopMode: LoopMode;
 	setValue: (key: ControlKey, val: number) => void;
 }
 
@@ -117,6 +118,7 @@ export function useClipNode({
 	values,
 	enabled,
 	loop,
+	loopMode,
 	setValue,
 }: UseClipNodeParams) {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
@@ -190,6 +192,7 @@ export function useClipNode({
 					fadeInDuration: values.fadeIn,
 					fadeOutDuration: values.fadeOut,
 					loop,
+					loopMode,
 					enableDetune: enabled.detune,
 					enableFadeIn: enabled.fadeIn,
 					enableFadeOut: enabled.fadeOut,
@@ -217,6 +220,7 @@ export function useClipNode({
 			);
 
 			node.loop = loop;
+			node.loopMode = loopMode;
 			node.playbackRate.value = values.playbackRate;
 			node.detune.value = values.detune;
 			node.lowpass.value = values.lowpass;
@@ -232,7 +236,7 @@ export function useClipNode({
 
 			return node;
 		},
-		[loop, values, enabled],
+		[loop, values, enabled, loopMode],
 	);
 
 	const start = useCallback(async () => {
@@ -374,6 +378,11 @@ export function useClipNode({
 		if (node) node.loop = checked;
 	}, []);
 
+	const setLoopModeOnNode = useCallback((mode: LoopMode) => {
+		const node = nodeRef.current;
+		if (node) node.loopMode = mode;
+	}, []);
+
 	return {
 		nodeState,
 		statusMessage,
@@ -395,5 +404,6 @@ export function useClipNode({
 		applyValues: applyValuesToNode,
 		applyToggle: applyToggleToNode,
 		setLoopOnNode,
+		setLoopModeOnNode,
 	};
 }

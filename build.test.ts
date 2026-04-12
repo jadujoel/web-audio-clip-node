@@ -1,8 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import {
 	addJsExtensionsToRelativeImports,
 	createAppBuildConfig,
@@ -54,5 +53,36 @@ describe("app build", () => {
 		expect(bundleText).not.toContain("react-dom-client.development");
 		expect(bundleText).not.toContain("react-jsx-dev-runtime.development");
 		expect(bundleText).toContain("Minified React error #");
+	});
+});
+
+describe("hashed build artifacts", () => {
+	test("dist/processor has a hashed variant", async () => {
+		const files = await readdir("dist");
+		const hashed = files.filter((f) => /^processor\.[a-f0-9]{8}\.js$/.test(f));
+		expect(hashed).toHaveLength(1);
+	});
+
+	test("dist/lib.bundle has a hashed variant", async () => {
+		const files = await readdir("dist");
+		const hashed = files.filter((f) =>
+			/^lib\.bundle\.[a-f0-9]{8}\.js$/.test(f),
+		);
+		expect(hashed).toHaveLength(1);
+	});
+
+	test("dist/workers/ minified files have hashed variants", async () => {
+		const files = await readdir("dist/workers");
+		const minFiles = files.filter(
+			(f) => f.endsWith(".min.js") && !/\.[a-f0-9]{8}\.js$/.test(f),
+		);
+		expect(minFiles.length).toBeGreaterThan(0);
+		for (const minFile of minFiles) {
+			const base = minFile.replace(/\.js$/, "");
+			const hashed = files.filter((f) =>
+				new RegExp(`^${base.replace(".", "\\.")}\\.[a-f0-9]{8}\\.js$`).test(f),
+			);
+			expect(hashed).toHaveLength(1);
+		}
 	});
 });

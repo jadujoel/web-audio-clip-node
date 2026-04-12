@@ -1,23 +1,53 @@
 const workers = [
 	{
-		entry: "./mp3-decode-worker.ts",
+		entry: "../../src/workers/aac-adts-decode-worker.ts",
+		output: "./generated/aac-adts-worker-code.ts",
+		exportName: "aacAdtsWorkerCode",
+	},
+	{
+		entry: "../../src/workers/flac-decode-worker.ts",
+		output: "./generated/flac-worker-code.ts",
+		exportName: "flacWorkerCode",
+	},
+	{
+		entry: "../../src/workers/mp3-decode-worker.ts",
 		output: "./generated/mp3-worker-code.ts",
 		exportName: "mp3WorkerCode",
 	},
 	{
-		entry: "./ogg-opus-decode-worker.ts",
+		entry: "../../src/workers/mp4-aac-decode-worker.ts",
+		output: "./generated/mp4-aac-worker-code.ts",
+		exportName: "mp4AacWorkerCode",
+	},
+	{
+		entry: "../../src/workers/ogg-flac-decode-worker.ts",
+		output: "./generated/ogg-flac-worker-code.ts",
+		exportName: "oggFlacWorkerCode",
+	},
+	{
+		entry: "../../src/workers/ogg-opus-decode-worker.ts",
 		output: "./generated/ogg-opus-worker-code.ts",
 		exportName: "oggOpusWorkerCode",
 	},
 	{
-		entry: "./raw-opus-framed-decode-worker.ts",
+		entry: "../../src/workers/ogg-vorbis-decode-worker.ts",
+		output: "./generated/ogg-vorbis-worker-code.ts",
+		exportName: "oggVorbisWorkerCode",
+	},
+	{
+		entry: "../../src/workers/raw-opus-framed-decode-worker.ts",
 		output: "./generated/raw-opus-framed-worker-code.ts",
 		exportName: "rawOpusFramedWorkerCode",
 	},
 	{
-		entry: "./webm-opus-decode-worker.ts",
+		entry: "../../src/workers/webm-opus-decode-worker.ts",
 		output: "./generated/webm-opus-worker-code.ts",
 		exportName: "webmOpusWorkerCode",
+	},
+	{
+		entry: "../../src/workers/webm-vorbis-decode-worker.ts",
+		output: "./generated/webm-vorbis-worker-code.ts",
+		exportName: "webmVorbisWorkerCode",
 	},
 ] as const;
 

@@ -1,5 +1,19 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, parse as parsePath } from "node:path";
+
+/**
+ * Write a file and also emit a hash-suffixed copy next to it.
+ * E.g. `foo.min.js` → `foo.min.a1b2c3d4.js`
+ */
+async function writeWithHash(filePath: string, content: string): Promise<void> {
+	await Bun.write(filePath, content);
+	const hash = new Bun.CryptoHasher("sha256")
+		.update(content)
+		.digest("hex")
+		.slice(0, 8);
+	const { dir, name, ext } = parsePath(filePath);
+	await Bun.write(join(dir, `${name}.${hash}${ext}`), content);
+}
 
 export async function buildProcessor(minify = true): Promise<string> {
 	const output = await Bun.build({
@@ -196,6 +210,24 @@ export async function buildWebpage(): Promise<void> {
 		join(webpageDir, "self-hosted", "processor.js"),
 	);
 
+	// Build streaming decode workers into webpage output
+	const streamingWorkersDir = join(webpageDir, "streaming", "workers");
+	await mkdir(streamingWorkersDir, { recursive: true });
+	for (const worker of streamingWorkerEntrypoints) {
+		const result = await Bun.build({
+			entrypoints: [worker.entry],
+			target: "browser",
+			minify: true,
+		});
+		if (!result.success) {
+			throw new Error(
+				`Worker build failed for ${worker.entry}: ${result.logs.join("\n")}`,
+			);
+		}
+		const code = await result.outputs[0].text();
+		await Bun.write(join(streamingWorkersDir, worker.output), code);
+	}
+
 	// Copy sound assets
 	await copySounds(webpageDir);
 
@@ -218,8 +250,8 @@ export async function buildLibrary(): Promise<void> {
 	// 1. Compile processor and generate embedded code module
 	const processorSource = await buildProcessorCodeModule();
 
-	// 2. Write standalone processor.js for CDN usage
-	await Bun.write("dist/processor.js", processorSource);
+	// 2. Write standalone processor.js for CDN usage (with hashed variant)
+	await writeWithHash("dist/processor.js", processorSource);
 
 	// 3. Generate version module from package.json
 	const { version } = await Bun.file("package.json").json();
@@ -258,6 +290,14 @@ export async function buildLibrary(): Promise<void> {
 		throw new Error(`esbuild exited with code ${esbuildExit}`);
 	}
 
+	// Emit hashed variant of the CDN bundle
+	const bundleContent = await Bun.file("dist/lib.bundle.js").text();
+	const bundleHash = new Bun.CryptoHasher("sha256")
+		.update(bundleContent)
+		.digest("hex")
+		.slice(0, 8);
+	await Bun.write(`dist/lib.bundle.${bundleHash}.js`, bundleContent);
+
 	// 6. Copy styles
 	await Bun.write("dist/styles.css", Bun.file("src/styles.css"));
 	await Bun.write("dist/styles.css.d.ts", Bun.file("src/styles.css.d.ts"));
@@ -268,12 +308,32 @@ export async function buildLibrary(): Promise<void> {
 
 const streamingWorkerEntrypoints = [
 	{
+		entry: "./src/workers/aac-adts-decode-worker.ts",
+		output: "aac-adts-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/flac-decode-worker.ts",
+		output: "flac-decode-worker.min.js",
+	},
+	{
 		entry: "./src/workers/mp3-decode-worker.ts",
 		output: "mp3-decode-worker.min.js",
 	},
 	{
+		entry: "./src/workers/mp4-aac-decode-worker.ts",
+		output: "mp4-aac-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/ogg-flac-decode-worker.ts",
+		output: "ogg-flac-decode-worker.min.js",
+	},
+	{
 		entry: "./src/workers/ogg-opus-decode-worker.ts",
 		output: "ogg-opus-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/ogg-vorbis-decode-worker.ts",
+		output: "ogg-vorbis-decode-worker.min.js",
 	},
 	{
 		entry: "./src/workers/raw-opus-framed-decode-worker.ts",
@@ -282,6 +342,10 @@ const streamingWorkerEntrypoints = [
 	{
 		entry: "./src/workers/webm-opus-decode-worker.ts",
 		output: "webm-opus-decode-worker.min.js",
+	},
+	{
+		entry: "./src/workers/webm-vorbis-decode-worker.ts",
+		output: "webm-vorbis-decode-worker.min.js",
 	},
 ] as const;
 
@@ -299,7 +363,7 @@ async function buildStreamingWorkers(): Promise<void> {
 			);
 		}
 		const code = await result.outputs[0].text();
-		await Bun.write(join("dist/workers", worker.output), code);
+		await writeWithHash(join("dist/workers", worker.output), code);
 	}
 }
 

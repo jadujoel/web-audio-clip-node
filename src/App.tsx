@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { LoopMode } from "./audio/types";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";
@@ -40,6 +41,7 @@ export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
+		loopMode: controls.loopMode,
 		setValue: controls.setValue,
 	});
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
@@ -202,6 +204,14 @@ export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 		[controls.setLoop, node.setLoopOnNode],
 	);
 
+	const handleLoopModeChange = useCallback(
+		(mode: LoopMode) => {
+			controls.setLoopMode(mode);
+			node.setLoopModeOnNode(mode);
+		},
+		[controls.setLoopMode, node.setLoopModeOnNode],
+	);
+
 	const handleMaxLockedChange = useCallback(
 		(key: ControlKey, locked: boolean) => {
 			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
@@ -362,6 +372,18 @@ export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 							checked={controls.loop}
 							onChange={(e) => handleLoopChange(e.target.checked)}
 						/>
+						{controls.loop && (
+							<select
+								id="loopMode"
+								value={controls.loopMode}
+								onChange={(e) =>
+									handleLoopModeChange(e.target.value as LoopMode)
+								}
+							>
+								<option value="forward">Forward</option>
+								<option value="ping-pong">Ping-Pong</option>
+							</select>
+						)}
 					</div>
 					{controls.loop && (
 						<ControlSection

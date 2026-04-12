@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { buildDefaults, DEFAULT_TEMPO } from "./controls/controlDefs";
+import {
+	buildDefaults,
+	DEFAULT_MAX_8_BARS,
+	DEFAULT_TEMPO,
+} from "./controls/controlDefs";
 import { buildLinkedControlPairDefaults } from "./controls/linkedControlPairs";
 import { useClipControls } from "./store/clipStore";
 
@@ -10,6 +14,7 @@ const applyValueMock = mock(() => {});
 const applyValuesMock = mock(() => {});
 const applyToggleMock = mock(() => {});
 const setLoopOnNodeMock = mock(() => {});
+const setLoopModeOnNodeMock = mock(() => {});
 
 const cacheMatchMock = mock(async () => undefined);
 const cachePutMock = mock(async () => undefined);
@@ -50,6 +55,7 @@ const useClipNodeStub: UseClipNodeImpl = () => {
 		applyValues: applyValuesMock,
 		applyToggle: applyToggleMock,
 		setLoopOnNode: setLoopOnNodeMock,
+		setLoopModeOnNode: setLoopModeOnNodeMock,
 	};
 };
 
@@ -210,12 +216,13 @@ describe("App tempo resync", () => {
 		});
 
 		const state = useClipControls.getState();
+		const step = DEFAULT_MAX_8_BARS / 100;
 		expect(state.linkedPairs.fadeOutStopDelay).toBe(true);
-		expect(state.values.stopDelay).toBeCloseTo(1.04, 5);
-		expect(state.values.fadeOut).toBeCloseTo(3.04, 5);
+		expect(state.values.stopDelay).toBeCloseTo(1 + step, 5);
+		expect(state.values.fadeOut).toBeCloseTo(3 + step, 5);
 		expect(applyValuesMock).toHaveBeenCalledWith({
-			stopDelay: 1.04,
-			fadeOut: 3.04,
+			stopDelay: 1 + step,
+			fadeOut: 3 + step,
 		});
 	});
 

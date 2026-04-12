@@ -68,6 +68,7 @@ function HookHarness() {
 			highpass: true,
 		},
 		loop: false,
+		loopMode: "forward" as const,
 		setValue: (_key: ControlKey, _value: number) => {},
 	});
 

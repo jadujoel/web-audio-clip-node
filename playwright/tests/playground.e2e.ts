@@ -105,6 +105,20 @@ test.describe("Playground example", () => {
 		await expect(loop).toHaveAttribute("type", "checkbox");
 	});
 
+	test("debug row is visible by default without expander", async ({ page }) => {
+		const display = page.locator("section#display");
+		await expect(display).toBeVisible();
+
+		const frameLabel = display.locator("code:has-text('Frame:')");
+		await expect(frameLabel).toBeVisible();
+
+		const latencyLabel = display.locator("code:has-text('Latency:')");
+		await expect(latencyLabel).toBeVisible();
+
+		await expect(display.locator("details")).toHaveCount(0);
+		await expect(display.locator("summary")).toHaveCount(0);
+	});
+
 	test("filter controls render", async ({ page }) => {
 		for (const label of ["Lowpass", "Highpass"]) {
 			await expect(

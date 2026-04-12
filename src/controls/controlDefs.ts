@@ -37,8 +37,11 @@ export interface ControlDef {
 	maxLockedByDefault?: boolean;
 }
 
-export const DEFAULT_TEMPO = 120;
+export const DEFAULT_TEMPO = 88;
 export const SAMPLE_RATE = 48000;
+
+/** 8 bars in seconds at DEFAULT_TEMPO (4/4 time). */
+export const DEFAULT_MAX_8_BARS = 8 * 4 * (60 / DEFAULT_TEMPO);
 
 export const controlDefs: ControlDef[] = [
 	{
@@ -82,7 +85,7 @@ export const controlDefs: ControlDef[] = [
 		key: "stopDelay",
 		label: "StopDelay",
 		min: 0,
-		max: 4,
+		max: DEFAULT_MAX_8_BARS,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -94,7 +97,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeIn",
 		label: "FadeIn",
 		min: 0,
-		max: 60,
+		max: DEFAULT_MAX_8_BARS,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,
@@ -106,7 +109,7 @@ export const controlDefs: ControlDef[] = [
 		key: "fadeOut",
 		label: "FadeOut",
 		min: 0,
-		max: 60,
+		max: DEFAULT_MAX_8_BARS,
 		defaultValue: 0,
 		snap: "beat",
 		hasSnap: true,

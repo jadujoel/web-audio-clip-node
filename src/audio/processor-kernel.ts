@@ -6,6 +6,7 @@ import {
 	type BlockReturnState,
 	type BufferRangeWrite,
 	type ClipProcessorOptions,
+	type LoopMode,
 	State,
 	type StreamBufferSpan,
 	type StreamBufferState,
@@ -189,10 +190,12 @@ export function getProperties(
 		streamBuffer = createStreamBufferState(buffer),
 		duration = -1,
 		loop = false,
+		loopMode = "forward" as const,
 		loopStart = 0,
 		loopEnd = (buffer[0]?.length ?? 0) / sampleRate,
 		loopCrossfade = 0,
 		playhead = 0,
+		playbackDirection = 1 as const,
 		offset = 0,
 		startWhen = 0,
 		stopWhen = 0,
@@ -220,11 +223,13 @@ export function getProperties(
 		buffer,
 		streamBuffer,
 		loop,
+		loopMode,
 		loopStart,
 		loopEnd,
 		loopCrossfade,
 		duration,
 		playhead,
+		playbackDirection,
 		offset,
 		startWhen,
 		stopWhen,
@@ -315,7 +320,15 @@ export function setOffset(
 // ---------------------------------------------------------------------------
 
 export function findIndexesNormal(p: BlockParameters): BlockReturnState {
-	const { playhead, bufferLength, loop, loopStartSamples, loopEndSamples } = p;
+	const {
+		playhead,
+		bufferLength,
+		loop,
+		loopStartSamples,
+		loopEndSamples,
+		loopMode = "forward",
+		playbackDirection: initialDirection = 1,
+	} = p;
 	let length = 128;
 	if (!loop && playhead + 128 > bufferLength) {
 		length = Math.max(bufferLength - playhead, 0);
@@ -332,19 +345,44 @@ export function findIndexesNormal(p: BlockParameters): BlockReturnState {
 			indexes,
 			looped: false,
 			ended: nextPlayhead >= bufferLength,
+			playbackDirection: initialDirection,
 		};
 	}
 
 	let head = playhead;
 	let looped = false;
-	for (let i = 0; i < length; i++, head++) {
-		if (head >= loopEndSamples) {
-			head = loopStartSamples + (head - loopEndSamples);
-			looped = true;
+	let dir = initialDirection;
+
+	if (loopMode === "ping-pong") {
+		for (let i = 0; i < length; i++) {
+			indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
+			head += dir;
+			if (dir > 0 && head >= loopEndSamples) {
+				head = loopEndSamples - 1;
+				dir = -1;
+				looped = true;
+			} else if (dir < 0 && head < loopStartSamples) {
+				head = loopStartSamples;
+				dir = 1;
+				looped = true;
+			}
 		}
-		indexes[i] = head;
+	} else {
+		for (let i = 0; i < length; i++, head++) {
+			if (head >= loopEndSamples) {
+				head = loopStartSamples + (head - loopEndSamples);
+				looped = true;
+			}
+			indexes[i] = head;
+		}
 	}
-	return { indexes, looped, ended: false, playhead: head };
+	return {
+		indexes,
+		looped,
+		ended: false,
+		playhead: head,
+		playbackDirection: dir,
+	};
 }
 
 export function findIndexesWithPlaybackRates(
@@ -356,6 +394,8 @@ export function findIndexesWithPlaybackRates(
 		loop,
 		loopStartSamples,
 		loopEndSamples,
+		loopMode = "forward",
+		playbackDirection: initialDirection = 1,
 		playbackRates,
 	} = p;
 	let length = 128;
@@ -365,21 +405,45 @@ export function findIndexesWithPlaybackRates(
 	const indexes: number[] = new Array(length);
 	let head = playhead;
 	let looped = false;
+	let dir = initialDirection;
 
 	if (loop) {
-		for (let i = 0; i < length; i++) {
-			indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
-			const rate = playbackRates[i] ?? playbackRates[0] ?? 1;
-			head += rate;
-			if (rate >= 0 && (head > loopEndSamples || head > bufferLength)) {
-				head = loopStartSamples;
-				looped = true;
-			} else if (rate < 0 && (head < loopStartSamples || head < 0)) {
-				head = loopEndSamples;
-				looped = true;
+		if (loopMode === "ping-pong") {
+			for (let i = 0; i < length; i++) {
+				indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
+				const rate = Math.abs(playbackRates[i] ?? playbackRates[0] ?? 1);
+				head += rate * dir;
+				if (dir > 0 && head >= loopEndSamples) {
+					head = loopEndSamples - 1;
+					dir = -1;
+					looped = true;
+				} else if (dir < 0 && head < loopStartSamples) {
+					head = loopStartSamples;
+					dir = 1;
+					looped = true;
+				}
+			}
+		} else {
+			for (let i = 0; i < length; i++) {
+				indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
+				const rate = playbackRates[i] ?? playbackRates[0] ?? 1;
+				head += rate;
+				if (rate >= 0 && (head > loopEndSamples || head > bufferLength)) {
+					head = loopStartSamples;
+					looped = true;
+				} else if (rate < 0 && (head < loopStartSamples || head < 0)) {
+					head = loopEndSamples;
+					looped = true;
+				}
 			}
 		}
-		return { playhead: head, indexes, looped, ended: false };
+		return {
+			playhead: head,
+			indexes,
+			looped,
+			ended: false,
+			playbackDirection: dir,
+		};
 	}
 
 	for (let i = 0; i < length; i++) {
@@ -391,6 +455,7 @@ export function findIndexesWithPlaybackRates(
 		indexes,
 		looped: false,
 		ended: head >= bufferLength || head < 0,
+		playbackDirection: dir,
 	};
 }
 
@@ -721,6 +786,7 @@ export function handleProcessorMessage(
 				setOffset(properties, d?.offset, sampleRate);
 				normalizeLoopBounds(properties, sampleRate);
 				properties.playhead = properties.offset;
+				properties.playbackDirection = 1;
 				properties.startWhen = d?.when ?? currentTime;
 				properties.stopWhen = properties.startWhen + properties.duration;
 				properties.playedSamples = 0;
@@ -762,6 +828,10 @@ export function handleProcessorMessage(
 			}
 			return [];
 		}
+		case "loopMode":
+			properties.loopMode = data as LoopMode;
+			properties.playbackDirection = 1;
+			return [];
 		case "loopStart":
 			properties.loopStart = data as number;
 			return [];
@@ -1017,6 +1087,8 @@ export function processBlock(
 	const blockParams: BlockParameters = {
 		bufferLength: effectiveSourceLength,
 		loop,
+		loopMode: props.loopMode,
+		playbackDirection: props.playbackDirection,
 		playhead: props.playhead,
 		loopStartSamples,
 		loopEndSamples,
@@ -1029,6 +1101,7 @@ export function processBlock(
 		ended,
 		looped,
 		playhead: updatedPlayhead,
+		playbackDirection: updatedDirection,
 	} = useRateIndexing
 		? findIndexesWithPlaybackRates(blockParams)
 		: findIndexesNormal(blockParams);
@@ -1070,8 +1143,8 @@ export function processBlock(
 		effectiveSourceLength > SAMPLE_BLOCK_SIZE;
 
 	if (isWithinLoopRange && needsCrossfade) {
-		// Crossfade out at loop start: fade out tail of previous loop iteration.
-		// Source: reads from END of loop (loopEnd - xfade to loopEnd).
+		// Crossfade out at loop start: the new iteration fades in while previous
+		// loop tail fades out.  Constant-gain: sin²+cos²=1.
 		{
 			const endIndex = loopStartSamples + xfadeNumSamples;
 			if (
@@ -1083,21 +1156,24 @@ export function processBlock(
 				const n = Math.min(Math.floor(endIndex - playhead), SAMPLE_BLOCK_SIZE);
 				for (let i = 0; i < n; i++) {
 					const position = (elapsed + i) / xfadeNumSamples;
-					const g = Math.cos((Math.PI * position) / 2);
+					const s = Math.sin((Math.PI * position) / 2);
+					const c = Math.cos((Math.PI * position) / 2);
+					const gIn = s * s;
+					const gOut = c * c;
 					const srcIdx = Math.floor(
 						loopEndSamples - xfadeNumSamples + elapsed + i,
 					);
 					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
-							output0[ch][i] += buffer[ch][srcIdx] * g;
+							output0[ch][i] = output0[ch][i] * gIn + buffer[ch][srcIdx] * gOut;
 						}
 					}
 				}
 			}
 		}
 
-		// Crossfade in approaching loop end: fade in head of next loop iteration.
-		// Source: reads from START of loop (loopStart to loopStart + xfade).
+		// Crossfade in approaching loop end: current audio fades out while the
+		// start of the next iteration fades in.
 		{
 			const startIndex = loopEndSamples - xfadeNumSamples;
 			if (
@@ -1112,11 +1188,14 @@ export function processBlock(
 				);
 				for (let i = 0; i < n; i++) {
 					const position = (elapsed + i) / xfadeNumSamples;
-					const g = Math.sin((Math.PI * position) / 2);
+					const s = Math.sin((Math.PI * position) / 2);
+					const c = Math.cos((Math.PI * position) / 2);
+					const gOut = c * c;
+					const gIn = s * s;
 					const srcIdx = Math.floor(loopStartSamples + elapsed + i);
 					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
-							output0[ch][i] += buffer[ch][srcIdx] * g;
+							output0[ch][i] = output0[ch][i] * gOut + buffer[ch][srcIdx] * gIn;
 						}
 					}
 				}
@@ -1179,6 +1258,7 @@ export function processBlock(
 
 	props.playedSamples += indexes.length;
 	props.playhead = updatedPlayhead;
+	props.playbackDirection = updatedDirection;
 
 	const numNans = checkNans(output0);
 	if (numNans > 0) {
