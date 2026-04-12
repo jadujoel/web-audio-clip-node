@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 import {
 	ClipNode,
 	getProcessorBlobUrl,
@@ -130,33 +130,13 @@ export function useStreamingClipNode({
 	const [statusMessage, setStatusMessage] = useState<string | null>("Idle");
 	const [progress, setProgress] = useState(0);
 	const [audioDuration, setAudioDuration] = useState<number | null>(null);
-	const [infoCurrentTime, setInfoCurrentTime] = useState("0");
-	const [infoCurrentFrame, setInfoCurrentFrame] = useState("0");
-	const [infoTimesLooped, setInfoTimesLooped] = useState("0");
 	const [infoLatency, setInfoLatency] = useState("unknown");
-	const [infoTimeTaken, setInfoTimeTaken] = useState("unknown");
 
 	const ctxRef = useRef<AudioContext | null>(null);
 	const clipRef = useRef<ClipNode | null>(null);
 	const workerRef = useRef<Worker | null>(null);
 	const frameRef = useRef<FrameData | null>(null);
-	const rafRef = useRef<number>(0);
-
-	const startRafLoop = useCallback(() => {
-		cancelAnimationFrame(rafRef.current);
-		const tick = () => {
-			const f = frameRef.current;
-			if (f) {
-				const [ct, cf, ph, tt] = f;
-				setInfoCurrentTime(ct.toPrecision(4));
-				setInfoCurrentFrame(cf.toString());
-				setInfoTimeTaken(tt.toFixed(4));
-				setValue("playhead", ph);
-			}
-			rafRef.current = requestAnimationFrame(tick);
-		};
-		rafRef.current = requestAnimationFrame(tick);
-	}, [setValue]);
+	const timesLoopedRef = useRef("0");
 
 	const ensureContext = useCallback(async () => {
 		if (ctxRef.current) return ctxRef.current;
@@ -204,8 +184,9 @@ export function useStreamingClipNode({
 			}
 
 			clip.onstatechange = (s) => setNodeState(s);
-			clip.onlooped = () =>
-				setInfoTimesLooped(clip.timesLooped.toString());
+			clip.onlooped = () => {
+				timesLoopedRef.current = clip.timesLooped.toString();
+			};
 			clip.onframe = (data) => {
 				frameRef.current = data;
 			};
@@ -217,7 +198,6 @@ export function useStreamingClipNode({
 			);
 
 			clipRef.current = clip;
-			startRafLoop();
 
 			// Create MessageChannel: port1 → Worker, port2 → Processor
 			const channel = new MessageChannel();
@@ -302,13 +282,13 @@ export function useStreamingClipNode({
 			setProgress(0);
 			setNodeState("initial");
 		},
-		[ensureContext, loop, values, enabled, startRafLoop],
+		[ensureContext, loop, values, enabled],
 	);
 
 	const pause = useCallback(() => {
 		const clip = clipRef.current;
 		if (!clip) return;
-		if (clip.state === "playing" || clip.state === "started") {
+		if (clip.state === "resumed" || clip.state === "started") {
 			clip.pause();
 			setStatusMessage("Paused.");
 		} else if (clip.state === "paused") {
@@ -367,11 +347,9 @@ export function useStreamingClipNode({
 		statusMessage,
 		progress,
 		audioDuration,
-		infoCurrentTime,
-		infoCurrentFrame,
-		infoTimesLooped,
+		frameRef: frameRef as RefObject<FrameData | null>,
+		timesLoopedRef: timesLoopedRef as RefObject<string>,
 		infoLatency,
-		infoTimeTaken,
 		stream,
 		pause,
 		stop,

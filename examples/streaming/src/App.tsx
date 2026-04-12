@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
 	ControlSection,
 	DetuneControl,
-	DisplayPanel,
 	FilterControl,
 	GainControl,
 	PanControl,
@@ -11,6 +10,7 @@ import {
 	useClipControls,
 } from "@jadujoel/web-audio-clip-node/react";
 import type { ControlKey } from "@jadujoel/web-audio-clip-node";
+import type { ClipNodeState, FrameData } from "@jadujoel/web-audio-clip-node";
 import {
 	controlDefs,
 	loopControlDefs,
@@ -23,6 +23,114 @@ import {
 	remapTempoRelativeValue,
 } from "@jadujoel/web-audio-clip-node";
 import { useStreamingClipNode } from "./useStreamingClipNode";
+import type { RefObject } from "react";
+
+/**
+ * Reads frame data from a ref via its own RAF loop and updates DOM directly,
+ * avoiding React re-renders on every animation frame.
+ */
+function StreamingDisplayPanelInner({
+	nodeState,
+	frameRef,
+	timesLoopedRef,
+	latency,
+}: {
+	nodeState: ClipNodeState;
+	frameRef: RefObject<FrameData | null>;
+	timesLoopedRef: RefObject<string>;
+	latency: string;
+}) {
+	const timeEl = useRef<HTMLOutputElement>(null);
+	const frameEl = useRef<HTMLOutputElement>(null);
+	const loopsEl = useRef<HTMLOutputElement>(null);
+	const ttEl = useRef<HTMLOutputElement>(null);
+
+	useEffect(() => {
+		let raf: number;
+		const tick = () => {
+			const f = frameRef.current;
+			if (f) {
+				const [ct, cf, , tt] = f;
+				if (timeEl.current) timeEl.current.textContent = ct.toPrecision(4);
+				if (frameEl.current)
+					frameEl.current.textContent = cf.toString();
+				if (ttEl.current) ttEl.current.textContent = tt.toFixed(4);
+			}
+			if (loopsEl.current)
+				loopsEl.current.textContent = timesLoopedRef.current;
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [frameRef, timesLoopedRef]);
+
+	return (
+		<section id="display">
+			<code>Sound:</code>
+			<output>Stream</output>
+			<code>State:</code>
+			<output>{nodeState}</output>
+			<code>Time:</code>
+			<output ref={timeEl}>0</output>
+			<code>Loops:</code>
+			<output ref={loopsEl}>0</output>
+			<details className="display-details">
+				<summary>Debug</summary>
+				<div className="display-details__row">
+					<code>Frame:</code>
+					<output ref={frameEl}>0</output>
+					<code>Latency:</code>
+					<output>{latency}</output>
+					<code>TimeTaken:</code>
+					<output ref={ttEl}>unknown</output>
+				</div>
+			</details>
+		</section>
+	);
+}
+const StreamingDisplayPanel = memo(StreamingDisplayPanelInner);
+
+/**
+ * Isolates playhead updates from the parent component tree.
+ * Reads the playhead position from frameRef via its own RAF loop,
+ * so only this small subtree re-renders at 60fps.
+ */
+function StreamingPlayheadInner({
+	frameRef,
+	audioDuration,
+	disabled,
+	onChange,
+}: {
+	frameRef: RefObject<FrameData | null>;
+	audioDuration: number | null;
+	disabled: boolean;
+	onChange: (v: number) => void;
+}) {
+	const [value, setValue] = useState(0);
+
+	useEffect(() => {
+		let raf: number;
+		const tick = () => {
+			const f = frameRef.current;
+			if (f) {
+				setValue(f[2]);
+			}
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [frameRef]);
+
+	return (
+		<PlayheadSlider
+			value={value}
+			audioDuration={audioDuration}
+			disabled={disabled}
+			onChange={onChange}
+		/>
+	);
+}
+const StreamingPlayhead = memo(StreamingPlayheadInner);
 
 function buildControlUpdates<T>(
 	keys: readonly ControlKey[],
@@ -390,15 +498,11 @@ export function App() {
 			</p>
 
 			{/* ── Display panel ── */}
-			<DisplayPanel
+			<StreamingDisplayPanel
 				nodeState={node.nodeState}
-				statusMessage={null}
-				soundName="Stream"
-				currentTime={node.infoCurrentTime}
-				currentFrame={node.infoCurrentFrame}
-				timesLooped={node.infoTimesLooped}
+				frameRef={node.frameRef}
+				timesLoopedRef={node.timesLoopedRef}
 				latency={node.infoLatency}
-				timeTaken={node.infoTimeTaken}
 			/>
 
 			{/* ── Tempo ── */}
@@ -433,8 +537,8 @@ export function App() {
 			</fieldset>
 
 			{/* ── Playhead ── */}
-			<PlayheadSlider
-				value={controls.values.playhead}
+			<StreamingPlayhead
+				frameRef={node.frameRef}
 				audioDuration={node.audioDuration}
 				disabled={
 					node.nodeState === "initial" || node.nodeState === "disposed"
