@@ -10,6 +10,10 @@ import type {
 	FrameData,
 } from "@jadujoel/web-audio-clip-node";
 import { workerCode } from "../generated/worker-code";
+import {
+	clampSeekTargetSeconds,
+	secondsFromSamples,
+} from "./streamTimeline";
 
 function getWorkerBlobUrl(): string {
 	const blob = new Blob([workerCode], { type: "application/javascript" });
@@ -130,7 +134,11 @@ export function useStreamingClipNode({
 	const [statusMessage, setStatusMessage] = useState<string | null>("Idle");
 	const [progress, setProgress] = useState(0);
 	const [audioDuration, setAudioDuration] = useState<number | null>(null);
+	const [seekableDuration, setSeekableDuration] = useState<number | null>(null);
 	const [infoLatency, setInfoLatency] = useState("unknown");
+	const statusRef = useRef<string | null>("Idle");
+	const finalDurationRef = useRef<number | null>(null);
+	const timelineSampleRateRef = useRef<number | null>(null);
 
 	const ctxRef = useRef<AudioContext | null>(null);
 	const clipRef = useRef<ClipNode | null>(null);
@@ -146,10 +154,16 @@ export function useStreamingClipNode({
 		return ctx;
 	}, []);
 
+	const setStatus = useCallback((next: string) => {
+		if (statusRef.current === next) return;
+		statusRef.current = next;
+		setStatusMessage(next);
+	}, []);
+
 	const stream = useCallback(
 		async (url: string, throttle: number) => {
 			if (!url.trim()) {
-				setStatusMessage("Enter a URL first.");
+				setStatus("Enter a URL first.");
 				return;
 			}
 
@@ -167,6 +181,10 @@ export function useStreamingClipNode({
 
 			const ctx = await ensureContext();
 			await ctx.resume();
+			finalDurationRef.current = null;
+			timelineSampleRateRef.current = ctx.sampleRate;
+			setAudioDuration(null);
+			setSeekableDuration(null);
 
 			// Create ClipNode (no buffer — streaming mode)
 			const clip = new ClipNode(ctx);
@@ -210,15 +228,38 @@ export function useStreamingClipNode({
 			worker.onmessage = (ev: MessageEvent) => {
 				const { type } = ev.data;
 				switch (type) {
+					case "streamMeta": {
+						const sampleRate = ev.data.sampleRate as number;
+						const estimatedTotalSamples =
+							ev.data.estimatedTotalSamples as number | null;
+						timelineSampleRateRef.current =
+							sampleRate > 0 ? sampleRate : timelineSampleRateRef.current;
+						if (
+							estimatedTotalSamples != null &&
+							timelineSampleRateRef.current != null
+						) {
+							const estimatedDuration = secondsFromSamples(
+								estimatedTotalSamples,
+								timelineSampleRateRef.current,
+							);
+							if (
+								estimatedDuration != null &&
+								finalDurationRef.current == null
+							) {
+								setAudioDuration(estimatedDuration);
+							}
+						}
+						break;
+					}
 					case "progress": {
 						const { bytesReceived, totalBytes } = ev.data;
 						if (totalBytes) {
 							setProgress(bytesReceived / totalBytes);
-							setStatusMessage(
+							setStatus(
 								`Downloading… ${((bytesReceived / 1024) | 0)} / ${((totalBytes / 1024) | 0)} KB`,
 							);
 						} else {
-							setStatusMessage(
+							setStatus(
 								`Downloading… ${((bytesReceived / 1024) | 0)} KB`,
 							);
 						}
@@ -226,38 +267,50 @@ export function useStreamingClipNode({
 					}
 					case "decoded": {
 						const { samplesDecoded } = ev.data;
+						if (timelineSampleRateRef.current != null) {
+							const nextSeekable = secondsFromSamples(
+								samplesDecoded,
+								timelineSampleRateRef.current,
+							);
+							if (nextSeekable != null) {
+								setSeekableDuration(nextSeekable);
+							}
+						}
 						if (
 							samplesDecoded > 0 &&
 							clipRef.current?.state === "initial"
 						) {
 							clipRef.current.start();
-							setStatusMessage("Streaming & playing…");
+							setStatus("Streaming & playing…");
 						}
 						break;
 					}
 					case "info": {
-						setStatusMessage(
+						setStatus(
 							`Decoding: ${ev.data.sampleRate} Hz, ${ev.data.channels} ch`,
 						);
 						break;
 					}
 					case "done": {
 						const samples = ev.data.samplesDecoded as number;
-						setStatusMessage(
+						setStatus(
 							`Done — ${samples} samples decoded.`,
 						);
 						setProgress(1);
 						if (ctx.sampleRate > 0) {
-							setAudioDuration(samples / ctx.sampleRate);
+							const duration = samples / ctx.sampleRate;
+							finalDurationRef.current = duration;
+							setAudioDuration(duration);
+							setSeekableDuration(duration);
 						}
 						break;
 					}
 					case "error": {
-						setStatusMessage(`Error: ${ev.data.message}`);
+						setStatus(`Error: ${ev.data.message}`);
 						break;
 					}
 					case "aborted": {
-						setStatusMessage("Aborted.");
+						setStatus("Aborted.");
 						break;
 					}
 				}
@@ -275,7 +328,7 @@ export function useStreamingClipNode({
 				[channel.port1],
 			);
 
-			setStatusMessage(
+			setStatus(
 				throttle > 0
 					? `Starting stream… (${(throttle / 1024).toFixed(0)} KB/s)`
 					: "Starting stream…",
@@ -283,7 +336,7 @@ export function useStreamingClipNode({
 			setProgress(0);
 			setNodeState("initial");
 		},
-		[ensureContext, loop, values, enabled],
+		[ensureContext, loop, values, enabled, setStatus],
 	);
 
 	const pause = useCallback(() => {
@@ -291,12 +344,12 @@ export function useStreamingClipNode({
 		if (!clip) return;
 		if (clip.state === "resumed" || clip.state === "started") {
 			clip.pause();
-			setStatusMessage("Paused.");
+			setStatus("Paused.");
 		} else if (clip.state === "paused") {
 			clip.start();
-			setStatusMessage("Resumed.");
+			setStatus("Resumed.");
 		}
-	}, []);
+	}, [setStatus]);
 
 	const stop = useCallback(() => {
 		const clip = clipRef.current;
@@ -308,8 +361,30 @@ export function useStreamingClipNode({
 			workerRef.current = null;
 		}
 		setProgress(0);
-		setStatusMessage("Stopped.");
-	}, []);
+		setStatus("Stopped.");
+		setSeekableDuration(null);
+		if (finalDurationRef.current != null) {
+			setAudioDuration(finalDurationRef.current);
+		}
+	}, [setStatus]);
+
+	const seekPlayhead = useCallback(
+		(targetSeconds: number) => {
+			const { value, clamped } = clampSeekTargetSeconds(
+				targetSeconds,
+				seekableDuration,
+			);
+			setValue("playhead", value);
+			const node = clipRef.current;
+			if (node) {
+				applyValueToClip(node, "playhead", value);
+			}
+			if (clamped) {
+				setStatus("Seek limited to decoded region while streaming.");
+			}
+		},
+		[seekableDuration, setStatus, setValue],
+	);
 
 	const applyValue = useCallback(
 		(key: ControlKey, val: number) => {
@@ -348,12 +423,14 @@ export function useStreamingClipNode({
 		statusMessage,
 		progress,
 		audioDuration,
+		seekableDuration,
 		frameRef: frameRef as RefObject<FrameData | null>,
 		timesLoopedRef: timesLoopedRef as RefObject<string>,
 		infoLatency,
 		stream,
 		pause,
 		stop,
+		seekPlayhead,
 		applyValue,
 		applyValues,
 		applyToggle,

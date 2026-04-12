@@ -153,4 +153,51 @@ describe("AudioWorklet Bun integration", () => {
 		// Reaching here = no crash, no hang
 		expect(true).toBe(true);
 	});
+
+	test("C3: playhead scrub beyond committed stream data remains stable", async () => {
+		const context = createContext({
+			sampleRate: 48_000,
+			channels: 2,
+			length: 48_000 * 2,
+		});
+
+		await Bun.build({
+			entrypoints: ["src/audio/processor.ts"],
+			outdir: "dist/audio",
+		});
+
+		await context.audioWorklet.addModule("./dist/audio/processor.js");
+
+		const clip = new ClipNode(context);
+		clip.connect(context.destination);
+		clip.initializeBuffer(48_000, 2, { streaming: true });
+		clip.start();
+
+		// Decode has only provided the first 0.1s so far.
+		clip.replaceBufferRange(
+			0,
+			[new Float32Array(4_800).fill(0.25), new Float32Array(4_800).fill(0.25)],
+			{ totalLength: 48_000 },
+		);
+
+		// Scrub far ahead into an uncommitted region; processor should underrun safely.
+		clip.playhead = 0.75;
+
+		// Continue streaming additional chunks and finish.
+		for (let i = 1; i < 10; i++) {
+			clip.replaceBufferRange(
+				i * 4_800,
+				[
+					new Float32Array(4_800).fill(0.25),
+					new Float32Array(4_800).fill(0.25),
+				],
+				{ totalLength: 48_000, streamEnded: i === 9 },
+			);
+		}
+
+		await renderContext(context);
+
+		// Reaching here confirms scrub + streaming writes remain stable.
+		expect(true).toBe(true);
+	});
 });

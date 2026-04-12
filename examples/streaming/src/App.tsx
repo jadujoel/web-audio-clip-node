@@ -334,8 +334,8 @@ export function App() {
 	);
 
 	const handlePlayheadChange = useCallback(
-		(v: number) => handleValueChange("playhead", v),
-		[handleValueChange],
+		(v: number) => node.seekPlayhead(v),
+		[node],
 	);
 	const handlePlaybackRateChange = useCallback(
 		(v: number) => handleValueChange("playbackRate", v),
@@ -496,6 +496,17 @@ export function App() {
 			>
 				{node.statusMessage}
 			</p>
+			{node.seekableDuration != null && (
+				<p
+					style={{
+						marginTop: "0.25rem",
+						fontSize: "0.8rem",
+						color: "#64748b",
+					}}
+				>
+					Decoded seekable: {node.seekableDuration.toFixed(2)}s
+				</p>
+			)}
 
 			{/* ── Display panel ── */}
 			<StreamingDisplayPanel

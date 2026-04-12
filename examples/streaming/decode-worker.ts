@@ -5,6 +5,8 @@
 // @ts-expect-error redeclare self as DedicatedWorkerGlobalScope
 declare const self: DedicatedWorkerGlobalScope;
 
+import { estimateTotalSamplesFromContentLength } from "./src/streamTimeline";
+
 // ── MP3 frame parser ─────────────────────────────────────────────────
 
 const BITRATES = [
@@ -178,6 +180,7 @@ async function startStreaming(
 	let samplesDecoded = 0;
 	let leftover = new Uint8Array(0);
 	let initialized = false;
+	let didSendMeta = false;
 
 	const decoder = new AudioDecoder({
 		output(audioData: AudioData) {
@@ -195,19 +198,32 @@ async function startStreaming(
 			audioData.close();
 			const resampledFrames = channelData[0].length;
 
+			if (!didSendMeta) {
+				didSendMeta = true;
+				const estimatedTotalSamples = estimateTotalSamplesFromContentLength({
+					totalBytes,
+					bitrate: null,
+					sourceSampleRate: srcRate,
+					targetSampleRate: dstRate,
+				});
+				self.postMessage({
+					type: "streamMeta",
+					estimatedTotalSamples,
+					sampleRate: dstRate,
+					channels: numChannels,
+					isEstimate: true,
+				});
+			}
+
 			if (!initialized) {
 				initialized = true;
 
-				// Estimate total samples from Content-Length if available
-				let estimatedTotalSamples: number | null = null;
-				if (totalBytes !== null) {
-					// Rough estimate at source rate; scale to target rate
-					const rawEstimate = Math.ceil(
-						(totalBytes / 417) * SAMPLES_PER_FRAME,
-					); // ~128kbps average frame size
-					const ratio = srcRate > 0 ? dstRate / srcRate : 1;
-					estimatedTotalSamples = Math.ceil(rawEstimate * ratio);
-				}
+				const estimatedTotalSamples = estimateTotalSamplesFromContentLength({
+					totalBytes,
+					bitrate: null,
+					sourceSampleRate: srcRate,
+					targetSampleRate: dstRate,
+				});
 
 				processorPort.postMessage({
 					type: "bufferInit",
@@ -273,6 +289,24 @@ async function startStreaming(
 			leftover = remainder;
 
 			for (const frame of frames) {
+				if (didSendMeta && totalBytes !== null) {
+					const refinedEstimate = estimateTotalSamplesFromContentLength({
+						totalBytes,
+						bitrate: frame.bitrate,
+						sourceSampleRate: frame.sampleRate,
+						targetSampleRate: targetSampleRate > 0 ? targetSampleRate : frame.sampleRate,
+					});
+					if (refinedEstimate != null) {
+						self.postMessage({
+							type: "streamMeta",
+							estimatedTotalSamples: refinedEstimate,
+							sampleRate: targetSampleRate > 0 ? targetSampleRate : frame.sampleRate,
+							channels: frame.channels,
+							isEstimate: true,
+						});
+					}
+				}
+
 				if (!configuredDecoder) {
 					decoder.configure({
 						codec: "mp3",
