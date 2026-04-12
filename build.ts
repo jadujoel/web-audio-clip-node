@@ -161,6 +161,26 @@ export async function buildWebpage(): Promise<void> {
 	// Streaming worker build
 	await Bun.$`bun run --cwd examples/streaming build:worker`;
 
+	// Read version for CDN example pinning
+	const { version } = await Bun.file("package.json").json();
+
+	// Copy a CDN example dir, replacing @latest with the pinned version
+	async function copyCdnExample(name: string): Promise<void> {
+		const src = join("examples", name);
+		const dest = join(webpageDir, name);
+		await mkdir(dest, { recursive: true });
+		for (const entry of await readdir(src)) {
+			const srcPath = join(src, entry);
+			const destPath = join(dest, entry);
+			if (entry.endsWith(".html")) {
+				const html = await readFile(srcPath, "utf8");
+				await writeFile(destPath, html.replaceAll("@latest", `@${version}`));
+			} else {
+				await cp(srcPath, destPath, { recursive: true });
+			}
+		}
+	}
+
 	// Build all examples in parallel
 	const buildTasks: Promise<unknown>[] = [
 		// Landing page
@@ -171,14 +191,10 @@ export async function buildWebpage(): Promise<void> {
 			minify: true,
 			throw: true,
 		}),
-		// CDN Vanilla — static copy
-		cp("examples/cdn-vanilla", join(webpageDir, "cdn-vanilla"), {
-			recursive: true,
-		}),
-		// CDN Opus Streaming — static copy
-		cp("examples/cdn-opus-streaming", join(webpageDir, "cdn-opus-streaming"), {
-			recursive: true,
-		}),
+		// CDN Vanilla — version-pinned copy
+		copyCdnExample("cdn-vanilla"),
+		// CDN Opus Streaming — version-pinned copy
+		copyCdnExample("cdn-opus-streaming"),
 		// Playground — full interactive demo
 		Bun.build({
 			entrypoints: ["./examples/playground/index.html"],

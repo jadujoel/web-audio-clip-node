@@ -17,6 +17,20 @@ test.describe("CDN Opus Streaming example", () => {
 		expect(errors).toEqual([]);
 	});
 
+	test("CDN module exports resolve without SyntaxError", async ({ page }) => {
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(err.message));
+
+		// Wait for the module script to fully load
+		await page.waitForLoadState("networkidle");
+
+		const importErrors = errors.filter(
+			(e) =>
+				e.includes("does not provide an export") || e.includes("SyntaxError"),
+		);
+		expect(importErrors).toEqual([]);
+	});
+
 	test("stop button is disabled before streaming starts", async ({ page }) => {
 		await expect(page.locator("#stop")).toBeDisabled();
 	});

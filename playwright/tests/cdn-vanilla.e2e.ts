@@ -13,6 +13,19 @@ test.describe("CDN Vanilla example", () => {
 		expect(errors).toEqual([]);
 	});
 
+	test("CDN module exports resolve without SyntaxError", async ({ page }) => {
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(err.message));
+
+		await page.waitForLoadState("networkidle");
+
+		const importErrors = errors.filter(
+			(e) =>
+				e.includes("does not provide an export") || e.includes("SyntaxError"),
+		);
+		expect(importErrors).toEqual([]);
+	});
+
 	test("Play, Pause, and Resume buttons render", async ({ page }) => {
 		await expect(page.locator("#play")).toBeVisible();
 		await expect(page.locator("#pause")).toBeVisible();
