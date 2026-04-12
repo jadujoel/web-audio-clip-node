@@ -47,17 +47,12 @@
 
   <script type="module">
     // Ogg Opus at 48 kHz recommended — avoids resampling overhead
-    import {
-      ClipNode,
-      getProcessorCdnUrl,
-    } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
+    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
 
     const playBtn = document.getElementById("play");
     const pauseBtn = document.getElementById("pause");
     const resumeBtn = document.getElementById("resume");
     const statusEl = document.getElementById("status");
-
-    let ctx, clip;
 
     function generateTone(sampleRate, seconds = 2, freq = 440) {
       const length = sampleRate * seconds;
@@ -69,38 +64,41 @@
       return [buf, buf.slice()]; // stereo
     }
 
-    playBtn.onclick = async () => {
-      if (!ctx) {
-        ctx = new AudioContext({ sampleRate: 48000 });
-        await ctx.audioWorklet.addModule(getProcessorCdnUrl());
-      }
-      await ctx.resume();
+    async function main() {
+      const context = new AudioContext({ sampleRate: 48000 });
+      await context.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/processor.js");
+      statusEl.textContent = "AudioWorklet loaded";
 
-      if (clip) { clip.stop(); clip.disconnect(); }
-
-      clip = new ClipNode(ctx, {
-        processorOptions: { buffer: generateTone(ctx.sampleRate) },
+      const clip = new ClipNode(context, {
+        processorOptions: { buffer: generateTone(context.sampleRate) },
       });
-      clip.connect(ctx.destination);
+      clip.connect(context.destination);
       clip.onstatechange = (s) => { statusEl.textContent = s; };
-      clip.start();
 
-      playBtn.disabled = false;
-      pauseBtn.disabled = false;
-      resumeBtn.disabled = true;
-    };
+      playBtn.onclick = async () => {
+        await context.resume();
+        if (clip.state === "started") {
+          clip.stop();
+        } else {
+          clip.start();
+        }
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+      };
 
-    pauseBtn.onclick = () => {
-      if (clip) clip.pause();
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = false;
-    };
+      pauseBtn.onclick = () => {
+        if (clip) clip.pause();
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = false;
+      };
 
-    resumeBtn.onclick = () => {
-      if (clip) clip.resume();
-      pauseBtn.disabled = false;
-      resumeBtn.disabled = true;
-    };
+      resumeBtn.onclick = () => {
+        if (clip) clip.resume();
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+      };
+    }
+    main()
   </script>
 </body>
 </html>
