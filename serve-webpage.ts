@@ -1,3 +1,4 @@
+import { existsSync, statSync } from "node:fs";
 import { extname } from "node:path";
 
 const port = 4175;
@@ -22,10 +23,12 @@ Bun.serve({
 							},
 						});
 					}
-					pathname += "/index.html";
+					pathname += "index.html";
 				}
-				console.info("serve", pathname);
 				const filePath = `webpage${pathname}`;
+				if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+					return new Response("Not Found", { status: 404 });
+				}
 				return new Response(Bun.file(filePath));
 			},
 		},
