@@ -12,7 +12,6 @@ test.describe("CDN Opus Streaming example", () => {
 
 		await expect(page).toHaveTitle(/CDN Opus Streaming/i);
 		await expect(page.locator("#start")).toBeVisible();
-		await expect(page.locator("#stop")).toBeVisible();
 		await expect(page.locator("#status")).toHaveText("Idle");
 		expect(errors).toEqual([]);
 	});
@@ -31,11 +30,7 @@ test.describe("CDN Opus Streaming example", () => {
 		expect(importErrors).toEqual([]);
 	});
 
-	test("stop button is disabled before streaming starts", async ({ page }) => {
-		await expect(page.locator("#stop")).toBeDisabled();
-	});
-
-	test("start stream transitions past starting state", async ({
+	test("play button toggles to stop after click", async ({
 		page,
 		browserName,
 	}) => {
@@ -44,15 +39,11 @@ test.describe("CDN Opus Streaming example", () => {
 			"streaming progress can be flaky in headless Firefox",
 		);
 
-		await page.locator("button#start").click();
-		const status = page.locator("#status");
+		const btn = page.locator("#start");
+		await expect(btn).toHaveText("Play");
+		await btn.click();
 
-		await expect
-			.poll(async () => (await status.textContent())?.trim() ?? "", {
-				timeout: 15000,
-			})
-			.not.toBe("Starting stream...");
-
-		await expect(status).not.toContainText("Error:");
+		await expect(btn).toHaveText("Stop", { timeout: 15000 });
+		await expect(page.locator("#status")).not.toContainText("Error:");
 	});
 });

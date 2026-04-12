@@ -36,8 +36,7 @@
     <h1>CDN Opus Streaming</h1>
     <p>No install and no build. Streams Ogg Opus through <code>ClipNode</code> using the package CDN build.</p>
     <div class="controls">
-      <button id="start">Start stream</button>
-      <button id="stop" disabled>Stop</button>
+      <button id="start">Play</button>
     </div>
     <div id="status">Idle</div>
   </main>
@@ -48,60 +47,43 @@
       getProcessorCdnUrl,
     } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
 
-    const OPUS_URL = "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
-    const startBtn = document.getElementById("start");
-    const stopBtn = document.getElementById("stop");
-    const statusEl = document.getElementById("status");
-
-    let coordinator;
-    let ctx;
-    let clip;
+    const btn = document.getElementById("start");
+    const status = document.getElementById("status");
 
     function setStatus(text) {
-      statusEl.textContent = text;
+      status.textContent = text;
     }
 
-    startBtn.onclick = async () => {
-      if (clip) {
-        clip.stop();
-        clip.disconnect();
-        clip = null;
-      }
-
-      if (!coordinator) {
-        ctx = new AudioContext({ sampleRate: 48000 });
-        coordinator = Coordinator.fromContext(ctx);
-        await coordinator.addModule(getProcessorCdnUrl());
-      }
-
-      await ctx.resume();
-
-      clip = coordinator.StreamingClipNode(undefined, { format: "OggOpus" });
-      clip.connect(ctx.destination);
+    async function main() {
+      const context = new AudioContext({ sampleRate: 48000 });
+      const coordinator = Coordinator.fromContext(context);
+      await coordinator.addModule(getProcessorCdnUrl());
+      const clip = coordinator.StreamingClipNode();
+      clip.connect(context.destination);
 
       clip.onprogress = (bytes) => {
         const kb = (bytes / 1024) | 0;
         setStatus(`Downloading... ${kb} KB`);
       };
-      clip.ondone = () => setStatus("Stream finished.");
+      clip.ondone = () => setStatus("Stream Downloaded.");
       clip.onerror = (msg) => setStatus(`Error: ${msg}`);
-      clip.onstarted = () => setStatus("Streaming and playing...");
+      clip.onstarted = () => setStatus("Streaming...");
+      clip.onended = () => setStatus("Stream Ended.");
 
-      clip.url = OPUS_URL;
-      clip.start();
+      btn.onclick = async () => {
+        clip.url ??= "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
+        if (clip.state !== "started") {
+          await context.resume();
+          clip.start();
+          btn.innerText = "Stop";
+        } else {
+          btn.innerText = "Play";
+          clip.stop();
+        }
+      };
+    }
 
-      stopBtn.disabled = false;
-      setStatus("Starting stream...");
-    };
-
-    stopBtn.onclick = () => {
-      if (clip) {
-        clip.stop();
-        clip.disconnect();
-        clip = null;
-      }
-      setStatus("Stopped");
-    };
+    main();
   </script>
 </body>
 </html>
