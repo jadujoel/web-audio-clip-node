@@ -65,8 +65,5 @@ describe("examples config", () => {
 		expect(source).toContain('linkWorkspacePackage("examples/self-hosted")');
 		expect(source).not.toContain('linkWorkspacePackage("examples/streaming")');
 		expect(source).toContain("bun run --cwd examples/self-hosted setup");
-		expect(source).toContain(
-			"npm install --prefix examples/streaming --no-package-lock --no-save ts-ebml@3.0.2",
-		);
 	});
 });

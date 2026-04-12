@@ -52,7 +52,7 @@
 		"build": "bun build.ts",
 		"build:lib": "bun build.ts --lib",
 		"build:webpage": "bun build.ts --webpage",
-		"dev": "bun serve.ts",
+		"dev": "bun serve-webpage.ts",
 		"examples": "bun examples.ts",
 		"lint": "biome check",
 		"serve-webpage": "bun serve-webpage.ts",

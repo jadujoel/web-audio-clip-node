@@ -27,7 +27,6 @@ export async function examples() {
 		linkWorkspacePackage("examples/self-hosted"),
 	]);
 	await Bun.$`bun run --cwd examples/self-hosted setup`;
-	await Bun.$`npm install --prefix examples/streaming --no-package-lock --no-save ts-ebml@3.0.2`;
 	await Bun.$`bun examples/index.html examples/cdn-vanilla/index.html examples/playground/index.html examples/esm-bundler/index.html examples/react/index.html examples/self-hosted/index.html examples/streaming/index.html`;
 }
 

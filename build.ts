@@ -72,7 +72,7 @@ async function rewriteDistImports(dir: string): Promise<void> {
 
 export function createAppBuildConfig(outdir = distDir): Bun.BuildConfig {
 	return {
-		entrypoints: ["./src/index.html"],
+		entrypoints: ["./examples/playground/index.html"],
 		target: "browser",
 		minify: true,
 		throw: true,
@@ -128,8 +128,7 @@ export async function buildWebpage(): Promise<void> {
 	// Self-hosted needs processor.js copied
 	await Bun.$`bun run --cwd examples/self-hosted setup`;
 
-	// Streaming needs ts-ebml + worker builds
-	await Bun.$`npm install --prefix examples/streaming --no-package-lock --no-save ts-ebml@3.0.2`;
+	// Streaming worker build
 	await Bun.$`bun run --cwd examples/streaming build:worker`;
 
 	// Build all examples in parallel
