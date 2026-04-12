@@ -374,6 +374,7 @@ export function App() {
 						{controls.loop && (
 							<select
 								id="loopMode"
+								className="loop-mode-select"
 								value={controls.loopMode}
 								onChange={(e) =>
 									handleLoopModeChange(e.target.value as LoopMode)

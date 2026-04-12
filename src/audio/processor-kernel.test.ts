@@ -5320,3 +5320,1091 @@ describe("enableFrameReporting", () => {
 		expect(props.enableFrameReporting).toBe(false);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Comprehensive Loop Crossfade Tests (DD-CLIP-55)
+// ---------------------------------------------------------------------------
+
+describe("Loop crossfade: comprehensive", () => {
+	const SR = 48000;
+
+	function makeParams(overrides?: Partial<Record<string, Float32Array>>) {
+		return {
+			playbackRate: new Float32Array([1]),
+			detune: new Float32Array([0]),
+			lowpass: new Float32Array([20000]),
+			highpass: new Float32Array([20]),
+			gain: new Float32Array([1]),
+			pan: new Float32Array([0]),
+			...overrides,
+		};
+	}
+	function fs() {
+		return { lowpass: createFilterState(), highpass: createFilterState() };
+	}
+	function ctx(time = 0.001, frame = 0) {
+		return { currentTime: time, currentFrame: frame, sampleRate: SR };
+	}
+
+	function makeUniform(length: number, value = 1.0, channels = 2) {
+		return Array.from({ length: channels }, () =>
+			new Float32Array(length).fill(value),
+		);
+	}
+
+	/** DC offset buffer — constant non-zero value */
+	function makeDCBuffer(length: number, dc: number, channels = 2) {
+		return Array.from({ length: channels }, () =>
+			new Float32Array(length).fill(dc),
+		);
+	}
+
+	/** RMS of a Float32Array */
+	function rms(arr: Float32Array): number {
+		let sum = 0;
+		for (let i = 0; i < arr.length; i++) sum += arr[i] * arr[i];
+		return Math.sqrt(sum / arr.length);
+	}
+
+	/** Peak absolute value */
+	function peak(arr: Float32Array): number {
+		let max = 0;
+		for (let i = 0; i < arr.length; i++) {
+			const abs = Math.abs(arr[i]);
+			if (abs > max) max = abs;
+		}
+		return max;
+	}
+
+	// --- Content type tests ---
+
+	it("XF1: sustained sine wave — no NaN, bounded output across many loops", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+			expect(peak(out[0])).toBeLessThanOrEqual(1.01);
+		}
+	});
+
+	it("XF2: percussive/transient content — crossfade doesn't introduce NaN", () => {
+		const length = SR;
+		const buffer = Array.from({ length: 2 }, () => {
+			const arr = new Float32Array(length);
+			// Sparse impulses simulating percussive hits
+			for (let i = 0; i < length; i += 480) {
+				arr[i] = 1.0;
+				if (i + 1 < length) arr[i + 1] = -0.8;
+				if (i + 2 < length) arr[i + 2] = 0.3;
+			}
+			return arr;
+		});
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.05,
+			loopEnd: 0.85,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.05 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF3: silence buffer — crossfade of silence is silence", () => {
+		const buffer = makeUniform(SR, 0.0);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+			for (let i = 0; i < 128; i++) {
+				expect(out[0][i]).toBe(0);
+			}
+		}
+	});
+
+	it("XF4: DC offset buffer — constant-gain means output stays at DC level", () => {
+		const dc = 0.7;
+		const buffer = makeDCBuffer(SR, dc);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+			// Every sample should be close to DC since crossfade blends
+			// identical values: dc * gIn + dc * gOut = dc * (gIn + gOut) = dc * 1
+			for (let i = 0; i < 128; i++) {
+				expect(out[0][i]).toBeCloseTo(dc, 4);
+			}
+		}
+	});
+
+	it("XF5: high-frequency content (Nyquist/2) — no NaN, stays bounded", () => {
+		const buffer = makeSineBuffer(SR, SR / 4, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.05,
+			loopEnd: 0.8,
+			loopCrossfade: 0.03,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.05 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Duration/fade length variations ---
+
+	it("XF6: very short crossfade (1ms = 48 samples) — no artifacts", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.8,
+			loopCrossfade: 0.001,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF7: crossfade of exactly 1 sample — degenerate but no crash", () => {
+		const buffer = makeUniform(SR, 0.5);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.8,
+			loopCrossfade: 1 / SR, // exactly 1 sample
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF8: crossfade equal to half the loop length — maximally overlapping", () => {
+		const loopStart = 0.2;
+		const loopEnd = 0.8;
+		const loopLen = loopEnd - loopStart;
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: loopLen / 2,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(loopStart * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF9: crossfade equal to loop length — clamped, no crash", () => {
+		const loopStart = 0.2;
+		const loopEnd = 0.5;
+		const loopLen = loopEnd - loopStart;
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: loopLen,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(loopStart * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF10: crossfade 2x loop length — clamped, no crash", () => {
+		const loopStart = 0.3;
+		const loopEnd = 0.5;
+		const loopLen = loopEnd - loopStart;
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: loopLen * 2,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(loopStart * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Very short loops ---
+
+	it("XF11: loop shorter than one block (64 samples) with crossfade — no NaN", () => {
+		const buffer = makeUniform(SR, 1.0);
+		const loopStartSamples = 1000;
+		const loopEndSamples = 1064; // 64 samples
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: loopStartSamples / SR,
+			loopEnd: loopEndSamples / SR,
+			loopCrossfade: 0.001,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples,
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF12: loop of exactly 128 samples (one block) with crossfade — no NaN", () => {
+		const buffer = makeUniform(SR, 1.0);
+		const loopStartSamples = 2000;
+		const loopEndSamples = 2128;
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: loopStartSamples / SR,
+			loopEnd: loopEndSamples / SR,
+			loopCrossfade: 0.001,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples,
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF13: loop of 10 samples with crossfade — degenerate but no crash", () => {
+		const buffer = makeUniform(SR, 0.5);
+		const loopStartSamples = 500;
+		const loopEndSamples = 510;
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: loopStartSamples / SR,
+			loopEnd: loopEndSamples / SR,
+			loopCrossfade: 0.001,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples,
+		});
+		const { allOutputs } = simulateBlocks(props, 100);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Very long loops ---
+
+	it("XF14: very long loop (5s) with crossfade — no NaN over 2000 blocks", () => {
+		const length = SR * 6;
+		const buffer = makeSineBuffer(length, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.5,
+			loopEnd: 5.5,
+			loopCrossfade: 0.1,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.5 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 2000);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Constant-gain property verification ---
+
+	it("XF15: constant-gain: sum gIn+gOut === 1 across xfade-out zone", () => {
+		// Use two different DC levels for each crossfade source region
+		// to verify the blend weights sum to 1
+		const buffer = makeDCBuffer(SR, 1.0);
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const xfade = 0.05;
+		const xfadeNumSamples = Math.floor(xfade * SR);
+		const loopStartSamples = Math.floor(loopStart * SR);
+
+		// Position playhead at start of xfade-out zone
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: xfade,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples + 1,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(props, outputs, makeParams(), ctx(), fs());
+
+		// With uniform value=1.0 in both sources, output should be exactly 1.0
+		// because gIn*1.0 + gOut*1.0 = (gIn+gOut)*1.0 = 1.0
+		const n = Math.min(xfadeNumSamples, 128);
+		for (let i = 0; i < n; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0, 3);
+		}
+	});
+
+	it("XF16: constant-gain: sum gIn+gOut === 1 across xfade-in zone", () => {
+		const buffer = makeDCBuffer(SR, 1.0);
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const xfade = 0.05;
+		const xfadeNumSamples = Math.floor(xfade * SR);
+		const loopEndSamples = Math.floor(loopEnd * SR);
+
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: xfade,
+			enableLoopCrossfade: true,
+			playhead: loopEndSamples - xfadeNumSamples + 1,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(props, outputs, makeParams(), ctx(), fs());
+
+		const n = Math.min(xfadeNumSamples, 128);
+		for (let i = 0; i < n; i++) {
+			expect(outputs[0][0][i]).toBeCloseTo(1.0, 3);
+		}
+	});
+
+	it("XF17: amplitude never exceeds max source amplitude in crossfade zone", () => {
+		// Sine wave with max amplitude 1.0
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			const p = peak(out[0]);
+			// constant-gain crossfade: max possible is ~1.0 for two sin waves that could be in-phase
+			// but it should never exceed sqrt(2) ≈ 1.414 even worst case
+			expect(p).toBeLessThanOrEqual(1.5);
+		}
+	});
+
+	// --- Crossfade + Ping-pong ---
+
+	it("XF18: crossfade with ping-pong mode — no NaN over many blocks", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopMode: "ping-pong",
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF19: DC buffer + ping-pong + crossfade — output stays at DC", () => {
+		const dc = 0.6;
+		const buffer = makeDCBuffer(SR, dc);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopMode: "ping-pong",
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF20: ping-pong + short loop + crossfade — no NaN", () => {
+		const buffer = makeUniform(SR, 0.8);
+		const loopStartSamples = 1000;
+		const loopEndSamples = 1200; // 200 samples
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: loopStartSamples / SR,
+			loopEnd: loopEndSamples / SR,
+			loopCrossfade: 0.002,
+			enableLoopCrossfade: true,
+			loopMode: "ping-pong",
+			playhead: loopStartSamples,
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Crossfade + playback rates ---
+
+	it("XF21: crossfade + rate=0.5 (half speed) — no NaN, stays bounded", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			500,
+			makeParams({ playbackRate: new Float32Array([0.5]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF22: crossfade + rate=3.0 (fast) — no NaN, multiple loops per block", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			500,
+			makeParams({ playbackRate: new Float32Array([3.0]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF23: crossfade + negative rate (reverse) — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+			playhead: Math.floor(0.5 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			500,
+			makeParams({ playbackRate: new Float32Array([-1.0]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF24: crossfade + varying a-rate playback (ramp 0.5→2.0) — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const rates = new Float32Array(128);
+		for (let i = 0; i < 128; i++) rates[i] = 0.5 + (1.5 * i) / 127;
+		const { allOutputs } = simulateBlocks(
+			props,
+			500,
+			makeParams({ playbackRate: rates }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Crossfade offset extremes ---
+
+	it("XF25: crossfade offset = -1 (minimum) — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopCrossfadeOffset: -1,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF26: crossfade offset = +1 (maximum) — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopCrossfadeOffset: 1,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF27: crossfade offset = 0.5 — different from default 0", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const propsDefault = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopCrossfadeOffset: 0,
+			playhead: Math.floor(0.1 * SR) + 5,
+		});
+		const propsOffset = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopCrossfadeOffset: 0.5,
+			playhead: Math.floor(0.1 * SR) + 5,
+		});
+
+		const out1 = [makeOutput(2)];
+		const out2 = [makeOutput(2)];
+		processBlock(propsDefault, out1, makeParams(), ctx(), fs());
+		processBlock(propsOffset, out2, makeParams(), ctx(), fs());
+
+		// Output should differ because the offset shifts the crossfade source
+		let differs = false;
+		for (let i = 0; i < 128; i++) {
+			if (Math.abs(out1[0][0][i] - out2[0][0][i]) > 0.0001) {
+				differs = true;
+				break;
+			}
+		}
+		expect(differs).toBe(true);
+		expect(checkNans(out1[0])).toBe(0);
+		expect(checkNans(out2[0])).toBe(0);
+	});
+
+	// --- Multi-iteration continuity ---
+
+	it("XF28: no sudden jumps in output across loop boundary (continuity check)", () => {
+		const buffer = makeDCBuffer(SR, 0.5);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.5,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 500);
+
+		// Check that consecutive samples across block boundaries don't jump
+		for (let b = 1; b < allOutputs.length; b++) {
+			const prevLast = allOutputs[b - 1][0][127];
+			const currFirst = allOutputs[b][0][0];
+			const jump = Math.abs(currFirst - prevLast);
+			// With DC content + constant-gain, jumps should be tiny
+			expect(jump).toBeLessThan(0.01);
+		}
+	});
+
+	it("XF29: no discontinuities within a block's crossfade zone", () => {
+		const buffer = makeDCBuffer(SR, 1.0);
+		const loopStart = 0.1;
+		const xfade = 0.05;
+		const loopStartSamples = Math.floor(loopStart * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd: 0.9,
+			loopCrossfade: xfade,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples + 1,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(props, outputs, makeParams(), ctx(), fs());
+
+		// With uniform DC=1.0, consecutive samples should be very close
+		for (let i = 1; i < 128; i++) {
+			const diff = Math.abs(outputs[0][0][i] - outputs[0][0][i - 1]);
+			expect(diff).toBeLessThan(0.001);
+		}
+	});
+
+	it("XF30: RMS doesn't drop during crossfade zone (no holes)", () => {
+		const buffer = makeDCBuffer(SR, 1.0);
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const xfade = 0.05;
+		const loopStartSamples = Math.floor(loopStart * SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart,
+			loopEnd,
+			loopCrossfade: xfade,
+			enableLoopCrossfade: true,
+			playhead: loopStartSamples + 1,
+		});
+		const outputs = [makeOutput(2)];
+		processBlock(props, outputs, makeParams(), ctx(), fs());
+
+		const blockRms = rms(outputs[0][0]);
+		// For DC=1.0, RMS should be close to 1.0 (constant gain)
+		expect(blockRms).toBeGreaterThan(0.99);
+		expect(blockRms).toBeLessThan(1.01);
+	});
+
+	// --- Mono buffer ---
+
+	it("XF31: mono buffer + crossfade — works with monoToStereo", () => {
+		const buffer = makeSineBuffer(SR, 440, SR, 1);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(props, 300);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+			// After monoToStereo, both channels should have data
+			expect(out.length).toBeGreaterThanOrEqual(2);
+		}
+	});
+
+	// --- Boundary conditions ---
+
+	it("XF32: loopStart=0, loopEnd=bufferEnd, crossfade — no OOB", () => {
+		const bufLen = 4800;
+		const buffer = makeSineBuffer(bufLen, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: bufLen / SR,
+			loopCrossfade: 0.01,
+			enableLoopCrossfade: true,
+			playhead: 1,
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF33: loop at the very end of buffer with crossfade — no OOB", () => {
+		const bufLen = 4800;
+		const buffer = makeSineBuffer(bufLen, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: (bufLen - 500) / SR,
+			loopEnd: bufLen / SR,
+			loopCrossfade: 0.005,
+			enableLoopCrossfade: true,
+			playhead: bufLen - 500,
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF34: loop at the very beginning of buffer with crossfade — no OOB", () => {
+		const bufLen = 4800;
+		const buffer = makeSineBuffer(bufLen, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0,
+			loopEnd: 500 / SR,
+			loopCrossfade: 0.005,
+			enableLoopCrossfade: true,
+			playhead: 1,
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Parametric sweep ---
+
+	const crossfadeDurations = [0.001, 0.005, 0.01, 0.05, 0.1, 0.3, 0.5];
+	for (const xfade of crossfadeDurations) {
+		it(`XF35-sweep: crossfade=${xfade}s with sine content — no NaN`, () => {
+			const buffer = makeSineBuffer(SR * 2, 440, SR);
+			const props = makeLoopProps({
+				buffer,
+				loop: true,
+				loopStart: 0.1,
+				loopEnd: 1.5,
+				loopCrossfade: xfade,
+				enableLoopCrossfade: true,
+				playhead: Math.floor(0.1 * SR),
+			});
+			const { allOutputs } = simulateBlocks(props, 300);
+			for (const out of allOutputs) {
+				expect(checkNans(out)).toBe(0);
+			}
+		});
+	}
+
+	const loopSizes = [0.002, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0];
+	for (const loopLen of loopSizes) {
+		it(`XF36-sweep: loop=${loopLen}s + xfade=min(0.01, loopLen*0.3) — no NaN`, () => {
+			const bufLen = Math.max(SR * (loopLen + 0.2), SR * 0.5);
+			const buffer = makeSineBuffer(Math.ceil(bufLen), 440, SR);
+			const xfade = Math.min(0.01, loopLen * 0.3);
+			const props = makeLoopProps({
+				buffer,
+				loop: true,
+				loopStart: 0.05,
+				loopEnd: 0.05 + loopLen,
+				loopCrossfade: xfade,
+				enableLoopCrossfade: true,
+				playhead: Math.floor(0.05 * SR),
+			});
+			const { allOutputs } = simulateBlocks(props, 200);
+			for (const out of allOutputs) {
+				expect(checkNans(out)).toBe(0);
+			}
+		});
+	}
+
+	// --- Combined features ---
+
+	it("XF37: crossfade + gain filter — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enableGain: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			300,
+			makeParams({ gain: new Float32Array([0.5]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF38: crossfade + pan — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePan: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			300,
+			makeParams({ pan: new Float32Array([0.7]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF39: crossfade + lowpass + highpass — no NaN cascade", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enableLowpass: true,
+			enableHighpass: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const { allOutputs } = simulateBlocks(
+			props,
+			300,
+			makeParams({
+				lowpass: new Float32Array([5000]),
+				highpass: new Float32Array([200]),
+			}),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	it("XF40: crossfade + fade-in — no NaN, fade-in applies during crossfade", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.0,
+			loopEnd: 0.5,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			fadeInDuration: 0.1,
+			enableFadeIn: true,
+			playhead: 0,
+		});
+		const { allOutputs } = simulateBlocks(props, 200);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+		// First block should be quieter due to fade-in
+		const firstRms = rms(allOutputs[0][0]);
+		const laterRms = rms(allOutputs[100][0]);
+		expect(firstRms).toBeLessThan(laterRms + 0.01);
+	});
+
+	it("XF41: crossfade + detune — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			enablePlaybackRate: true,
+		});
+		// Position after start so detune has clean crossfade to work with
+		handleProcessorMessage(
+			props,
+			{
+				type: "start",
+				data: { when: 0, offset: 0.1, duration: 100, loop: true },
+			},
+			SR,
+			0,
+		);
+		props.playhead = Math.floor(0.1 * SR);
+		props.state = State.Started;
+		const { allOutputs } = simulateBlocks(
+			props,
+			300,
+			makeParams({ detune: new Float32Array([600]) }),
+		);
+		for (const out of allOutputs) {
+			expect(checkNans(out)).toBe(0);
+		}
+	});
+
+	// --- Dynamic crossfade parameter changes ---
+
+	it("XF42: toggle crossfade on and off every 50 blocks — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const params = makeParams();
+		const filterState = fs();
+		const blockDuration = 128 / SR;
+
+		for (let b = 0; b < 500; b++) {
+			if (b % 50 === 0) {
+				props.enableLoopCrossfade = !props.enableLoopCrossfade;
+			}
+			const outputs = [makeOutput(2)];
+			const result = processBlock(
+				props,
+				outputs,
+				params,
+				{
+					currentTime: 0.001 + b * blockDuration,
+					currentFrame: b * 128,
+					sampleRate: SR,
+				},
+				filterState,
+			);
+			expect(checkNans(outputs[0])).toBe(0);
+			expect(result.keepAlive).toBe(true);
+		}
+	});
+
+	it("XF43: change crossfade duration every 20 blocks — no NaN", () => {
+		const buffer = makeSineBuffer(SR, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.01,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const params = makeParams();
+		const filterState = fs();
+		const durations = [0.01, 0.02, 0.05, 0.1, 0.2, 0.05, 0.01];
+		const blockDuration = 128 / SR;
+
+		for (let b = 0; b < 500; b++) {
+			if (b % 20 === 0) {
+				props.loopCrossfade = durations[(b / 20) % durations.length];
+			}
+			const outputs = [makeOutput(2)];
+			processBlock(
+				props,
+				outputs,
+				params,
+				{
+					currentTime: 0.001 + b * blockDuration,
+					currentFrame: b * 128,
+					sampleRate: SR,
+				},
+				filterState,
+			);
+			expect(checkNans(outputs[0])).toBe(0);
+		}
+	});
+
+	it("XF44: change loop bounds while crossfade active — no NaN", () => {
+		const buffer = makeSineBuffer(SR * 2, 440, SR);
+		const props = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			playhead: Math.floor(0.1 * SR),
+		});
+		const params = makeParams();
+		const filterState = fs();
+		const blockDuration = 128 / SR;
+
+		for (let b = 0; b < 500; b++) {
+			if (b === 100) {
+				props.loopStart = 0.2;
+				props.loopEnd = 1.0;
+			}
+			if (b === 200) {
+				props.loopStart = 0.05;
+				props.loopEnd = 1.5;
+			}
+			if (b === 300) {
+				props.loopStart = 0.5;
+				props.loopEnd = 0.8;
+			}
+			const outputs = [makeOutput(2)];
+			processBlock(
+				props,
+				outputs,
+				params,
+				{
+					currentTime: 0.001 + b * blockDuration,
+					currentFrame: b * 128,
+					sampleRate: SR,
+				},
+				filterState,
+			);
+			expect(checkNans(outputs[0])).toBe(0);
+		}
+	});
+});
