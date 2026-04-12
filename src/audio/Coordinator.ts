@@ -4,17 +4,21 @@ import { ClipNode } from "./ClipNode";
 import type { ClipWorkletOptions } from "./types";
 import { getProcessorBlobUrl } from "./workletUrl";
 
-interface PendingStart {
+export interface PendingStart {
 	when?: number;
 	offset?: number;
 	duration?: number;
 }
 
-interface StreamingClipNodeOptions {
+export interface StreamingClipNodeOptions {
 	defaultFormat: StreamFormat | null;
 	targetSampleRate: number;
 	/** Injectable worker factory — used for testing without mocking globals. */
 	createWorker?: (format: StreamFormat) => Worker;
+}
+
+export interface CoordinatorStreamingOptions {
+	format?: StreamFormat;
 }
 
 export class StreamingClipNode extends ClipNode {
@@ -125,8 +129,7 @@ export class StreamingClipNode extends ClipNode {
 export class Coordinator {
 	private _context: BaseAudioContext;
 	private _moduleLoaded = false;
-	private _defaultFormat: StreamFormat | null = null;
-	private _nodes = new Set<StreamingClipNode>();
+	private _nodes = new Set<ClipNode>();
 	private _workerFactory?: (format: StreamFormat) => Worker;
 
 	private constructor(
@@ -152,14 +155,18 @@ export class Coordinator {
 		this._moduleLoaded = true;
 	}
 
-	async addStreamingSupport(format?: StreamFormat): Promise<this> {
-		this._defaultFormat = format ?? null;
-		return this;
+	ClipNode(options?: ClipWorkletOptions): ClipNode {
+		const node = new ClipNode(this._context, options ?? {});
+		this._nodes.add(node);
+		return node;
 	}
 
-	ClipNode(options?: ClipWorkletOptions): StreamingClipNode {
+	StreamingClipNode(
+		options?: ClipWorkletOptions,
+		streamingOptions?: CoordinatorStreamingOptions,
+	): StreamingClipNode {
 		const node = new StreamingClipNode(this._context, options ?? {}, {
-			defaultFormat: this._defaultFormat,
+			defaultFormat: streamingOptions?.format ?? null,
 			targetSampleRate: this._context.sampleRate,
 			createWorker: this._workerFactory,
 		});

@@ -191,7 +191,7 @@ The [examples](examples/) directory covers the main integration styles.
 | Example | Description | Build step? |
 |---------|-------------|-------------|
 | [cdn-vanilla](examples/cdn-vanilla/) | Single HTML file using the CDN bundle and processor URL | No |
-| [cdn-opus-streaming](examples/cdn-opus-streaming/) | Single HTML file streaming Ogg Opus through ClipNode via CDN imports | No |
+| [cdn-opus-streaming](examples/cdn-opus-streaming/) | Single HTML file streaming Ogg Opus through Coordinator.StreamingClipNode via CDN imports | No |
 | [esm-bundler](examples/esm-bundler/) | Vite + TypeScript app importing the package directly | Yes |
 
 ## License

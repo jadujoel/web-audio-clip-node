@@ -72,12 +72,11 @@
         ctx = new AudioContext({ sampleRate: 48000 });
         coordinator = Coordinator.fromContext(ctx);
         await coordinator.addModule(getProcessorCdnUrl());
-        await coordinator.addStreamingSupport("OggOpus");
       }
 
       await ctx.resume();
 
-      clip = coordinator.ClipNode();
+      clip = coordinator.StreamingClipNode(undefined, { format: "OggOpus" });
       clip.connect(ctx.destination);
 
       clip.onprogress = (bytes) => {

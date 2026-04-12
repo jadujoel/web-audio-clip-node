@@ -15,5 +15,5 @@ That command builds the local package, links the examples that need it, and serv
 | Example | Description | Build step? |
 |---------|-------------|-------------|
 | [cdn-vanilla](./cdn-vanilla/) | Single HTML file using the jsDelivr bundle and a generated demo clip | No |
-| [cdn-opus-streaming](./cdn-opus-streaming/) | Single HTML file streaming Ogg Opus through ClipNode via CDN imports | No |
+| [cdn-opus-streaming](./cdn-opus-streaming/) | Single HTML file streaming Ogg Opus through Coordinator.StreamingClipNode via CDN imports | No |
 | [esm-bundler](./esm-bundler/) | Vite + TypeScript importing the package directly | Yes |

@@ -1,11 +1,8 @@
 import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { createContext } from "../../TestPreload";
 import type { StreamFormat } from "../streaming";
+import { ClipNode } from "./ClipNode";
 import { Coordinator, StreamingClipNode } from "./Coordinator";
-
-// ── Fake Worker ──────────────────────────────────────────────────────────────
-// Instead of importing real Worker (which spawns processes), we inject a fake
-// one via the `workerFactory` DI option on Coordinator.fromContext().
 
 interface FakeWorkerMessage {
 	type: string;
@@ -25,7 +22,6 @@ class FakeWorker {
 		this.terminated = true;
 	}
 
-	/** Simulate a message arriving from the worker. */
 	receive(data: FakeWorkerMessage) {
 		this.onmessage?.({ data });
 	}
@@ -36,8 +32,6 @@ function fakeWorkerFactory(_format: StreamFormat): Worker {
 	lastWorker = new FakeWorker();
 	return lastWorker as unknown as Worker;
 }
-
-// ── Setup ────────────────────────────────────────────────────────────────────
 
 let processorBuilt = false;
 
@@ -52,11 +46,8 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
-	// reset between tests
 	lastWorker = undefined as unknown as FakeWorker;
 });
-
-// ── Coordinator ──────────────────────────────────────────────────────────────
 
 describe("Coordinator.fromContext", () => {
 	test("returns a Coordinator instance", () => {
@@ -71,39 +62,56 @@ describe("Coordinator.addModule", () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		const coordinator = Coordinator.fromContext(ctx);
 		await coordinator.addModule("./dist/audio/processor.js");
-		// Second call should be a no-op (idempotent)
 		await coordinator.addModule("./dist/audio/processor.js");
-		// If addModule were called twice the underlying implementation would
-		// throw on the second call; reaching here proves idempotency.
 		expect(true).toBe(true);
 	});
 });
 
-describe("Coordinator.addStreamingSupport", () => {
-	test("returns the coordinator (chainable / awaitable)", async () => {
-		const ctx = createContext({ sampleRate: 48_000 });
-		const coordinator = Coordinator.fromContext(ctx);
-		const result = await coordinator.addStreamingSupport("OggOpus");
-		expect(result).toBe(coordinator);
-	});
-
-	test("works without a format argument (enables auto-detect)", async () => {
-		const ctx = createContext({ sampleRate: 48_000 });
-		const coordinator = Coordinator.fromContext(ctx);
-		const result = await coordinator.addStreamingSupport();
-		expect(result).toBe(coordinator);
-	});
-});
-
 describe("Coordinator.ClipNode", () => {
-	test("returns a StreamingClipNode", async () => {
+	test("returns a regular ClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
 		const node = coordinator.ClipNode();
+		expect(node).toBeInstanceOf(ClipNode);
+		expect(node).not.toBeInstanceOf(StreamingClipNode);
+	});
+});
+
+describe("Coordinator.StreamingClipNode", () => {
+	test("returns a StreamingClipNode", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+		});
+		const node = coordinator.StreamingClipNode();
 		expect(node).toBeInstanceOf(StreamingClipNode);
+	});
+
+	test("respects explicit stream format", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+
+		const capturedFormats: StreamFormat[] = [];
+		const trackingFactory = (format: StreamFormat): Worker => {
+			capturedFormats.push(format);
+			const w = new FakeWorker();
+			lastWorker = w;
+			return w as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+		});
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.unknown";
+
+		expect(capturedFormats[0]).toBe("OggOpus");
 	});
 });
 
@@ -114,10 +122,13 @@ describe("Coordinator.dispose", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
-		node.url = "https://example.com/audio.opus";
+		const regular = coordinator.ClipNode();
+		const streaming = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		streaming.url = "https://example.com/audio.opus";
+		expect(regular).toBeInstanceOf(ClipNode);
 
 		const worker = lastWorker;
 		coordinator.dispose();
@@ -126,8 +137,6 @@ describe("Coordinator.dispose", () => {
 	});
 });
 
-// ── StreamingClipNode ────────────────────────────────────────────────────────
-
 describe("StreamingClipNode.url setter", () => {
 	test("creates a worker and posts an init message with the url and sampleRate", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -135,9 +144,10 @@ describe("StreamingClipNode.url setter", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		const url = "https://example.com/audio.opus";
 		node.url = url;
 
@@ -154,9 +164,10 @@ describe("StreamingClipNode.url setter", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio1.opus";
 		const firstWorker = lastWorker;
 
@@ -172,45 +183,36 @@ describe("StreamingClipNode.url setter", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode();
 		node.url = "https://example.com/audio.opus";
 		expect(node.url).toBe("https://example.com/audio.opus");
 	});
 });
 
-describe("StreamingClipNode.start – deferred until first decoded", () => {
+describe("StreamingClipNode.start - deferred until first decoded", () => {
 	test("does not start immediately; fires when worker sends decoded", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		const worker = lastWorker;
-
-		// start() called before any decoded message
 		node.start();
 
-		// No "start" message should have been sent to the worklet yet
-		// (ClipNode.start() posts { type: "start" } via this.port.postMessage)
-		// We can't directly introspect AudioWorkletNode.port in tests,
-		// but we can verify that the worker message arrives correctly
-		// by simulating the decoded message and checking state changes.
 		let stateChanged = false;
 		node.onstarted = () => {
 			stateChanged = true;
 		};
 
-		// Simulate the first decoded message from the worker
 		worker.receive({ type: "decoded" });
 
-		// After decoded, the deferred start should have been triggered.
-		// In a real context the worklet handles it; here we just verify no throw.
-		expect(stateChanged).toBe(false); // onstarted fires from worklet, not synchronously
+		expect(stateChanged).toBe(false);
 		expect(node.url).toBe("https://example.com/audio.opus");
 	});
 });
@@ -222,9 +224,10 @@ describe("StreamingClipNode.stop", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		const worker = lastWorker;
@@ -239,9 +242,10 @@ describe("StreamingClipNode.stop", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		const worker = lastWorker;
@@ -259,9 +263,10 @@ describe("StreamingClipNode callbacks", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		let errorMsg = "";
@@ -279,9 +284,10 @@ describe("StreamingClipNode callbacks", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		let received = -1;
@@ -299,9 +305,10 @@ describe("StreamingClipNode callbacks", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
 		});
-		await coordinator.addStreamingSupport("OggOpus");
 
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
 		node.url = "https://example.com/audio.opus";
 
 		let done = false;
@@ -330,8 +337,7 @@ describe("StreamingClipNode format auto-detection", () => {
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
 		});
-		// No addStreamingSupport → auto-detect
-		const node = coordinator.ClipNode();
+		const node = coordinator.StreamingClipNode();
 		node.url = "https://example.com/audio.opus";
 
 		expect(capturedFormats[0]).toBe("OggOpus");

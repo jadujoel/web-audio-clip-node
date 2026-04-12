@@ -20,4 +20,25 @@ test.describe("CDN Opus Streaming example", () => {
 	test("stop button is disabled before streaming starts", async ({ page }) => {
 		await expect(page.locator("#stop")).toBeDisabled();
 	});
+
+	test("start stream transitions past starting state", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming progress can be flaky in headless Firefox",
+		);
+
+		await page.locator("button#start").click();
+		const status = page.locator("#status");
+
+		await expect
+			.poll(async () => (await status.textContent())?.trim() ?? "", {
+				timeout: 15000,
+			})
+			.not.toBe("Starting stream...");
+
+		await expect(status).not.toContainText("Error:");
+	});
 });
