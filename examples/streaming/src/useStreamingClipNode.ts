@@ -9,14 +9,17 @@ import type {
 	ClipNodeState,
 	FrameData,
 } from "@jadujoel/web-audio-clip-node";
-import { workerCode } from "../generated/worker-code";
+import { mp3WorkerCode } from "../generated/mp3-worker-code";
+import { opusWorkerCode } from "../generated/opus-worker-code";
 import {
 	clampSeekTargetSamples,
 	secondsFromSamples,
 } from "./streamTimeline";
+import { detectStreamFormat, type StreamFormat } from "./streamFormat";
 
-function getWorkerBlobUrl(): string {
-	const blob = new Blob([workerCode], { type: "application/javascript" });
+function getWorkerBlobUrl(format: StreamFormat): string {
+	const code = format === "opus" ? opusWorkerCode : mp3WorkerCode;
+	const blob = new Blob([code], { type: "application/javascript" });
 	return URL.createObjectURL(blob);
 }
 
@@ -162,7 +165,7 @@ export function useStreamingClipNode({
 	}, []);
 
 	const stream = useCallback(
-		async (url: string, throttle: number) => {
+		async (url: string, throttle: number, format?: StreamFormat) => {
 			if (!url.trim()) {
 				setStatus("Enter a URL first.");
 				return;
@@ -224,7 +227,8 @@ export function useStreamingClipNode({
 			clip.transferPort(channel.port2);
 
 			// Create and start decode worker
-			const worker = new Worker(getWorkerBlobUrl());
+			const selectedFormat = format ?? detectStreamFormat(url);
+			const worker = new Worker(getWorkerBlobUrl(selectedFormat));
 			workerRef.current = worker;
 
 			worker.onmessage = (ev: MessageEvent) => {

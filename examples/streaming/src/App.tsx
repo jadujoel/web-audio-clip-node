@@ -24,6 +24,10 @@ import {
 } from "@jadujoel/web-audio-clip-node";
 import { useStreamingClipNode } from "./useStreamingClipNode";
 import type { RefObject } from "react";
+import {
+	getDefaultUrlForFormat,
+	type StreamFormat,
+} from "./streamFormat";
 
 /**
  * Reads frame data from a ref via its own RAF loop and updates DOM directly,
@@ -150,13 +154,26 @@ export function App() {
 		setValue: controls.setValue,
 	});
 
-	const [url, setUrl] = useState(
-		"https://jadujoel.github.io/web-audio-clip-node/example.mp3",
-	);
+	const [format, setFormat] = useState<StreamFormat>("mp3");
+	const [url, setUrl] = useState(getDefaultUrlForFormat("mp3"));
 	const [throttle, setThrottle] = useState(0);
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
 	const progressRef = useRef<HTMLDivElement>(null);
+
+	const handleFormatChange = useCallback((nextFormat: StreamFormat) => {
+		setFormat(nextFormat);
+		setUrl((prevUrl) => {
+			const trimmed = prevUrl.trim();
+			if (!trimmed) {
+				return getDefaultUrlForFormat(nextFormat);
+			}
+			return trimmed === getDefaultUrlForFormat("mp3") ||
+				trimmed === getDefaultUrlForFormat("opus")
+				? getDefaultUrlForFormat(nextFormat)
+				: prevUrl;
+		});
+	}, []);
 
 	// Sync progress bar width
 	useEffect(() => {
@@ -399,9 +416,35 @@ export function App() {
 				ClipNode — Streaming
 			</h1>
 			<p style={{ color: "#94a3b8", marginTop: 0, fontSize: "0.9rem" }}>
-				Stream &amp; decode an MP3 in a Web Worker, feeding decoded audio
+				Stream &amp; decode MP3 or Ogg/Opus in a Web Worker, feeding decoded audio
 				directly to the AudioWorklet processor via MessagePort.
 			</p>
+
+			<label
+				htmlFor="format-select"
+				style={{ display: "block", marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}
+			>
+				Format
+			</label>
+			<select
+				id="format-select"
+				value={format}
+				onChange={(e) => handleFormatChange(e.target.value as StreamFormat)}
+				style={{
+					width: "100%",
+					boxSizing: "border-box",
+					padding: "0.5rem",
+					marginTop: "0.25rem",
+					border: "1px solid var(--color-border-subtle, #334155)",
+					borderRadius: "6px",
+					background: "var(--color-surface, #1e293b)",
+					color: "var(--color-text, #e2e8f0)",
+					fontSize: "0.9rem",
+				}}
+			>
+				<option value="mp3">MP3</option>
+				<option value="opus">Opus (Ogg)</option>
+			</select>
 
 			<label
 				htmlFor="url"
@@ -455,7 +498,7 @@ export function App() {
 			</select>
 
 			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-				<button type="button" onClick={() => node.stream(url, throttle)}>
+				<button type="button" onClick={() => node.stream(url, throttle, format)}>
 					▶ Stream &amp; Play
 				</button>
 				<button type="button" onClick={node.pause} disabled={!isStreaming}>
