@@ -250,9 +250,14 @@ export async function buildWebpage(): Promise<void> {
 		);
 	}
 
-	// Build streaming decode workers into webpage output
-	const streamingWorkersDir = join(webpageDir, "streaming", "workers");
-	await mkdir(streamingWorkersDir, { recursive: true });
+	// Build streaming decode workers into webpage outputs that load workers via import.meta.url.
+	const streamingWorkersDirs = [
+		join(webpageDir, "streaming", "workers"),
+		join(webpageDir, "coordinator-streaming", "workers"),
+	];
+	for (const dir of streamingWorkersDirs) {
+		await mkdir(dir, { recursive: true });
+	}
 	for (const worker of streamingWorkerEntrypoints) {
 		const result = await Bun.build({
 			entrypoints: [worker.entry],
@@ -266,7 +271,9 @@ export async function buildWebpage(): Promise<void> {
 			);
 		}
 		const code = await result.outputs[0].text();
-		await Bun.write(join(streamingWorkersDir, worker.output), code);
+		for (const dir of streamingWorkersDirs) {
+			await Bun.write(join(dir, worker.output), code);
+		}
 	}
 
 	// Copy sound assets

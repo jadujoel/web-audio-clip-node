@@ -7,7 +7,6 @@ async function main() {
   const context: AudioContext = new AudioContext({ sampleRate: 48000 });
   const coordinator: Coordinator = Coordinator.fromContext(context);
   await coordinator.addModule();
-  await coordinator.addStreamingSupport("OggOpus");
   const clip = coordinator.ClipNode();
   clip.connect(context.destination);
 
@@ -15,16 +14,15 @@ async function main() {
     const kb = (bytes / 1024) | 0;
     setStatus(`Downloading... ${kb} KB`);
   };
-  clip.ondone = () => setStatus("Stream finished.");
+  clip.ondone = () => setStatus("Stream Downloaded.");
   clip.onerror = (msg) => setStatus(`Error: ${msg}`);
-  clip.onstarted = () => setStatus("Streaming and playing...");
-
-  clip.url = "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
+  clip.onstarted = () => setStatus("Streaming...");
+  clip.onended = () => setStatus("Stream Ended.");
 
   btn.onclick = async () => {
-    await context.resume();
+    clip.url ??= "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
     if (clip.state !== "started") {
-      setStatus("Starting stream...");
+      await context.resume();
       clip.start();
       btn.innerText = "Stop";
     } else {

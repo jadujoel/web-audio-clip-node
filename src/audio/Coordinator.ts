@@ -18,7 +18,7 @@ interface StreamingClipNodeOptions {
 }
 
 export class StreamingClipNode extends ClipNode {
-	private _url = "";
+	private _url: string | undefined;
 	private _worker: Worker | null = null;
 	private _pendingStart: PendingStart | null = null;
 	private _firstDecoded = false;
@@ -37,7 +37,7 @@ export class StreamingClipNode extends ClipNode {
 		this._streamOptions = streamOptions;
 	}
 
-	get url(): string {
+	get url(): string | undefined {
 		return this._url;
 	}
 
