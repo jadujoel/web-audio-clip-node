@@ -218,7 +218,14 @@ test.describe("Streaming example", () => {
 
 	test("playhead updates after pressing Stream & Play a second time", async ({
 		page,
+		browserName,
 	}) => {
+		// Headless Firefox on CI does not advance the streaming playhead
+		test.skip(
+			browserName === "firefox",
+			"streaming playhead not supported in headless Firefox",
+		);
+
 		const streamBtn = page.locator("button:has-text('Stream & Play')");
 		const stopBtn = page.locator("button:has-text('Stop')");
 		const slider = page.locator(".playhead-slider [role='slider']");
