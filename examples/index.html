@@ -3,15 +3,250 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Examples</title>
+  <meta name="theme-color" content="#2b2b2b" />
+  <meta name="description" content="Examples for @jadujoel/web-audio-clip-node — a custom Audio Worklet Node for playing audio clips." />
+  <title>web-audio-clip-node — Examples</title>
+  <style>
+    :root {
+      --color-bg: #2b2b2b;
+      --color-surface: #3a3a3a;
+      --color-surface-hover: #424242;
+      --color-text: #e8e8e8;
+      --color-text-muted: #999;
+      --color-accent: #5b9bd5;
+      --color-accent-dim: rgba(91, 155, 213, 0.15);
+      --color-border: #555;
+      --color-border-subtle: #444;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background-color: var(--color-bg);
+      color: var(--color-text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      margin: 0;
+      padding: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      max-width: 740px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+      flex: 1;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    .eyebrow {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 5vw, 2.2rem);
+      font-weight: 700;
+      margin: 0 0 12px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      margin: 0;
+      line-height: 1.55;
+      max-width: 52ch;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-lg);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .card:hover {
+      background: var(--color-surface-hover);
+      border-color: var(--color-border);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .card a {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 20px 22px;
+      text-decoration: none;
+      color: inherit;
+      height: 100%;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-title .arrow {
+      color: var(--color-accent);
+      opacity: 0;
+      transform: translateX(-4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      font-size: 0.9em;
+    }
+
+    .card:hover .card-title .arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--color-accent-dim);
+      color: var(--color-accent);
+      border: 1px solid rgba(91, 155, 213, 0.25);
+      white-space: nowrap;
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px 20px;
+      color: var(--color-text-muted);
+      font-size: 0.8125rem;
+      border-top: 1px solid var(--color-border-subtle);
+    }
+
+    footer a {
+      color: var(--color-accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
-  <ul>
-    <li><a href="cdn-vanilla">Vanilla</a>
-    <li><a href="esm-bundler">ESM Bundler</a></li>
-    <li><a href="react">React</a></li>
-    <li><a href="self-hosted">Self Hosted</a></li>
-    <li><a href="streaming">Streaming</a></li>
-  </ul>
+  <main>
+    <header>
+      <p class="eyebrow">@jadujoel/web-audio-clip-node</p>
+      <h1>Examples</h1>
+      <p class="subtitle">Five integration paths for the custom Audio Worklet Node — from a zero-build CDN snippet to a full streaming React app.</p>
+    </header>
+
+    <ul class="grid">
+      <li class="card">
+        <a href="cdn-vanilla">
+          <div class="card-header">
+            <span class="card-icon">🌐</span>
+            <span class="card-title">CDN Vanilla<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Single HTML file. No build step — loads the jsDelivr bundle directly and plays a generated demo clip.</p>
+          <span class="badge">No build</span>
+        </a>
+      </li>
+      <li class="card">
+        <a href="esm-bundler">
+          <div class="card-header">
+            <span class="card-icon">📦</span>
+            <span class="card-title">ESM Bundler<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Bun + TypeScript importing the package as an ES module. Standard bundler workflow.</p>
+          <span class="badge">Bun</span>
+        </a>
+      </li>
+      <li class="card">
+        <a href="react">
+          <div class="card-header">
+            <span class="card-icon">⚛️</span>
+            <span class="card-title">React<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Bun + React using the built-in hooks and UI controls — the full interactive demo.</p>
+          <span class="badge">Bun · React</span>
+        </a>
+      </li>
+      <li class="card">
+        <a href="self-hosted">
+          <div class="card-header">
+            <span class="card-icon">🗄️</span>
+            <span class="card-title">Self-Hosted<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Serve your own <code>processor.js</code> via <code>getProcessorModuleUrl()</code> for full control over asset hosting.</p>
+          <span class="badge">Bun</span>
+        </a>
+      </li>
+      <li class="card">
+        <a href="streaming">
+          <div class="card-header">
+            <span class="card-icon">🎵</span>
+            <span class="card-title">Streaming<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Decode and buffer audio on-the-fly from a network stream via a dedicated Worker — minimal latency start.</p>
+          <span class="badge">Bun · Worker</span>
+        </a>
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <a href="https://github.com/jadujoel/web-audio-clip-node" target="_blank" rel="noopener noreferrer">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://www.npmjs.com/package/@jadujoel/web-audio-clip-node" target="_blank" rel="noopener noreferrer">npm</a>
+  </footer>
 </body>
 </html>

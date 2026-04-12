@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	clampSeekTargetSamples,
 	clampSeekTargetSeconds,
 	estimateTotalSamplesFromContentLength,
 	secondsFromSamples,
@@ -52,6 +53,21 @@ describe("streamTimeline", () => {
 		});
 		expect(clampSeekTargetSeconds(1.5, null)).toEqual({
 			value: 1.5,
+			clamped: false,
+		});
+	});
+
+	it("clamps sample-based seek target to decoded samples", () => {
+		expect(clampSeekTargetSamples(96_000, 48_000)).toEqual({
+			value: 48_000,
+			clamped: true,
+		});
+		expect(clampSeekTargetSamples(47_999.9, 48_000)).toEqual({
+			value: 47_999,
+			clamped: false,
+		});
+		expect(clampSeekTargetSamples(-100, 48_000)).toEqual({
+			value: 0,
 			clamped: false,
 		});
 	});

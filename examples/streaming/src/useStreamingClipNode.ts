@@ -11,7 +11,7 @@ import type {
 } from "@jadujoel/web-audio-clip-node";
 import { workerCode } from "../generated/worker-code";
 import {
-	clampSeekTargetSeconds,
+	clampSeekTargetSamples,
 	secondsFromSamples,
 } from "./streamTimeline";
 
@@ -135,6 +135,7 @@ export function useStreamingClipNode({
 	const [progress, setProgress] = useState(0);
 	const [audioDuration, setAudioDuration] = useState<number | null>(null);
 	const [seekableDuration, setSeekableDuration] = useState<number | null>(null);
+	const [seekableSamples, setSeekableSamples] = useState<number | null>(null);
 	const [infoLatency, setInfoLatency] = useState("unknown");
 	const statusRef = useRef<string | null>("Idle");
 	const finalDurationRef = useRef<number | null>(null);
@@ -185,6 +186,7 @@ export function useStreamingClipNode({
 			timelineSampleRateRef.current = ctx.sampleRate;
 			setAudioDuration(null);
 			setSeekableDuration(null);
+			setSeekableSamples(null);
 
 			// Create ClipNode (no buffer — streaming mode)
 			const clip = new ClipNode(ctx);
@@ -267,6 +269,7 @@ export function useStreamingClipNode({
 					}
 					case "decoded": {
 						const { samplesDecoded } = ev.data;
+						setSeekableSamples(samplesDecoded);
 						if (timelineSampleRateRef.current != null) {
 							const nextSeekable = secondsFromSamples(
 								samplesDecoded,
@@ -302,6 +305,7 @@ export function useStreamingClipNode({
 							finalDurationRef.current = duration;
 							setAudioDuration(duration);
 							setSeekableDuration(duration);
+							setSeekableSamples(samples);
 						}
 						break;
 					}
@@ -363,27 +367,28 @@ export function useStreamingClipNode({
 		setProgress(0);
 		setStatus("Stopped.");
 		setSeekableDuration(null);
+		setSeekableSamples(null);
 		if (finalDurationRef.current != null) {
 			setAudioDuration(finalDurationRef.current);
 		}
 	}, [setStatus]);
 
 	const seekPlayhead = useCallback(
-		(targetSeconds: number) => {
-			const { value, clamped } = clampSeekTargetSeconds(
-				targetSeconds,
-				seekableDuration,
+		(targetSample: number) => {
+			const { value: clampedValue, clamped } = clampSeekTargetSamples(
+				targetSample,
+				seekableSamples,
 			);
-			setValue("playhead", value);
+			setValue("playhead", clampedValue);
 			const node = clipRef.current;
 			if (node) {
-				applyValueToClip(node, "playhead", value);
+				applyValueToClip(node, "playhead", clampedValue);
 			}
 			if (clamped) {
 				setStatus("Seek limited to decoded region while streaming.");
 			}
 		},
-		[seekableDuration, setStatus, setValue],
+		[seekableSamples, setStatus, setValue],
 	);
 
 	const applyValue = useCallback(

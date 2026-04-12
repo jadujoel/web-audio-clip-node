@@ -53,3 +53,24 @@ export function clampSeekTargetSeconds(
 	}
 	return { value: seekableDurationSeconds, clamped: true };
 }
+
+export function clampSeekTargetSamples(
+	targetSample: number,
+	seekableSamples: number | null,
+): { value: number; clamped: boolean } {
+	const requested = Number.isFinite(targetSample)
+		? Math.max(0, Math.floor(targetSample))
+		: 0;
+	if (
+		seekableSamples == null ||
+		!Number.isFinite(seekableSamples) ||
+		seekableSamples < 0
+	) {
+		return { value: requested, clamped: false };
+	}
+	const clampedValue = Math.min(requested, Math.max(0, Math.floor(seekableSamples)));
+	return {
+		value: clampedValue,
+		clamped: clampedValue !== requested,
+	};
+}
