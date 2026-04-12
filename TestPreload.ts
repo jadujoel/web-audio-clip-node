@@ -89,8 +89,16 @@ export function createContext(opts?: {
 	sampleRate?: number;
 	length?: number;
 	channels?: number;
+	preferOffline?: boolean;
 }): AudioContext | OfflineAudioContext {
 	const sampleRate = opts?.sampleRate ?? 44100;
+	if (opts?.preferOffline) {
+		return new OfflineAudioContext(
+			opts?.channels ?? 1,
+			opts?.length ?? sampleRate,
+			sampleRate,
+		);
+	}
 	try {
 		return new AudioContext({ sampleRate });
 	} catch {

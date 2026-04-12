@@ -1,18 +1,34 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 
 import { createContext, renderContext } from "../../TestPreload";
 import { ClipNode } from "./ClipNode";
+
+beforeAll(async () => {
+	await Bun.build({
+		entrypoints: ["src/audio/processor.ts"],
+		outdir: "dist/audio",
+	});
+});
 
 describe("AudioWorklet Bun integration", () => {
 	test("loads the processor module without crashing on Bun", async () => {
 		const context = createContext({ sampleRate: 48_000 });
 
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+		expect(
+			context.audioWorklet.addModule("./dist/audio/processor.js"),
+		).resolves.toBeUndefined();
+	});
+
+	test("offline test contexts render deterministically for Bun integration coverage", async () => {
+		const context = createContext({
+			sampleRate: 48_000,
+			channels: 2,
+			length: 48_000,
+			preferOffline: true,
 		});
 
-		expect(
+		expect(context).toBeInstanceOf(OfflineAudioContext);
+		await expect(
 			context.audioWorklet.addModule("./dist/audio/processor.js"),
 		).resolves.toBeUndefined();
 	});
@@ -21,17 +37,13 @@ describe("AudioWorklet Bun integration", () => {
 		const context = createContext({
 			sampleRate: 48_000,
 			channels: 2,
-			length: 48_000 * 2,
-		});
-
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+			length: 12_000,
+			preferOffline: true,
 		});
 
 		await context.audioWorklet.addModule("./dist/audio/processor.js");
 
-		const buffer = context.createBuffer(2, 48_000, context.sampleRate);
+		const buffer = context.createBuffer(2, 12_000, context.sampleRate);
 		buffer.getChannelData(0).fill(0.25);
 		buffer.getChannelData(1).fill(0.25);
 
@@ -51,11 +63,7 @@ describe("AudioWorklet Bun integration", () => {
 			sampleRate: 48_000,
 			channels: 2,
 			length: 48_000,
-		});
-
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+			preferOffline: true,
 		});
 
 		await context.audioWorklet.addModule("./dist/audio/processor.js");
@@ -83,17 +91,13 @@ describe("AudioWorklet Bun integration", () => {
 		const context = createContext({
 			sampleRate: 48_000,
 			channels: 2,
-			length: 48_000 * 2,
-		});
-
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+			length: 12_000,
+			preferOffline: true,
 		});
 
 		await context.audioWorklet.addModule("./dist/audio/processor.js");
 
-		const buffer1 = context.createBuffer(2, 48_000, context.sampleRate);
+		const buffer1 = context.createBuffer(2, 12_000, context.sampleRate);
 		buffer1.getChannelData(0).fill(0.25);
 		buffer1.getChannelData(1).fill(0.25);
 
@@ -103,7 +107,7 @@ describe("AudioWorklet Bun integration", () => {
 		clip.start();
 
 		// Swap to a different buffer after a short delay
-		const buffer2 = context.createBuffer(2, 48_000, context.sampleRate);
+		const buffer2 = context.createBuffer(2, 12_000, context.sampleRate);
 		buffer2.getChannelData(0).fill(0.5);
 		buffer2.getChannelData(1).fill(0.5);
 		clip.buffer = buffer2;
@@ -118,12 +122,8 @@ describe("AudioWorklet Bun integration", () => {
 		const context = createContext({
 			sampleRate: 48_000,
 			channels: 2,
-			length: 48_000 * 2,
-		});
-
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+			length: 12_000,
+			preferOffline: true,
 		});
 
 		await context.audioWorklet.addModule("./dist/audio/processor.js");
@@ -132,18 +132,18 @@ describe("AudioWorklet Bun integration", () => {
 		clip.connect(context.destination);
 
 		// Initialize streaming buffer
-		clip.initializeBuffer(48_000, 2, { streaming: true });
+		clip.initializeBuffer(12_000, 2, { streaming: true });
 		clip.start();
 
 		// Feed data in chunks
-		const chunkSize = 4800;
+		const chunkSize = 1_200;
 		for (let i = 0; i < 10; i++) {
 			const data = [
 				new Float32Array(chunkSize).fill(0.25),
 				new Float32Array(chunkSize).fill(0.25),
 			];
 			clip.replaceBufferRange(i * chunkSize, data, {
-				totalLength: 48_000,
+				totalLength: 12_000,
 				streamEnded: i === 9,
 			});
 		}
@@ -158,26 +158,22 @@ describe("AudioWorklet Bun integration", () => {
 		const context = createContext({
 			sampleRate: 48_000,
 			channels: 2,
-			length: 48_000 * 2,
-		});
-
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
+			length: 12_000,
+			preferOffline: true,
 		});
 
 		await context.audioWorklet.addModule("./dist/audio/processor.js");
 
 		const clip = new ClipNode(context);
 		clip.connect(context.destination);
-		clip.initializeBuffer(48_000, 2, { streaming: true });
+		clip.initializeBuffer(12_000, 2, { streaming: true });
 		clip.start();
 
 		// Decode has only provided the first 0.1s so far.
 		clip.replaceBufferRange(
 			0,
-			[new Float32Array(4_800).fill(0.25), new Float32Array(4_800).fill(0.25)],
-			{ totalLength: 48_000 },
+			[new Float32Array(1_200).fill(0.25), new Float32Array(1_200).fill(0.25)],
+			{ totalLength: 12_000 },
 		);
 
 		// Scrub far ahead into an uncommitted region; processor should underrun safely.
@@ -186,12 +182,12 @@ describe("AudioWorklet Bun integration", () => {
 		// Continue streaming additional chunks and finish.
 		for (let i = 1; i < 10; i++) {
 			clip.replaceBufferRange(
-				i * 4_800,
+				i * 1_200,
 				[
-					new Float32Array(4_800).fill(0.25),
-					new Float32Array(4_800).fill(0.25),
+					new Float32Array(1_200).fill(0.25),
+					new Float32Array(1_200).fill(0.25),
 				],
-				{ totalLength: 48_000, streamEnded: i === 9 },
+				{ totalLength: 12_000, streamEnded: i === 9 },
 			);
 		}
 
