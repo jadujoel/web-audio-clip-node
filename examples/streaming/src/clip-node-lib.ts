@@ -23,7 +23,7 @@ export {
 	PlayheadSlider,
 	useClipControls,
 } from "../../../src/lib-react";
-export type { ControlKey, ClipNodeState, FrameData } from "../../../src/lib";
+export type { ControlKey, ClipNodeState, FrameData, LoopMode } from "../../../src/lib";
 export {
 	createStreamingWorker,
 	detectStreamFormat,

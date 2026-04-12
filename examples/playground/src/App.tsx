@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
 	type ControlKey,
+	type LoopMode,
 	controlDefs,
 	getActiveLinkedControls,
 	getLinkedControlPairForControl,
@@ -202,6 +203,14 @@ export function App() {
 		[controls.setLoop, node.setLoopOnNode],
 	);
 
+	const handleLoopModeChange = useCallback(
+		(mode: LoopMode) => {
+			controls.setLoopMode(mode);
+			node.setLoopModeOnNode(mode);
+		},
+		[controls.setLoopMode, node.setLoopModeOnNode],
+	);
+
 	const handleMaxLockedChange = useCallback(
 		(key: ControlKey, locked: boolean) => {
 			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
@@ -362,6 +371,18 @@ export function App() {
 							checked={controls.loop}
 							onChange={(e) => handleLoopChange(e.target.checked)}
 						/>
+						{controls.loop && (
+							<select
+								id="loopMode"
+								value={controls.loopMode}
+								onChange={(e) =>
+									handleLoopModeChange(e.target.value as LoopMode)
+								}
+							>
+								<option value="forward">Forward</option>
+								<option value="ping-pong">Ping-Pong</option>
+							</select>
+						)}
 					</div>
 					{controls.loop && (
 						<ControlSection

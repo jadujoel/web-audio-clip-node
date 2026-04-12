@@ -162,4 +162,24 @@ test.describe("Playground example", () => {
 		await expect(page.locator("section#buttons")).toBeVisible();
 		expect(errors).toEqual([]);
 	});
+
+	test("loop mode dropdown appears when loop is enabled", async ({ page }) => {
+		const loopCheckbox = page.locator("#loop");
+		await expect(loopCheckbox).toBeVisible();
+
+		// Loop mode dropdown should not be visible initially
+		await expect(page.locator("#loopMode")).toHaveCount(0);
+
+		// Enable loop
+		await loopCheckbox.check();
+
+		// Now the loop mode dropdown should appear
+		const loopMode = page.locator("#loopMode");
+		await expect(loopMode).toBeVisible();
+		await expect(loopMode).toHaveValue("forward");
+
+		// Switch to ping-pong
+		await loopMode.selectOption("ping-pong");
+		await expect(loopMode).toHaveValue("ping-pong");
+	});
 });

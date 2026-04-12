@@ -260,4 +260,63 @@ test.describe("Streaming example", () => {
 		const urlInput = page.locator("input#url");
 		await expect(urlInput).toHaveValue(/\.fopus$/);
 	});
+
+	test("resume continues from paused position instead of restarting", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming playhead not supported in headless Firefox",
+		);
+
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const pauseBtn = page.locator("button").filter({ hasText: /Pause|Resume/ });
+		const slider = page.locator(".playhead-slider [role='slider']");
+
+		// Start streaming playback
+		await streamBtn.click();
+
+		// Wait for playhead to advance past 0
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+
+		// Pause
+		await pauseBtn.click();
+		await page.waitForTimeout(500);
+
+		// Record the paused playhead value
+		const pausedValue = Number(await slider.getAttribute("aria-valuenow"));
+		expect(pausedValue).toBeGreaterThan(0);
+
+		// Resume
+		await pauseBtn.click();
+		await page.waitForTimeout(500);
+
+		// Verify playhead is >= the paused value (not reset to 0)
+		const resumedValue = Number(await slider.getAttribute("aria-valuenow"));
+		expect(resumedValue).toBeGreaterThanOrEqual(pausedValue);
+	});
+
+	test("loop mode dropdown appears when loop is enabled", async ({ page }) => {
+		const loopCheckbox = page.locator("#loop");
+		await expect(loopCheckbox).toBeVisible();
+
+		// Loop mode dropdown should not be visible initially
+		await expect(page.locator("#loopMode")).toHaveCount(0);
+
+		// Enable loop
+		await loopCheckbox.check();
+
+		// Now the loop mode dropdown should appear
+		const loopMode = page.locator("#loopMode");
+		await expect(loopMode).toBeVisible();
+		await expect(loopMode).toHaveValue("forward");
+
+		// Switch to ping-pong
+		await loopMode.selectOption("ping-pong");
+		await expect(loopMode).toHaveValue("ping-pong");
+	});
 });

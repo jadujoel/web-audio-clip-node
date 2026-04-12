@@ -55,6 +55,7 @@ await ctx.audioWorklet.addModule(getProcessorBlobUrl());
 const clip = new ClipNode(ctx);
 clip.connect(ctx.destination);
 
+// Ogg Opus at 48 kHz recommended — avoids resampling overhead
 const response = await fetch("/audio/clip.opus");
 const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
 
@@ -75,6 +76,8 @@ clip.start();
 ```
 
 `clip.playhead` is read and written in samples, so you can scrub to an exact frame position while playback is active.
+
+> **Tip:** Use **Ogg Opus** encoded at **48 kHz** for best performance. Most browsers run Web Audio at 48 kHz internally; matching the source sample rate avoids resampling overhead on decode.
 
 ## React Quick Start
 
@@ -188,9 +191,8 @@ The [examples](examples/) directory covers the main integration styles.
 | Example | Description | Build step? |
 |---------|-------------|-------------|
 | [cdn-vanilla](examples/cdn-vanilla/) | Single HTML file using the CDN bundle and processor URL | No |
+| [cdn-opus-streaming](examples/cdn-opus-streaming/) | Single HTML file streaming Ogg Opus through ClipNode via CDN imports | No |
 | [esm-bundler](examples/esm-bundler/) | Vite + TypeScript app importing the package directly | Yes |
-| [react](examples/react/) | Vite + React with the included hooks and controls | Yes |
-| [self-hosted](examples/self-hosted/) | Vite app serving `processor.js` locally via `getProcessorModuleUrl()` | Yes |
 
 ## License
 

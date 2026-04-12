@@ -15,7 +15,7 @@ import {
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
-import type { StreamFormat } from "./clip-node-lib";
+import type { LoopMode, StreamFormat } from "./clip-node-lib";
 import {
 	clampSeekTargetSamples,
 	secondsFromSamples,
@@ -454,7 +454,7 @@ export function useStreamingClipNode({
 			clip.pause();
 			setStatus("Paused.");
 		} else if (clip.state === "paused") {
-			clip.start();
+			clip.resume();
 			setStatus("Resumed.");
 		}
 	}, [setStatus]);
@@ -527,6 +527,11 @@ export function useStreamingClipNode({
 		if (node) node.loop = checked;
 	}, []);
 
+	const setLoopModeOnNode = useCallback((mode: LoopMode) => {
+		const clip = clipRef.current;
+		if (clip) clip.loopMode = mode;
+	}, []);
+
 	return {
 		nodeState,
 		statusMessage,
@@ -545,5 +550,6 @@ export function useStreamingClipNode({
 		applyValues,
 		applyToggle,
 		setLoopOnNode,
+		setLoopModeOnNode,
 	};
 }

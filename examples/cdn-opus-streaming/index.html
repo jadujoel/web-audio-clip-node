@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CDN Opus Streaming — web-audio-clip-node</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #2b2b2b;
+      color: #e8e8e8;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    main { width: min(520px, 100%); }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    p { margin: 0 0 16px; color: #b8b8b8; line-height: 1.5; }
+    .controls { display: flex; gap: 8px; margin-bottom: 10px; }
+    button {
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #3a3a3a;
+      color: #e8e8e8;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    #status { color: #9ec2e8; min-height: 1.25em; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CDN Opus Streaming</h1>
+    <p>No install and no build. Streams Ogg Opus through <code>ClipNode</code> using the package CDN build.</p>
+    <div class="controls">
+      <button id="start">Start stream</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+    <div id="status">Idle</div>
+  </main>
+
+  <script type="module">
+    import {
+      ClipNode,
+      getProcessorCdnUrl,
+    } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
+
+    import { getStreamingWorkerUrl } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/streaming.js";
+
+    const OPUS_URL = "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
+    const startBtn = document.getElementById("start");
+    const stopBtn = document.getElementById("stop");
+    const statusEl = document.getElementById("status");
+
+    let ctx;
+    let clip;
+    let worker;
+    let started = false;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function stopStream() {
+      if (worker) {
+        worker.postMessage({ type: "abort" });
+        worker.terminate();
+        worker = null;
+      }
+      if (clip) {
+        clip.stop();
+        clip.disconnect();
+        clip = null;
+      }
+      started = false;
+      stopBtn.disabled = true;
+    }
+
+    startBtn.onclick = async () => {
+      stopStream();
+
+      if (!ctx) {
+        ctx = new AudioContext({ sampleRate: 48000 });
+        await ctx.audioWorklet.addModule(getProcessorCdnUrl());
+      }
+      await ctx.resume();
+
+      clip = new ClipNode(ctx);
+      clip.connect(ctx.destination);
+
+      const channel = new MessageChannel();
+      clip.transferPort(channel.port2);
+
+      worker = new Worker(getStreamingWorkerUrl("OggOpus"));
+      worker.onmessage = (event) => {
+        const msg = event.data;
+        if (msg.type === "decoded" && !started) {
+          clip.start();
+          started = true;
+          setStatus("Streaming and playing...");
+        } else if (msg.type === "progress") {
+          const kb = ((msg.bytesReceived || 0) / 1024) | 0;
+          setStatus(`Downloading... ${kb} KB`);
+        } else if (msg.type === "done") {
+          setStatus("Stream finished.");
+        } else if (msg.type === "error") {
+          setStatus(`Error: ${msg.message}`);
+        }
+      };
+
+      worker.postMessage(
+        {
+          type: "init",
+          port: channel.port1,
+          url: OPUS_URL,
+          throttle: 0,
+          targetSampleRate: ctx.sampleRate,
+        },
+        [channel.port1],
+      );
+
+      stopBtn.disabled = false;
+      setStatus("Starting stream...");
+    };
+
+    stopBtn.onclick = () => {
+      stopStream();
+      setStatus("Stopped");
+    };
+  </script>
+</body>
+</html>

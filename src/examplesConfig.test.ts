@@ -8,16 +8,8 @@ describe("examples config", () => {
 			join(import.meta.dir, "../examples/playground/src/App.tsx"),
 			"utf8",
 		);
-		const reactSource = await readFile(
-			join(import.meta.dir, "../examples/react/src/App.tsx"),
-			"utf8",
-		);
 		const esmSource = await readFile(
 			join(import.meta.dir, "../examples/esm-bundler/main.ts"),
-			"utf8",
-		);
-		const selfHostedSource = await readFile(
-			join(import.meta.dir, "../examples/self-hosted/src/main.ts"),
 			"utf8",
 		);
 		const streamingSource = await readFile(
@@ -41,10 +33,7 @@ describe("examples config", () => {
 		expect(playgroundSource).toContain(
 			"@jadujoel/web-audio-clip-node/styles.css",
 		);
-		expect(reactSource).toContain("@jadujoel/web-audio-clip-node/react");
-		expect(reactSource).toContain("@jadujoel/web-audio-clip-node/styles.css");
 		expect(esmSource).toContain("@jadujoel/web-audio-clip-node");
-		expect(selfHostedSource).toContain("@jadujoel/web-audio-clip-node");
 		expect(streamingSource).not.toContain("@jadujoel/web-audio-clip-node");
 		expect(streamingHookSource).not.toContain("@jadujoel/web-audio-clip-node");
 		expect(streamingShimSource).toContain("../../../src/lib");
@@ -60,10 +49,7 @@ describe("examples config", () => {
 
 		expect(source).toContain("bun run build:lib");
 		expect(source).toContain('linkWorkspacePackage("examples/playground")');
-		expect(source).toContain('linkWorkspacePackage("examples/react")');
 		expect(source).toContain('linkWorkspacePackage("examples/esm-bundler")');
-		expect(source).toContain('linkWorkspacePackage("examples/self-hosted")');
 		expect(source).not.toContain('linkWorkspacePackage("examples/streaming")');
-		expect(source).toContain("bun run --cwd examples/self-hosted setup");
 	});
 });

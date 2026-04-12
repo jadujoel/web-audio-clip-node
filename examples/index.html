@@ -187,7 +187,7 @@
     <header>
       <p class="eyebrow">@jadujoel/web-audio-clip-node</p>
       <h1>Examples</h1>
-      <p class="subtitle">Six integration paths for the custom Audio Worklet Node — from a zero-build CDN snippet to a full streaming React app.</p>
+      <p class="subtitle">Five integration paths for the custom Audio Worklet Node — from zero-build CDN snippets to a full streaming React app.</p>
     </header>
 
     <ul class="grid">
@@ -202,12 +202,32 @@
         </a>
       </li>
       <li class="card">
+        <a href="streaming">
+          <div class="card-header">
+            <span class="card-icon">🎵</span>
+            <span class="card-title">Streaming<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Decode and buffer audio on-the-fly from a network stream via a dedicated Worker — minimal latency start.</p>
+          <span class="badge">Bun · Worker</span>
+        </a>
+      </li>
+      <li class="card">
         <a href="cdn-vanilla">
           <div class="card-header">
             <span class="card-icon">🌐</span>
             <span class="card-title">CDN Vanilla<span class="arrow">→</span></span>
           </div>
           <p class="card-desc">Single HTML file. No build step — loads the jsDelivr bundle directly and plays a generated demo clip.</p>
+          <span class="badge">No build</span>
+        </a>
+      </li>
+      <li class="card">
+        <a href="cdn-opus-streaming">
+          <div class="card-header">
+            <span class="card-icon">📡</span>
+            <span class="card-title">CDN Opus Streaming<span class="arrow">→</span></span>
+          </div>
+          <p class="card-desc">Single HTML file. Streams Ogg Opus with ClipNode using CDN imports only.</p>
           <span class="badge">No build</span>
         </a>
       </li>
@@ -219,36 +239,6 @@
           </div>
           <p class="card-desc">Bun + TypeScript importing the package as an ES module. Standard bundler workflow.</p>
           <span class="badge">Bun</span>
-        </a>
-      </li>
-      <li class="card">
-        <a href="react">
-          <div class="card-header">
-            <span class="card-icon">⚛️</span>
-            <span class="card-title">React<span class="arrow">→</span></span>
-          </div>
-          <p class="card-desc">Bun + React using the built-in hooks and UI controls — the full interactive demo.</p>
-          <span class="badge">Bun · React</span>
-        </a>
-      </li>
-      <li class="card">
-        <a href="self-hosted">
-          <div class="card-header">
-            <span class="card-icon">🗄️</span>
-            <span class="card-title">Self-Hosted<span class="arrow">→</span></span>
-          </div>
-          <p class="card-desc">Serve your own <code>processor.js</code> via <code>getProcessorModuleUrl()</code> for full control over asset hosting.</p>
-          <span class="badge">Bun</span>
-        </a>
-      </li>
-      <li class="card">
-        <a href="streaming">
-          <div class="card-header">
-            <span class="card-icon">🎵</span>
-            <span class="card-title">Streaming<span class="arrow">→</span></span>
-          </div>
-          <p class="card-desc">Decode and buffer audio on-the-fly from a network stream via a dedicated Worker — minimal latency start.</p>
-          <span class="badge">Bun · Worker</span>
         </a>
       </li>
     </ul>

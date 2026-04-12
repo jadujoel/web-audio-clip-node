@@ -14,13 +14,24 @@ test.describe("Landing page", () => {
 		for (const name of [
 			"playground",
 			"cdn-vanilla",
+			"cdn-opus-streaming",
 			"esm-bundler",
-			"react",
-			"self-hosted",
 			"streaming",
 		]) {
 			expect(hrefs).toContain(name);
 		}
+	});
+
+	test("does not show a React card", async ({ page }) => {
+		await openLanding(page);
+		const reactCard = page.locator('a[href="react"]');
+		await expect(reactCard).toHaveCount(0);
+	});
+
+	test("does not show a Self-Hosted card", async ({ page }) => {
+		await openLanding(page);
+		const selfHostedCard = page.locator('a[href="self-hosted"]');
+		await expect(selfHostedCard).toHaveCount(0);
 	});
 
 	test("each card navigates to the correct example", async ({ page }) => {

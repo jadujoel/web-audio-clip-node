@@ -115,15 +115,17 @@ class ClipProcessor extends AudioWorkletProcessor {
 			// Frame reporting
 			const timeTaken = currentTime - this.lastFrameTime;
 			this.lastFrameTime = currentTime;
-			this.port.postMessage({
-				type: "frame",
-				data: [
-					currentTime,
-					currentFrame,
-					Math.floor(this.properties.playhead),
-					timeTaken * 1000,
-				],
-			});
+			if (this.properties.enableFrameReporting) {
+				this.port.postMessage({
+					type: "frame",
+					data: [
+						currentTime,
+						currentFrame,
+						Math.floor(this.properties.playhead),
+						timeTaken * 1000,
+					],
+				});
+			}
 
 			return result.keepAlive;
 		} catch (e) {

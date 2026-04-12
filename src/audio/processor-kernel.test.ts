@@ -5246,3 +5246,36 @@ describe("Ping-pong looping", () => {
 		expect(props.playbackDirection).toBe(1);
 	});
 });
+
+describe("enableFrameReporting", () => {
+	const SR = 48000;
+
+	it("defaults to false in getProperties", () => {
+		const props = getProperties({}, SR);
+		expect(props.enableFrameReporting).toBe(false);
+	});
+
+	it("handleProcessorMessage sets enableFrameReporting to true", () => {
+		const props = getProperties({}, SR);
+		expect(props.enableFrameReporting).toBe(false);
+		handleProcessorMessage(
+			props,
+			{ type: "enableFrameReporting", data: true },
+			0,
+			SR,
+		);
+		expect(props.enableFrameReporting).toBe(true);
+	});
+
+	it("handleProcessorMessage sets enableFrameReporting back to false", () => {
+		const props = getProperties({ enableFrameReporting: true }, SR);
+		expect(props.enableFrameReporting).toBe(true);
+		handleProcessorMessage(
+			props,
+			{ type: "enableFrameReporting", data: false },
+			0,
+			SR,
+		);
+		expect(props.enableFrameReporting).toBe(false);
+	});
+});

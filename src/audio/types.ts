@@ -43,6 +43,7 @@ export interface ClipProcessorOptions {
 	enableLowpass?: boolean;
 	enableDetune?: boolean;
 	enablePlaybackRate?: boolean;
+	enableFrameReporting?: boolean;
 }
 
 export interface ClipWorkletOptions extends AudioWorkletNodeOptions {
@@ -126,7 +127,8 @@ export type ClipProcessorMessageRx =
 	| ClipProcessorLoopCrossfadeMessageRx
 	| ClipProcessorLoopCrossfadeOffsetMessageRx
 	| ClipProcessorToggleMessageRx
-	| ClipProcessorLogStateMessageRx;
+	| ClipProcessorLogStateMessageRx
+	| ClipProcessorEnableFrameReportingMessageRx;
 
 export type ClipProcessorMessageType =
 	| "buffer"
@@ -151,11 +153,17 @@ export type ClipProcessorMessageType =
 	| "loopCrossfade"
 	| "loopCrossfadeOffset"
 	| ClipProcessorToggleMessageType
-	| "logState";
+	| "logState"
+	| "enableFrameReporting";
 
 export interface ClipProcessorLogStateMessageRx {
 	readonly type: "logState";
 	readonly data?: never;
+}
+
+export interface ClipProcessorEnableFrameReportingMessageRx {
+	readonly type: "enableFrameReporting";
+	readonly data: boolean;
 }
 
 export interface ClipProcessorToggleMessageRx {

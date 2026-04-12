@@ -8,6 +8,7 @@ app.innerHTML = `
   <p id="status">Click Play to start.</p>
 `;
 
+// Tip: For real audio, use Ogg Opus at 48 kHz — avoids resampling overhead.
 function createToneBuffer(ctx: AudioContext, freq = 440, duration = 2) {
 	const length = ctx.sampleRate * duration;
 	const buf = ctx.createBuffer(1, length, ctx.sampleRate);

@@ -17,6 +17,7 @@ import {
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
+import type { LoopMode } from "./clip-node-lib";
 import {
 	controlDefs,
 	loopControlDefs,
@@ -167,8 +168,8 @@ export function App() {
 		setValue: controls.setValue,
 	});
 
-	const [format, setFormat] = useState<StreamFormat>("Mp3");
-	const [url, setUrl] = useState(getDefaultUrlForFormat("Mp3"));
+	const [format, setFormat] = useState<StreamFormat>("OggOpus");
+	const [url, setUrl] = useState(getDefaultUrlForFormat("OggOpus"));
 	const [throttle, setThrottle] = useState(0);
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
@@ -358,6 +359,14 @@ export function App() {
 		[controls.setLoop, node.setLoopOnNode],
 	);
 
+	const handleLoopModeChange = useCallback(
+		(mode: LoopMode) => {
+			controls.setLoopMode(mode);
+			node.setLoopModeOnNode(mode);
+		},
+		[controls.setLoopMode, node.setLoopModeOnNode],
+	);
+
 	const handleMaxLockedChange = useCallback(
 		(key: ControlKey, locked: boolean) => {
 			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
@@ -473,7 +482,7 @@ export function App() {
 				<option value="Mp4Aac">AAC (MP4/M4A)</option>
 				<option value="Flac">FLAC (Lossless)</option>
 				<option value="OggFlac">FLAC (OGG)</option>
-				<option value="OggOpus">Opus (Ogg)</option>
+				<option value="OggOpus">Opus (Ogg) — Recommended</option>
 				<option value="OggVorbis">Vorbis (Ogg)</option>
 				<option value="RawOpusFramed">Opus (framed raw)</option>
 				<option value="WebmOpus">Opus (WebM)</option>
@@ -668,6 +677,18 @@ export function App() {
 							checked={controls.loop}
 							onChange={(e) => handleLoopChange(e.target.checked)}
 						/>
+						{controls.loop && (
+							<select
+								id="loopMode"
+								value={controls.loopMode}
+								onChange={(e) =>
+									handleLoopModeChange(e.target.value as LoopMode)
+								}
+							>
+								<option value="forward">Forward</option>
+								<option value="ping-pong">Ping-Pong</option>
+							</select>
+						)}
 					</div>
 					{controls.loop && (
 						<ControlSection

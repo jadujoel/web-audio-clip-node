@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, parse as parsePath } from "node:path";
 
@@ -131,22 +132,36 @@ async function copySounds(outputRoot: string): Promise<void> {
 export async function buildWebpage(): Promise<void> {
 	await rm(webpageDir, { force: true, recursive: true });
 
+	const hasReactExample = existsSync("examples/react/index.html");
+	const hasSelfHostedExample = existsSync("examples/self-hosted/index.html");
+	const hasSelfHostedSetup = existsSync("examples/self-hosted/package.json");
+	const hasSelfHostedProcessor = existsSync(
+		"examples/self-hosted/public/processor.js",
+	);
+
 	// Link library to examples that use package imports
-	await Promise.all([
+	const linkTasks: Promise<void>[] = [
 		linkWorkspacePackage("examples/playground"),
-		linkWorkspacePackage("examples/react"),
 		linkWorkspacePackage("examples/esm-bundler"),
-		linkWorkspacePackage("examples/self-hosted"),
-	]);
+	];
+	if (hasReactExample) {
+		linkTasks.push(linkWorkspacePackage("examples/react"));
+	}
+	if (hasSelfHostedExample) {
+		linkTasks.push(linkWorkspacePackage("examples/self-hosted"));
+	}
+	await Promise.all(linkTasks);
 
 	// Self-hosted needs processor.js copied
-	await Bun.$`bun run --cwd examples/self-hosted setup`;
+	if (hasSelfHostedExample && hasSelfHostedSetup) {
+		await Bun.$`bun run --cwd examples/self-hosted setup`;
+	}
 
 	// Streaming worker build
 	await Bun.$`bun run --cwd examples/streaming build:worker`;
 
 	// Build all examples in parallel
-	await Promise.all([
+	const buildTasks: Promise<unknown>[] = [
 		// Landing page
 		Bun.build({
 			entrypoints: ["./examples/index.html"],
@@ -159,19 +174,14 @@ export async function buildWebpage(): Promise<void> {
 		cp("examples/cdn-vanilla", join(webpageDir, "cdn-vanilla"), {
 			recursive: true,
 		}),
+		// CDN Opus Streaming — static copy
+		cp("examples/cdn-opus-streaming", join(webpageDir, "cdn-opus-streaming"), {
+			recursive: true,
+		}),
 		// Playground — full interactive demo
 		Bun.build({
 			entrypoints: ["./examples/playground/index.html"],
 			outdir: join(webpageDir, "playground"),
-			target: "browser",
-			minify: true,
-			throw: true,
-			define: reactProductionDefine,
-		}),
-		// React — minimal React integration
-		Bun.build({
-			entrypoints: ["./examples/react/index.html"],
-			outdir: join(webpageDir, "react"),
 			target: "browser",
 			minify: true,
 			throw: true,
@@ -185,14 +195,6 @@ export async function buildWebpage(): Promise<void> {
 			minify: true,
 			throw: true,
 		}),
-		// Self-Hosted
-		Bun.build({
-			entrypoints: ["./examples/self-hosted/index.html"],
-			outdir: join(webpageDir, "self-hosted"),
-			target: "browser",
-			minify: true,
-			throw: true,
-		}),
 		// Streaming
 		Bun.build({
 			entrypoints: ["./examples/streaming/index.html"],
@@ -202,13 +204,42 @@ export async function buildWebpage(): Promise<void> {
 			throw: true,
 			define: reactProductionDefine,
 		}),
-	]);
+	];
+
+	if (hasReactExample) {
+		buildTasks.push(
+			Bun.build({
+				entrypoints: ["./examples/react/index.html"],
+				outdir: join(webpageDir, "react"),
+				target: "browser",
+				minify: true,
+				throw: true,
+				define: reactProductionDefine,
+			}),
+		);
+	}
+
+	if (hasSelfHostedExample) {
+		buildTasks.push(
+			Bun.build({
+				entrypoints: ["./examples/self-hosted/index.html"],
+				outdir: join(webpageDir, "self-hosted"),
+				target: "browser",
+				minify: true,
+				throw: true,
+			}),
+		);
+	}
+
+	await Promise.all(buildTasks);
 
 	// Copy self-hosted processor.js into its webpage output
-	await cp(
-		"examples/self-hosted/public/processor.js",
-		join(webpageDir, "self-hosted", "processor.js"),
-	);
+	if (hasSelfHostedExample && hasSelfHostedProcessor) {
+		await cp(
+			"examples/self-hosted/public/processor.js",
+			join(webpageDir, "self-hosted", "processor.js"),
+		);
+	}
 
 	// Build streaming decode workers into webpage output
 	const streamingWorkersDir = join(webpageDir, "streaming", "workers");

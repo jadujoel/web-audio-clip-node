@@ -19,6 +19,7 @@ export type {
 	ClipProcessorToggleMessageType,
 	ClipWorkletOptions,
 	FrameData,
+	LoopMode,
 	StreamBufferSpan,
 	StreamBufferState,
 } from "./audio/types";

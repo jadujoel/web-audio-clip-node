@@ -22,12 +22,9 @@ export async function examples() {
 	await Bun.$`bun run build:lib`;
 	await Promise.all([
 		linkWorkspacePackage("examples/playground"),
-		linkWorkspacePackage("examples/react"),
 		linkWorkspacePackage("examples/esm-bundler"),
-		linkWorkspacePackage("examples/self-hosted"),
 	]);
-	await Bun.$`bun run --cwd examples/self-hosted setup`;
-	await Bun.$`bun examples/index.html examples/cdn-vanilla/index.html examples/playground/index.html examples/esm-bundler/index.html examples/react/index.html examples/self-hosted/index.html examples/streaming/index.html`;
+	await Bun.$`bun examples/index.html examples/cdn-vanilla/index.html examples/cdn-opus-streaming/index.html examples/playground/index.html examples/esm-bundler/index.html examples/streaming/index.html`;
 }
 
 if (import.meta.main) {

@@ -14,7 +14,7 @@ export class ClipNode extends AudioWorkletNode {
 	onended?: () => void;
 	onlooped?: () => void;
 	onstopped?: () => void;
-	onframe?: (data: FrameData) => void;
+	private _onframe?: (data: FrameData) => void;
 	ondisposed?: () => void;
 	onstatechange?: (state: ClipNodeState) => void;
 
@@ -37,6 +37,21 @@ export class ClipNode extends AudioWorkletNode {
 	timesLooped = 0;
 	state: ClipNodeState = "initial";
 	cpu = 0;
+
+	get onframe(): ((data: FrameData) => void) | undefined {
+		return this._onframe;
+	}
+	set onframe(cb: ((data: FrameData) => void) | undefined) {
+		const hadCallback = !!this._onframe;
+		this._onframe = cb;
+		const hasCallback = !!cb;
+		if (hadCallback !== hasCallback) {
+			this.port.postMessage({
+				type: "enableFrameReporting",
+				data: hasCallback,
+			});
+		}
+	}
 
 	constructor(context: BaseAudioContext, options: ClipWorkletOptions = {}) {
 		super(context, "ClipProcessor", {
@@ -64,7 +79,7 @@ export class ClipNode extends AudioWorkletNode {
 				const [_ct, _cf, ph, tt] = data as [number, number, number, number];
 				this._playhead = ph;
 				this.cpu = tt;
-				this.onframe?.(data);
+				this._onframe?.(data);
 				break;
 			}
 			case "scheduled":
@@ -384,7 +399,7 @@ export class ClipNode extends AudioWorkletNode {
 		this.ondisposed?.();
 		this._buffer = undefined;
 		this.onended = undefined;
-		this.onframe = undefined;
+		this._onframe = undefined;
 		this.onlooped = undefined;
 		this.onpaused = undefined;
 		this.onresumed = undefined;

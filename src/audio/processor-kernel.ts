@@ -218,6 +218,7 @@ export function getProperties(
 		enablePan = true,
 		enableDetune = true,
 		enablePlaybackRate = true,
+		enableFrameReporting = false,
 	} = opts;
 
 	return {
@@ -253,6 +254,7 @@ export function getProperties(
 		enableDetune,
 		enablePlaybackRate,
 		enableLoopCrossfade,
+		enableFrameReporting,
 	};
 }
 
@@ -906,6 +908,9 @@ export function handleProcessorMessage(
 				(data as boolean | undefined) ?? !properties.enableLoopCrossfade;
 			return [];
 		case "logState":
+			return [];
+		case "enableFrameReporting":
+			properties.enableFrameReporting = data as boolean;
 			return [];
 	}
 	return [];
