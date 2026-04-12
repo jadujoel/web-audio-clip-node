@@ -198,6 +198,9 @@ export async function buildWebpage(): Promise<void> {
 
 	// Copy sound assets
 	await copySounds(webpageDir);
+
+	// Copy favicon
+	await cp("src/favicon.svg", join(webpageDir, "favicon.svg"));
 }
 
 async function buildProcessorCodeModule(): Promise<string> {
