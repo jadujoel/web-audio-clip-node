@@ -1,7 +1,6 @@
 import { statSync } from "node:fs";
 import { extname, join } from "node:path";
 
-const webpageDir = join(import.meta.dir, "webpage");
 const port = 4175;
 
 const mimeTypes: Record<string, string> = {
@@ -24,35 +23,20 @@ function getMime(path: string): string {
 
 Bun.serve({
 	port,
-	async fetch(req) {
-		const url = new URL(req.url);
-		const pathname = decodeURIComponent(url.pathname);
-
-		// Try exact path first, then index.html for directories
-		let filePath = join(webpageDir, pathname);
-		try {
-			const stat = statSync(filePath);
-			if (stat.isDirectory()) {
-				// Redirect to trailing slash so relative paths resolve correctly
-				if (!pathname.endsWith("/")) {
-					return Response.redirect(`${pathname}/`, 301);
-				}
-				filePath = join(filePath, "index.html");
-			}
-		} catch {
-			// not found, try .html extension
-			if (!extname(pathname)) {
-				filePath = `${filePath}.html`;
-			}
-		}
-
-		const file = Bun.file(filePath);
-		if (await file.exists()) {
-			return new Response(file, {
-				headers: { "Content-Type": getMime(filePath) },
-			});
-		}
-
+  routes: {
+    "/": {
+      GET() {
+        return new Response(Bun.file("webpage/index.html"));
+      }
+    },
+    "/*": {
+      GET(req) {
+        const pathname = new URL(req.url).pathname;
+        return new Response(Bun.file(`webpage/${pathname}`));
+      }
+    }
+  },
+	async fetch() {
 		return new Response("Not Found", { status: 404 });
 	},
 });

@@ -20,7 +20,7 @@ jobs:
         run: bun install
 
       - name: Build
-        run: bun build:lib
+        run: bun run build
 
       - name: Test
         run: bun test
