@@ -218,6 +218,7 @@ export async function buildWebpage(): Promise<void> {
 			entrypoints: [worker.entry],
 			target: "browser",
 			minify: true,
+			format: "iife",
 		});
 		if (!result.success) {
 			throw new Error(
@@ -356,6 +357,7 @@ async function buildStreamingWorkers(): Promise<void> {
 			entrypoints: [worker.entry],
 			target: "browser",
 			minify: true,
+			format: "iife",
 		});
 		if (!result.success) {
 			throw new Error(

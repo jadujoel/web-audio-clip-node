@@ -28,6 +28,9 @@ function applyValue(node: ClipNode, key: ControlKey, value: number) {
 		case "loopCrossfade":
 			node.loopCrossfade = value;
 			break;
+		case "loopCrossfadeOffset":
+			node.loopCrossfadeOffset = value;
+			break;
 		case "fadeIn":
 			node.fadeIn = value;
 			break;
@@ -101,6 +104,7 @@ function applyToggle(node: ClipNode, key: ControlKey, on: boolean) {
 			break;
 		case "startDelay":
 		case "stopDelay":
+		case "loopCrossfadeOffset":
 			// These are applied at start/stop time; toggle state is handled in the hook
 			break;
 	}

@@ -194,6 +194,7 @@ export function getProperties(
 		loopStart = 0,
 		loopEnd = (buffer[0]?.length ?? 0) / sampleRate,
 		loopCrossfade = 0,
+		loopCrossfadeOffset = 0,
 		playhead = 0,
 		playbackDirection = 1 as const,
 		offset = 0,
@@ -227,6 +228,7 @@ export function getProperties(
 		loopStart,
 		loopEnd,
 		loopCrossfade,
+		loopCrossfadeOffset,
 		duration,
 		playhead,
 		playbackDirection,
@@ -842,6 +844,12 @@ export function handleProcessorMessage(
 			properties.loopCrossfade = data as number;
 			properties.enableLoopCrossfade = properties.loopCrossfade > 0;
 			return [];
+		case "loopCrossfadeOffset":
+			properties.loopCrossfadeOffset = Math.max(
+				-1,
+				Math.min(1, data as number),
+			);
+			return [];
 		case "playhead":
 			properties.playhead = Math.floor(data as number);
 			return [];
@@ -982,6 +990,7 @@ export function processBlock(
 		loopStart,
 		loopEnd,
 		loopCrossfade,
+		loopCrossfadeOffset,
 		stopWhen,
 		playedSamples,
 		enableLowpass,
@@ -1143,6 +1152,8 @@ export function processBlock(
 		effectiveSourceLength > SAMPLE_BLOCK_SIZE;
 
 	if (isWithinLoopRange && needsCrossfade) {
+		const offsetShift = Math.floor((loopCrossfadeOffset * xfadeNumSamples) / 2);
+
 		// Crossfade out at loop start: the new iteration fades in while previous
 		// loop tail fades out.  Constant-gain: sin²+cos²=1.
 		{
@@ -1161,7 +1172,7 @@ export function processBlock(
 					const gIn = s * s;
 					const gOut = c * c;
 					const srcIdx = Math.floor(
-						loopEndSamples - xfadeNumSamples + elapsed + i,
+						loopEndSamples - xfadeNumSamples + elapsed + i - offsetShift,
 					);
 					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
@@ -1192,7 +1203,9 @@ export function processBlock(
 					const c = Math.cos((Math.PI * position) / 2);
 					const gOut = c * c;
 					const gIn = s * s;
-					const srcIdx = Math.floor(loopStartSamples + elapsed + i);
+					const srcIdx = Math.floor(
+						loopStartSamples + elapsed + i + offsetShift,
+					);
 					if (srcIdx >= 0 && srcIdx < effectiveSourceLength) {
 						for (let ch = 0; ch < nc; ch++) {
 							output0[ch][i] = output0[ch][i] * gOut + buffer[ch][srcIdx] * gIn;

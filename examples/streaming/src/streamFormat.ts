@@ -20,7 +20,7 @@ export function getDefaultUrlForFormat(format: StreamFormat): string {
 		return "../sounds/example-vorbis.ogg";
 	}
 	if (format === "RawOpusFramed") {
-		return "";
+		return "../sounds/example.fopus";
 	}
 	if (format === "WebmOpus") {
 		return "../sounds/example.webm";

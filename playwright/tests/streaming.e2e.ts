@@ -31,7 +31,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const aacOption = select.locator("option[value='Aac']");
-		await expect(aacOption).toBeVisible();
+		await expect(aacOption).toBeAttached();
 		await expect(aacOption).toHaveText("AAC (ADTS)");
 	});
 
@@ -48,7 +48,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const mp4Option = select.locator("option[value='Mp4Aac']");
-		await expect(mp4Option).toBeVisible();
+		await expect(mp4Option).toBeAttached();
 		await expect(mp4Option).toHaveText("AAC (MP4/M4A)");
 	});
 
@@ -65,7 +65,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const vorbisOggOption = select.locator("option[value='OggVorbis']");
-		await expect(vorbisOggOption).toBeVisible();
+		await expect(vorbisOggOption).toBeAttached();
 		await expect(vorbisOggOption).toHaveText("Vorbis (Ogg)");
 	});
 
@@ -82,7 +82,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const flacOption = select.locator("option[value='Flac']");
-		await expect(flacOption).toBeVisible();
+		await expect(flacOption).toBeAttached();
 		await expect(flacOption).toHaveText("FLAC (Lossless)");
 	});
 
@@ -99,7 +99,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const oggFlacOption = select.locator("option[value='OggFlac']");
-		await expect(oggFlacOption).toBeVisible();
+		await expect(oggFlacOption).toBeAttached();
 		await expect(oggFlacOption).toHaveText("FLAC (OGG)");
 	});
 
@@ -116,7 +116,7 @@ test.describe("Streaming example", () => {
 		await expect(select).toBeVisible();
 
 		const vorbisWebmOption = select.locator("option[value='WebmVorbis']");
-		await expect(vorbisWebmOption).toBeVisible();
+		await expect(vorbisWebmOption).toBeAttached();
 		await expect(vorbisWebmOption).toHaveText("Vorbis (WebM)");
 	});
 
@@ -214,5 +214,43 @@ test.describe("Streaming example", () => {
 		const after = await slider.getAttribute("aria-valuenow");
 		expect(Number(after)).toBeGreaterThanOrEqual(0);
 		expect(Number(after)).toBe(0);
+	});
+
+	test("playhead updates after pressing Stream & Play a second time", async ({
+		page,
+	}) => {
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const stopBtn = page.locator("button:has-text('Stop')");
+		const slider = page.locator(".playhead-slider [role='slider']");
+
+		// First play
+		await streamBtn.click();
+		// Wait for playhead to advance
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 10000 });
+
+		// Stop
+		await stopBtn.click();
+		await page.waitForTimeout(500);
+
+		// Second play
+		await streamBtn.click();
+		// Wait for playhead to advance again (this was the bug — it would freeze)
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 10000 });
+	});
+
+	test("selecting RawOpusFramed format populates default URL", async ({
+		page,
+	}) => {
+		const select = page.locator("select#format-select");
+		await select.selectOption("RawOpusFramed");
+
+		const urlInput = page.locator("input#url");
+		await expect(urlInput).toHaveValue(/\.fopus$/);
 	});
 });

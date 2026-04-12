@@ -13,6 +13,7 @@ export type ControlKey =
 	| "loopStart"
 	| "loopEnd"
 	| "loopCrossfade"
+	| "loopCrossfadeOffset"
 	| "playbackRate"
 	| "detune"
 	| "gain"
@@ -153,6 +154,15 @@ export const loopControlDefs: ControlDef[] = [
 		snap: "beat",
 		hasSnap: true,
 		hasToggle: true,
+	},
+	{
+		key: "loopCrossfadeOffset",
+		label: "Crossfade Offset",
+		min: -1,
+		max: 1,
+		defaultValue: 0,
+		precision: 2,
+		hasToggle: false,
 	},
 ];
 

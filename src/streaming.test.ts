@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectStreamFormat, usesBufferedContainerDecode } from "./streaming";
 
@@ -20,6 +20,16 @@ describe("streaming build output", () => {
 	for (const file of workerFiles) {
 		test(`dist/workers/${file} exists after build`, () => {
 			expect(existsSync(join("dist", "workers", file))).toBe(true);
+		});
+	}
+
+	for (const file of workerFiles) {
+		test(`dist/workers/${file} is IIFE format (no export/import statements)`, () => {
+			const filePath = join("dist", "workers", file);
+			if (!existsSync(filePath)) return; // skip if not built yet
+			const code = readFileSync(filePath, "utf8");
+			expect(code).not.toMatch(/\bexport\s/);
+			expect(code).not.toMatch(/\bimport\s/);
 		});
 	}
 

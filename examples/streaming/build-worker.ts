@@ -56,6 +56,7 @@ for (const worker of workers) {
 		entrypoints: [worker.entry],
 		target: "browser",
 		minify: true,
+		format: "iife",
 	});
 
 	if (!result.success) {

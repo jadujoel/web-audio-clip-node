@@ -18,6 +18,7 @@ export interface ClipProcessorOptions {
 	loopStart?: number;
 	loopEnd?: number;
 	loopCrossfade?: number;
+	loopCrossfadeOffset?: number;
 	offset?: number;
 	duration?: number;
 	playhead?: number;
@@ -123,6 +124,7 @@ export type ClipProcessorMessageRx =
 	| ClipProcessorFadeInMessageRx
 	| ClipProcessorFadeOutMessageRx
 	| ClipProcessorLoopCrossfadeMessageRx
+	| ClipProcessorLoopCrossfadeOffsetMessageRx
 	| ClipProcessorToggleMessageRx
 	| ClipProcessorLogStateMessageRx;
 
@@ -147,6 +149,7 @@ export type ClipProcessorMessageType =
 	| "fadeIn"
 	| "fadeOut"
 	| "loopCrossfade"
+	| "loopCrossfadeOffset"
 	| ClipProcessorToggleMessageType
 	| "logState";
 
@@ -281,6 +284,11 @@ export interface ClipProcessorFadeOutMessageRx {
 
 export interface ClipProcessorLoopCrossfadeMessageRx {
 	readonly type: "loopCrossfade";
+	readonly data: number;
+}
+
+export interface ClipProcessorLoopCrossfadeOffsetMessageRx {
+	readonly type: "loopCrossfadeOffset";
 	readonly data: number;
 }
 

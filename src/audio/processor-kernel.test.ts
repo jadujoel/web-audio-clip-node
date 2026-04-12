@@ -888,6 +888,35 @@ describe("handleProcessorMessage", () => {
 		expect(props.enableLoopCrossfade).toBe(false);
 	});
 
+	it("loopCrossfadeOffset setter", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(
+			props,
+			{ type: "loopCrossfadeOffset", data: 0.5 },
+			CT,
+			SR,
+		);
+		expect(props.loopCrossfadeOffset).toBe(0.5);
+	});
+
+	it("loopCrossfadeOffset clamps to [-1, 1]", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(
+			props,
+			{ type: "loopCrossfadeOffset", data: 2 },
+			CT,
+			SR,
+		);
+		expect(props.loopCrossfadeOffset).toBe(1);
+		handleProcessorMessage(
+			props,
+			{ type: "loopCrossfadeOffset", data: -3 },
+			CT,
+			SR,
+		);
+		expect(props.loopCrossfadeOffset).toBe(-1);
+	});
+
 	it("toggleGain", () => {
 		const props = getProperties({ enableGain: true }, SR);
 		handleProcessorMessage(props, { type: "toggleGain" }, CT, SR);
@@ -1822,6 +1851,172 @@ describe("processBlock", () => {
 				}
 			}
 		}
+	});
+
+	it("loopCrossfadeOffset=0 produces same output as default", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		for (let i = 0; i < bufLen; i++) {
+			buffer[0][i] = Math.sin(i * 0.01);
+			buffer[1][i] = Math.cos(i * 0.01);
+		}
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const loopCrossfade = 0.05;
+		const loopStartSamples = Math.floor(loopStart * SR);
+
+		const propsA = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer: [buffer[0].slice(), buffer[1].slice()],
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				loopCrossfadeOffset: 0,
+				playhead: loopStartSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputsA = [makeOutput(2)];
+		processBlock(
+			propsA,
+			outputsA,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+
+		const propsB = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer: [buffer[0].slice(), buffer[1].slice()],
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				playhead: loopStartSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputsB = [makeOutput(2)];
+		processBlock(
+			propsB,
+			outputsB,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+
+		for (let ch = 0; ch < 2; ch++) {
+			for (let i = 0; i < SAMPLE_BLOCK_SIZE; i++) {
+				expect(outputsA[0][ch][i]).toBeCloseTo(outputsB[0][ch][i], 10);
+			}
+		}
+	});
+
+	it("loopCrossfadeOffset shifts crossfade source positions", () => {
+		const bufLen = 48000;
+		const buffer = makeBuffer(bufLen);
+		// Fill with distinct values per sample so offset shift is detectable
+		for (let i = 0; i < bufLen; i++) {
+			buffer[0][i] = Math.sin(i * 0.1);
+			buffer[1][i] = Math.cos(i * 0.1);
+		}
+		const loopStart = 0.1;
+		const loopEnd = 0.9;
+		const loopCrossfade = 0.05;
+		const loopStartSamples = Math.floor(loopStart * SR);
+
+		const propsDefault = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer: [buffer[0].slice(), buffer[1].slice()],
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				loopCrossfadeOffset: 0,
+				playhead: loopStartSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputsDefault = [makeOutput(2)];
+		processBlock(
+			propsDefault,
+			outputsDefault,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+
+		const propsOffset = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: 100,
+				duration: 100,
+				buffer: [buffer[0].slice(), buffer[1].slice()],
+				loop: true,
+				loopStart,
+				loopEnd,
+				loopCrossfade,
+				enableLoopCrossfade: true,
+				loopCrossfadeOffset: -1,
+				playhead: loopStartSamples + 10,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputsOffset = [makeOutput(2)];
+		processBlock(
+			propsOffset,
+			outputsOffset,
+			makeProcessParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+
+		// With a non-zero offset, the crossfade sources differ, so output should differ
+		let differ = false;
+		for (let i = 0; i < SAMPLE_BLOCK_SIZE; i++) {
+			if (Math.abs(outputsDefault[0][0][i] - outputsOffset[0][0][i]) > 1e-6) {
+				differ = true;
+				break;
+			}
+		}
+		expect(differ).toBe(true);
 	});
 
 	it("enableLoopStart=false uses 0 for loopStart", () => {

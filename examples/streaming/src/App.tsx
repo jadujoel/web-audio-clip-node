@@ -105,11 +105,13 @@ function StreamingPlayheadInner({
 	audioDuration,
 	disabled,
 	onChange,
+	playbackGeneration,
 }: {
 	frameRef: RefObject<FrameData | null>;
 	audioDuration: number | null;
 	disabled: boolean;
 	onChange: (v: number) => void;
+	playbackGeneration: number;
 }) {
 	const [value, setValue] = useState(0);
 
@@ -134,7 +136,7 @@ function StreamingPlayheadInner({
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [frameRef]);
+	}, [frameRef, playbackGeneration]);
 
 	return (
 		<PlayheadSlider
@@ -630,6 +632,7 @@ export function App() {
 					node.nodeState === "initial" || node.nodeState === "disposed"
 				}
 				onChange={handlePlayheadChange}
+				playbackGeneration={node.playbackGeneration}
 			/>
 
 			{/* ── Controls (reused from library) ── */}

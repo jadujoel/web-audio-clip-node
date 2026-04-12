@@ -45,6 +45,9 @@ function applyValueToClip(node: ClipNode, key: ControlKey, value: number) {
 		case "loopCrossfade":
 			node.loopCrossfade = value;
 			break;
+		case "loopCrossfadeOffset":
+			node.loopCrossfadeOffset = value;
+			break;
 		case "fadeIn":
 			node.fadeIn = value;
 			break;
@@ -118,6 +121,7 @@ function applyToggleToClip(node: ClipNode, key: ControlKey, on: boolean) {
 			break;
 		case "startDelay":
 		case "stopDelay":
+		case "loopCrossfadeOffset":
 			break;
 	}
 }
@@ -184,6 +188,7 @@ export function useStreamingClipNode({
 	const workerRef = useRef<Worker | null>(null);
 	const frameRef = useRef<FrameData | null>(null);
 	const timesLoopedRef = useRef("0");
+	const [playbackGeneration, setPlaybackGeneration] = useState(0);
 
 	const ensureContext = useCallback(async () => {
 		if (ctxRef.current) return ctxRef.current;
@@ -205,6 +210,9 @@ export function useStreamingClipNode({
 				setStatus("Enter a URL first.");
 				return;
 			}
+
+			// Increment generation so playhead effect resets its state
+			setPlaybackGeneration((g) => g + 1);
 
 			// Tear down previous run
 			if (workerRef.current) {
@@ -528,6 +536,7 @@ export function useStreamingClipNode({
 		frameRef: frameRef as RefObject<FrameData | null>,
 		timesLoopedRef: timesLoopedRef as RefObject<string>,
 		infoLatency,
+		playbackGeneration,
 		stream,
 		pause,
 		stop,

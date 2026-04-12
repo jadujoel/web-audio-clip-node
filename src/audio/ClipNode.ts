@@ -28,6 +28,7 @@ export class ClipNode extends AudioWorkletNode {
 	private _fadeIn = 0;
 	private _fadeOut = 0;
 	private _loopCrossfade = 0;
+	private _loopCrossfadeOffset = 0;
 	private _duration = -1;
 	private _previousState: ClipNodeState = "initial";
 	private _bufferWriteCursor = 0;
@@ -364,6 +365,17 @@ export class ClipNode extends AudioWorkletNode {
 	set loopCrossfade(value: number) {
 		this._loopCrossfade = value;
 		this.port.postMessage({ type: "loopCrossfade", data: value });
+	}
+
+	get loopCrossfadeOffset() {
+		return this._loopCrossfadeOffset;
+	}
+	set loopCrossfadeOffset(value: number) {
+		this._loopCrossfadeOffset = Math.max(-1, Math.min(1, value));
+		this.port.postMessage({
+			type: "loopCrossfadeOffset",
+			data: this._loopCrossfadeOffset,
+		});
 	}
 
 	dispose() {
