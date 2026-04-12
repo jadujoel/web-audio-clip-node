@@ -270,6 +270,7 @@ export function useStreamingClipNode({
 					port: channel.port1,
 					url: absoluteUrl,
 					throttle,
+					targetSampleRate: ctx.sampleRate,
 				},
 				[channel.port1],
 			);

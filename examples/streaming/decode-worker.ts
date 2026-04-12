@@ -105,6 +105,28 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 	return out;
 }
 
+// ── Linear-interpolation resampler ───────────────────────────────────
+
+function resampleChannel(
+	src: Float32Array,
+	srcRate: number,
+	dstRate: number,
+): Float32Array {
+	if (srcRate === dstRate) return src;
+	const ratio = srcRate / dstRate;
+	const dstLen = Math.round(src.length / ratio);
+	const dst = new Float32Array(dstLen);
+	for (let i = 0; i < dstLen; i++) {
+		const srcPos = i * ratio;
+		const idx = Math.floor(srcPos);
+		const frac = srcPos - idx;
+		const a = src[idx] ?? 0;
+		const b = src[Math.min(idx + 1, src.length - 1)] ?? 0;
+		dst[i] = a + frac * (b - a);
+	}
+	return dst;
+}
+
 // ── Throttle stream ──────────────────────────────────────────────────
 
 function createThrottleStream(bytesPerSec: number): TransformStream<Uint8Array, Uint8Array> {
@@ -131,13 +153,14 @@ let abortController: AbortController | null = null;
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle } = ev.data as {
+		const { port, url, throttle, targetSampleRate } = ev.data as {
 			port: MessagePort;
 			url: string;
 			throttle?: number;
+			targetSampleRate?: number;
 		};
 		abortController = new AbortController();
-		startStreaming(port, url, abortController.signal, throttle ?? 0);
+		startStreaming(port, url, abortController.signal, throttle ?? 0, targetSampleRate ?? 0);
 	} else if (type === "abort") {
 		abortController?.abort();
 	}
@@ -148,6 +171,7 @@ async function startStreaming(
 	url: string,
 	signal: AbortSignal,
 	throttle: number,
+	targetSampleRate: number,
 ) {
 	let totalBytes: number | null = null;
 	let bytesReceived = 0;
@@ -159,14 +183,17 @@ async function startStreaming(
 		output(audioData: AudioData) {
 			const numFrames = audioData.numberOfFrames;
 			const numChannels = audioData.numberOfChannels;
+			const srcRate = audioData.sampleRate;
+			const dstRate = targetSampleRate > 0 ? targetSampleRate : srcRate;
 			const channelData: Float32Array[] = [];
 
 			for (let ch = 0; ch < numChannels; ch++) {
-				const dest = new Float32Array(numFrames);
-				audioData.copyTo(dest, { planeIndex: ch, format: "f32-planar" });
-				channelData.push(dest);
+				const raw = new Float32Array(numFrames);
+				audioData.copyTo(raw, { planeIndex: ch, format: "f32-planar" });
+				channelData.push(resampleChannel(raw, srcRate, dstRate));
 			}
 			audioData.close();
+			const resampledFrames = channelData[0].length;
 
 			if (!initialized) {
 				initialized = true;
@@ -174,10 +201,12 @@ async function startStreaming(
 				// Estimate total samples from Content-Length if available
 				let estimatedTotalSamples: number | null = null;
 				if (totalBytes !== null) {
-					// Rough estimate; will be corrected by bufferEnd
-					estimatedTotalSamples = Math.ceil(
+					// Rough estimate at source rate; scale to target rate
+					const rawEstimate = Math.ceil(
 						(totalBytes / 417) * SAMPLES_PER_FRAME,
 					); // ~128kbps average frame size
+					const ratio = srcRate > 0 ? dstRate / srcRate : 1;
+					estimatedTotalSamples = Math.ceil(rawEstimate * ratio);
 				}
 
 				processorPort.postMessage({
@@ -189,7 +218,7 @@ async function startStreaming(
 					},
 				});
 
-				self.postMessage({ type: "info", sampleRate: audioData.sampleRate, channels: numChannels });
+				self.postMessage({ type: "info", sampleRate: srcRate, channels: numChannels });
 			}
 
 			processorPort.postMessage({
@@ -200,7 +229,7 @@ async function startStreaming(
 				},
 			});
 
-			samplesDecoded += numFrames;
+			samplesDecoded += resampledFrames;
 			self.postMessage({ type: "decoded", samplesDecoded });
 		},
 		error(e: DOMException) {
