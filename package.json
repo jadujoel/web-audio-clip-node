@@ -1,6 +1,6 @@
 {
 	"name": "@jadujoel/web-audio-clip-node",
-	"version": "0.1.8",
+	"version": "0.1.9",
 	"type": "module",
 	"description": "Full-featured AudioWorklet clip player with playback rate, detune, gain, pan, filters, looping, fades, crossfade, and streaming buffer support. React components included.",
 	"keywords": [
