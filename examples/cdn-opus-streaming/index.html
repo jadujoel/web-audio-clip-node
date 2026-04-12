@@ -44,90 +44,63 @@
 
   <script type="module">
     import {
-      ClipNode,
+      Coordinator,
       getProcessorCdnUrl,
     } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
-
-    import { getStreamingWorkerUrl } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/streaming.js";
 
     const OPUS_URL = "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
     const startBtn = document.getElementById("start");
     const stopBtn = document.getElementById("stop");
     const statusEl = document.getElementById("status");
 
+    let coordinator;
     let ctx;
     let clip;
-    let worker;
-    let started = false;
 
     function setStatus(text) {
       statusEl.textContent = text;
     }
 
-    function stopStream() {
-      if (worker) {
-        worker.postMessage({ type: "abort" });
-        worker.terminate();
-        worker = null;
-      }
+    startBtn.onclick = async () => {
       if (clip) {
         clip.stop();
         clip.disconnect();
         clip = null;
       }
-      started = false;
-      stopBtn.disabled = true;
-    }
 
-    startBtn.onclick = async () => {
-      stopStream();
-
-      if (!ctx) {
+      if (!coordinator) {
         ctx = new AudioContext({ sampleRate: 48000 });
-        await ctx.audioWorklet.addModule(getProcessorCdnUrl());
+        coordinator = Coordinator.fromContext(ctx);
+        await coordinator.addModule(getProcessorCdnUrl());
+        await coordinator.addStreamingSupport("OggOpus");
       }
+
       await ctx.resume();
 
-      clip = new ClipNode(ctx);
+      clip = coordinator.ClipNode();
       clip.connect(ctx.destination);
 
-      const channel = new MessageChannel();
-      clip.transferPort(channel.port2);
-
-      worker = new Worker(getStreamingWorkerUrl("OggOpus"));
-      worker.onmessage = (event) => {
-        const msg = event.data;
-        if (msg.type === "decoded" && !started) {
-          clip.start();
-          started = true;
-          setStatus("Streaming and playing...");
-        } else if (msg.type === "progress") {
-          const kb = ((msg.bytesReceived || 0) / 1024) | 0;
-          setStatus(`Downloading... ${kb} KB`);
-        } else if (msg.type === "done") {
-          setStatus("Stream finished.");
-        } else if (msg.type === "error") {
-          setStatus(`Error: ${msg.message}`);
-        }
+      clip.onprogress = (bytes) => {
+        const kb = (bytes / 1024) | 0;
+        setStatus(`Downloading... ${kb} KB`);
       };
+      clip.ondone = () => setStatus("Stream finished.");
+      clip.onerror = (msg) => setStatus(`Error: ${msg}`);
+      clip.onstarted = () => setStatus("Streaming and playing...");
 
-      worker.postMessage(
-        {
-          type: "init",
-          port: channel.port1,
-          url: OPUS_URL,
-          throttle: 0,
-          targetSampleRate: ctx.sampleRate,
-        },
-        [channel.port1],
-      );
+      clip.url = OPUS_URL;
+      clip.start();
 
       stopBtn.disabled = false;
       setStatus("Starting stream...");
     };
 
     stopBtn.onclick = () => {
-      stopStream();
+      if (clip) {
+        clip.stop();
+        clip.disconnect();
+        clip = null;
+      }
       setStatus("Stopped");
     };
   </script>

@@ -130,6 +130,11 @@ try {
 	);
 
 	assert(typeof main.ClipNode === "function", "ClipNode is exported");
+	assert(typeof main.Coordinator === "function", "Coordinator is exported");
+	assert(
+		typeof main.StreamingClipNode === "function",
+		"StreamingClipNode is exported",
+	);
 	assert(typeof main.processorCode === "string", "processorCode is a string");
 	assert(main.processorCode.length > 0, "processorCode is non-empty");
 	assert(typeof main.processBlock === "function", "processBlock is exported");

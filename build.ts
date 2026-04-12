@@ -143,6 +143,7 @@ export async function buildWebpage(): Promise<void> {
 	const linkTasks: Promise<void>[] = [
 		linkWorkspacePackage("examples/playground"),
 		linkWorkspacePackage("examples/esm-bundler"),
+		linkWorkspacePackage("examples/coordinator-streaming"),
 	];
 	if (hasReactExample) {
 		linkTasks.push(linkWorkspacePackage("examples/react"));
@@ -191,6 +192,14 @@ export async function buildWebpage(): Promise<void> {
 		Bun.build({
 			entrypoints: ["./examples/esm-bundler/index.html"],
 			outdir: join(webpageDir, "esm-bundler"),
+			target: "browser",
+			minify: true,
+			throw: true,
+		}),
+		// Coordinator Streaming (local build test)
+		Bun.build({
+			entrypoints: ["./examples/coordinator-streaming/index.html"],
+			outdir: join(webpageDir, "coordinator-streaming"),
 			target: "browser",
 			minify: true,
 			throw: true,

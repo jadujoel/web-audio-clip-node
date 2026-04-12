@@ -1,0 +1,11 @@
+{
+  "name": "coordinator-streaming-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun index.html"
+  },
+  "dependencies": {
+    "@jadujoel/web-audio-clip-node": "file:../.."
+  }
+}

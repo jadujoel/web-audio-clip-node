@@ -1,5 +1,6 @@
 // Core audio
 export { ClipNode } from "./audio/ClipNode";
+export { Coordinator, StreamingClipNode } from "./audio/Coordinator";
 export { processorCode } from "./audio/processor-code";
 // Processor kernel (for advanced / testing)
 export {
@@ -9,7 +10,6 @@ export {
 	processBlock,
 	SAMPLE_BLOCK_SIZE,
 } from "./audio/processor-kernel";
-
 // Types
 export type {
 	BufferRangeWrite,
@@ -67,8 +67,13 @@ export {
 	loopLinkedControlPairs,
 	transportLinkedControlPairs,
 } from "./controls/linkedControlPairs";
-
 // Data
 export { loadFromCache } from "./data/cache";
 export type { StoredFile } from "./data/fileStore";
 export { loadUploadedFile, saveUploadedFile } from "./data/fileStore";
+export type { StreamFormat } from "./streaming";
+export {
+	createStreamingWorker,
+	detectStreamFormat,
+	getStreamingWorkerUrl,
+} from "./streaming";
