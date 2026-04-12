@@ -34,9 +34,9 @@ describe("getProcessorBlobUrl", () => {
 
 describe("getProcessorCdnUrl", () => {
 	test("returns a jsdelivr URL with the given version", () => {
-		const url = getProcessorCdnUrl("1.2.3");
+		const url = getProcessorCdnUrl("latest");
 		expect(url).toBe(
-			"https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@1.2.3/dist/processor.js",
+			"https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/processor.js",
 		);
 	});
 

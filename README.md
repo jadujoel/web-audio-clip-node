@@ -126,10 +126,10 @@ Use the bundled entry point when you want a single browser import and load the p
   import {
     ClipNode,
     getProcessorCdnUrl,
-  } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@0.1.10/dist/lib.bundle.js";
+  } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
 
   const ctx = new AudioContext();
-  await ctx.audioWorklet.addModule(getProcessorCdnUrl("0.1.10"));
+  await ctx.audioWorklet.addModule(getProcessorCdnUrl("latest"));
 
   const clip = new ClipNode(ctx);
   clip.connect(ctx.destination);
@@ -176,7 +176,7 @@ For per-render-quantum telemetry, assign `clip.onframe` to receive a `FrameData`
 | Method | Function | Use case |
 |--------|----------|----------|
 | Blob URL | `getProcessorBlobUrl()` | Default for package consumers — zero setup |
-| CDN | `getProcessorCdnUrl("0.1.10")` | Plain browser usage via jsDelivr |
+| CDN | `getProcessorCdnUrl("latest")` | Plain browser usage via jsDelivr |
 | Self-hosted | `getProcessorModuleUrl(baseUrl)` | You serve `processor.js` from your own server |
 
 ## Entry Points
