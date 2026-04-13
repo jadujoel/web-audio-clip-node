@@ -42,12 +42,16 @@ interface StreamingOpusDecoderOptions {
 	processorPort: MessagePort;
 	targetSampleRate: number;
 	postMessage: (message: unknown) => void;
+	format?: string;
+	sampleOffset?: number;
+	isSeeking?: boolean;
 }
 
 export class StreamingOpusDecoder {
 	private readonly processorPort: MessagePort;
 	private readonly targetSampleRate: number;
 	private readonly postMessage: (message: unknown) => void;
+	private readonly format: string | undefined;
 	private readonly decoder: AudioDecoder;
 	private totalBytes: number | null = null;
 	private samplesDecodedCount = 0;
@@ -62,6 +66,7 @@ export class StreamingOpusDecoder {
 	private allowTimestampProbe = false;
 	private preSkipProbeDone = false;
 	private shouldApplyPreSkip = true;
+	private didSignalSeeked = true;
 	private lastConfig: {
 		codec: string;
 		sampleRate: number;
@@ -73,10 +78,18 @@ export class StreamingOpusDecoder {
 		processorPort,
 		targetSampleRate,
 		postMessage,
+		format,
+		sampleOffset = 0,
+		isSeeking = false,
 	}: StreamingOpusDecoderOptions) {
 		this.processorPort = processorPort;
 		this.targetSampleRate = targetSampleRate;
 		this.postMessage = postMessage;
+		this.format = format;
+		this.samplesDecodedCount = sampleOffset;
+		this.initialized = isSeeking;
+		this.didSendMeta = isSeeking;
+		this.didSignalSeeked = !isSeeking;
 		this.decoder = new AudioDecoder({
 			output: this.handleOutput,
 			error: (error: DOMException) => {
@@ -232,6 +245,7 @@ export class StreamingOpusDecoder {
 				bitrate: null,
 				sourceSampleRate: OPUS_SAMPLE_RATE,
 				targetSampleRate: dstRate,
+				format: this.format,
 			});
 			this.postMessage({
 				type: "streamMeta",
@@ -249,6 +263,7 @@ export class StreamingOpusDecoder {
 				bitrate: null,
 				sourceSampleRate: OPUS_SAMPLE_RATE,
 				targetSampleRate: dstRate,
+				format: this.format,
 			});
 			this.processorPort.postMessage({
 				type: "bufferInit",
@@ -278,6 +293,14 @@ export class StreamingOpusDecoder {
 				type: "decoded",
 				samplesDecoded: this.samplesDecodedCount,
 			});
+
+			if (!this.didSignalSeeked) {
+				this.didSignalSeeked = true;
+				this.postMessage({
+					type: "seeked",
+					sampleOffset: this.samplesDecodedCount,
+				});
+			}
 		}
 	};
 }

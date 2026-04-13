@@ -687,7 +687,7 @@ export function App() {
 								}
 							>
 								<option value="forward">Forward</option>
-								<option value="ping-pong">Ping-Pong</option>
+								<option value="boomerang">Boomerang</option>
 							</select>
 						)}
 					</div>

@@ -6,10 +6,15 @@
 declare const self: DedicatedWorkerGlobalScope;
 
 import {
+	BackpressureGate,
 	concat,
 	createThrottleStream,
+	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
+	fetchWithRetry,
+	parseTotalBytes,
 	resampleChannel,
+	type StreamRetryConfig,
 } from "./worker-utils";
 
 // ── ADTS frame parser ────────────────────────────────────────────────
@@ -96,24 +101,62 @@ export function parseAdtsFrames(buf: Uint8Array): ParseResult {
 // ── Main worker entry ────────────────────────────────────────────────
 
 let abortController: AbortController | null = null;
+const gate = new BackpressureGate();
+let currentPort: MessagePort | null = null;
+let currentUrl = "";
+let currentThrottle = 0;
+let currentTargetSampleRate = 0;
+let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
 
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate } = ev.data as {
+		const { port, url, throttle, targetSampleRate, retry } = ev.data as {
 			port: MessagePort;
 			url: string;
 			throttle?: number;
 			targetSampleRate?: number;
+			retry?: StreamRetryConfig | null;
 		};
+		currentPort = port;
+		currentUrl = url;
+		currentThrottle = throttle ?? 0;
+		currentTargetSampleRate = targetSampleRate ?? 0;
+		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
 			port,
 			url,
 			abortController.signal,
-			throttle ?? 0,
-			targetSampleRate ?? 0,
+			currentThrottle,
+			currentTargetSampleRate,
+			currentRetryConfig,
+			0,
+			0,
 		);
+	} else if (type === "seek") {
+		const { sampleOffset, byteOffset } = ev.data as {
+			sampleOffset: number;
+			byteOffset: number;
+		};
+		abortController?.abort();
+		abortController = new AbortController();
+		if (currentPort) {
+			startStreaming(
+				currentPort,
+				currentUrl,
+				abortController.signal,
+				currentThrottle,
+				currentTargetSampleRate,
+				currentRetryConfig,
+				byteOffset,
+				sampleOffset,
+			);
+		}
+	} else if (type === "pause-fetch") {
+		gate.pause();
+	} else if (type === "resume-fetch") {
+		gate.resume();
 	} else if (type === "abort") {
 		abortController?.abort();
 	}
@@ -125,13 +168,18 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
+	retryConfig: StreamRetryConfig,
+	byteOffset = 0,
+	sampleOffset = 0,
 ) {
+	const isSeeking = byteOffset > 0;
 	let totalBytes: number | null = null;
 	let bytesReceived = 0;
-	let samplesDecoded = 0;
+	let samplesDecoded = sampleOffset;
 	let leftover = new Uint8Array(0);
-	let initialized = false;
-	let didSendMeta = false;
+	let initialized = isSeeking;
+	let didSendMeta = isSeeking;
+	let didSignalSeeked = !isSeeking;
 
 	const decoder = new AudioDecoder({
 		output(audioData: AudioData) {
@@ -156,6 +204,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: srcRate,
 					targetSampleRate: dstRate,
+					format: "Aac",
 				});
 				self.postMessage({
 					type: "streamMeta",
@@ -174,6 +223,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: srcRate,
 					targetSampleRate: dstRate,
+					format: "Aac",
 				});
 
 				processorPort.postMessage({
@@ -200,30 +250,39 @@ async function startStreaming(
 				},
 			});
 
+			if (!didSignalSeeked) {
+				didSignalSeeked = true;
+				self.postMessage({ type: "seeked", sampleOffset: samplesDecoded });
+			}
+
 			samplesDecoded += resampledFrames;
 			self.postMessage({ type: "decoded", samplesDecoded });
 		},
 		error(e: DOMException) {
-			self.postMessage({ type: "error", message: e.message });
+			self.postMessage({ type: "error", code: "DECODE", message: e.message });
 		},
 	});
 
 	try {
-		const response = await fetch(url, { signal });
-		if (!response.ok) {
+		const response = await fetchWithRetry(url, signal, retryConfig, byteOffset);
+		if (!response.ok && response.status !== 206) {
 			self.postMessage({
 				type: "error",
+				code: "NETWORK",
 				message: `Fetch failed: ${response.status} ${response.statusText}`,
 			});
 			return;
 		}
 		if (!response.body) {
-			self.postMessage({ type: "error", message: "Response has no body" });
+			self.postMessage({
+				type: "error",
+				code: "NETWORK",
+				message: "Response has no body",
+			});
 			return;
 		}
 
-		const contentLength = response.headers.get("content-length");
-		totalBytes = contentLength ? Number.parseInt(contentLength, 10) : null;
+		totalBytes = parseTotalBytes(response, byteOffset);
 
 		const body =
 			throttle > 0
@@ -231,9 +290,12 @@ async function startStreaming(
 				: response.body;
 		const reader = body.getReader();
 		let configuredDecoder = false;
-		let timestampUs = 0;
+		let timestampUs = isSeeking
+			? Math.round((sampleOffset / 48_000) * 1_000_000)
+			: 0;
 
 		while (true) {
+			await gate.wait();
 			const { done, value } = await reader.read();
 			if (done) break;
 
@@ -278,6 +340,7 @@ async function startStreaming(
 		} else {
 			self.postMessage({
 				type: "error",
+				code: "FORMAT_UNSUPPORTED",
 				message: "No ADTS frames found in the stream",
 			});
 			return;
@@ -296,6 +359,7 @@ async function startStreaming(
 		} else {
 			self.postMessage({
 				type: "error",
+				code: "DECODE",
 				message: e instanceof Error ? e.message : String(e),
 			});
 		}

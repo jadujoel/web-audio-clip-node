@@ -34,6 +34,9 @@ function createStreamBufferState(
 		lowWaterThreshold: SAMPLE_BLOCK_SIZE * 4,
 		lowWaterNotified: false,
 		lastUnderrunSample: null,
+		underrunActive: false,
+		underrunRecoverySamples: 256,
+		underrunRecoveryPosition: 256, // Start at max = no recovery needed
 	};
 }
 
@@ -234,6 +237,7 @@ export function getProperties(
 		enableDetune = true,
 		enablePlaybackRate = true,
 		enableFrameReporting = false,
+		muted = false,
 	} = opts;
 
 	return {
@@ -270,6 +274,7 @@ export function getProperties(
 		enablePlaybackRate,
 		enableLoopCrossfade,
 		enableFrameReporting,
+		muted,
 	};
 }
 
@@ -372,7 +377,7 @@ export function findIndexesNormal(p: BlockParameters): BlockReturnState {
 	let looped = false;
 	let dir = initialDirection;
 
-	if (loopMode === "ping-pong") {
+	if (loopMode === "boomerang") {
 		for (let i = 0; i < length; i++) {
 			indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
 			head += dir;
@@ -427,7 +432,7 @@ export function findIndexesWithPlaybackRates(
 	let dir = initialDirection;
 
 	if (loop) {
-		if (loopMode === "ping-pong") {
+		if (loopMode === "boomerang") {
 			for (let i = 0; i < length; i++) {
 				indexes[i] = Math.min(Math.max(Math.floor(head), 0), bufferLength - 1);
 				const rate = Math.abs(playbackRates[i] ?? playbackRates[0] ?? 1);
@@ -929,6 +934,9 @@ export function handleProcessorMessage(
 		case "enableFrameReporting":
 			properties.enableFrameReporting = data as boolean;
 			return [];
+		case "mute":
+			properties.muted = data as boolean;
+			return [];
 	}
 	return [];
 }
@@ -959,7 +967,22 @@ export function processBlock(
 	let state = props.state;
 	if (state === State.Disposed) return { keepAlive: false, messages };
 
+	const hadPendingWrites = props.streamBuffer.pendingWrites.length > 0;
 	applyPendingBufferWrites(props);
+	if (hadPendingWrites) {
+		messages.push({
+			type: "bufferState",
+			data: {
+				committedLength: props.streamBuffer.committedLength,
+				totalLength: props.streamBuffer.totalLength,
+				streamEnded: props.streamBuffer.streamEnded,
+				writtenSpans: props.streamBuffer.writtenSpans.map((s) => ({
+					startSample: s.startSample,
+					endSample: s.endSample,
+				})),
+			},
+		});
+	}
 
 	if (state === State.Initial) return { keepAlive: true, messages };
 
@@ -1164,7 +1187,46 @@ export function processBlock(
 		props.streamBuffer.lastUnderrunSample = null;
 	}
 
+	// Track underrun active state for recovery crossfade.
+	// Underrun can be detected two ways:
+	// 1. indexes land in uncommitted range (underrunSample !== undefined)
+	// 2. In streaming mode, indexes are truncated because effectiveSourceLength
+	//    was clamped to committedLength (partial block while stream not ended)
+	const isStreamingUnderrun =
+		hasUnfinishedStreamTail &&
+		!props.streamBuffer.streamEnded &&
+		indexes.length < SAMPLE_BLOCK_SIZE;
+	const isUnderrunning =
+		(underrunSample !== undefined && !props.streamBuffer.streamEnded) ||
+		isStreamingUnderrun;
+
+	if (isUnderrunning) {
+		props.streamBuffer.underrunActive = true;
+	} else if (props.streamBuffer.underrunActive && !isUnderrunning) {
+		// Recovering from underrun — start fade-in
+		props.streamBuffer.underrunActive = false;
+		props.streamBuffer.underrunRecoveryPosition = 0;
+	}
+
 	fill(output0, buffer, indexes);
+
+	// --- Underrun recovery fade-in ---
+	if (
+		props.streamBuffer.underrunRecoveryPosition <
+		props.streamBuffer.underrunRecoverySamples
+	) {
+		const recoverySamples = props.streamBuffer.underrunRecoverySamples;
+		const nc = output0.length;
+		for (let i = 0; i < SAMPLE_BLOCK_SIZE; i++) {
+			const pos = props.streamBuffer.underrunRecoveryPosition;
+			if (pos >= recoverySamples) break;
+			const gain = pos / recoverySamples;
+			for (let ch = 0; ch < nc; ch++) {
+				output0[ch][i] *= gain;
+			}
+			props.streamBuffer.underrunRecoveryPosition++;
+		}
+	}
 
 	// --- Loop crossfade ---
 	const xfadeNumSamples = Math.min(
@@ -1286,6 +1348,13 @@ export function processBlock(
 	if (enableGain) gainFilter(output0, gains);
 	if (nc === 1) monoToStereo(output0);
 	if (enablePan) panFilter(output0, pans);
+
+	// --- Mute ---
+	if (props.muted) {
+		for (let ch = 0; ch < output0.length; ch++) {
+			output0[ch].fill(0);
+		}
+	}
 
 	if (looped) {
 		props.timesLooped++;

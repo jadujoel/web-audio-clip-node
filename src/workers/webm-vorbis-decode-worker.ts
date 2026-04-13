@@ -6,10 +6,15 @@ declare const self: DedicatedWorkerGlobalScope;
 
 import { parseVorbisIdentification } from "./vorbis-utils";
 import {
+	BackpressureGate,
 	concat,
 	createThrottleStream,
+	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
+	fetchWithRetry,
+	parseTotalBytes,
 	resampleChannel,
+	type StreamRetryConfig,
 } from "./worker-utils";
 
 // ── Minimal EBML/WebM parser for Vorbis extraction ──────────────────
@@ -437,24 +442,68 @@ function extractFirstXiphPacket(data: Uint8Array): Uint8Array | null {
 // ── Worker entry point ───────────────────────────────────────────────
 
 let abortController: AbortController | null = null;
+const gate = new BackpressureGate();
+let currentPort: MessagePort | null = null;
+let currentUrl = "";
+let currentThrottle = 0;
+let currentTargetSampleRate = 0;
+let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
+// Cached codec config for seek (Vorbis needs CodecPrivate from WebM header)
+let cachedCodecConfig: {
+	sampleRate: number;
+	channels: number;
+	codecPrivate: Uint8Array;
+} | null = null;
 
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate } = ev.data as {
+		const { port, url, throttle, targetSampleRate, retry } = ev.data as {
 			port: MessagePort;
 			url: string;
 			throttle?: number;
 			targetSampleRate?: number;
+			retry?: StreamRetryConfig | null;
 		};
+		currentPort = port;
+		currentUrl = url;
+		currentThrottle = throttle ?? 0;
+		currentTargetSampleRate = targetSampleRate ?? 0;
+		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
 			port,
 			url,
 			abortController.signal,
-			throttle ?? 0,
-			targetSampleRate ?? 0,
+			currentThrottle,
+			currentTargetSampleRate,
+			currentRetryConfig,
+			0,
+			0,
 		);
+	} else if (type === "seek") {
+		const { sampleOffset, byteOffset } = ev.data as {
+			sampleOffset: number;
+			byteOffset: number;
+		};
+		abortController?.abort();
+		abortController = new AbortController();
+		if (currentPort) {
+			startStreaming(
+				currentPort,
+				currentUrl,
+				abortController.signal,
+				currentThrottle,
+				currentTargetSampleRate,
+				currentRetryConfig,
+				byteOffset,
+				sampleOffset,
+			);
+		}
+	} else if (type === "pause-fetch") {
+		gate.pause();
+	} else if (type === "resume-fetch") {
+		gate.resume();
 	} else if (type === "abort") {
 		abortController?.abort();
 	}
@@ -466,12 +515,17 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
+	retryConfig: StreamRetryConfig,
+	byteOffset = 0,
+	sampleOffset = 0,
 ) {
+	const isSeeking = byteOffset > 0;
 	let totalBytes: number | null = null;
 	let bytesReceived = 0;
-	let samplesDecoded = 0;
-	let initialized = false;
-	let didSendMeta = false;
+	let samplesDecoded = sampleOffset;
+	let initialized = isSeeking;
+	let didSendMeta = isSeeking;
+	let didSignalSeeked = !isSeeking;
 	let streamChannels = 2;
 	let streamSampleRate = 44100;
 
@@ -501,6 +555,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: streamSampleRate,
 					targetSampleRate: dstRate,
+					format: "WebmVorbis",
 				});
 				self.postMessage({
 					type: "streamMeta",
@@ -518,6 +573,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: streamSampleRate,
 					targetSampleRate: dstRate,
+					format: "WebmVorbis",
 				});
 				processorPort.postMessage({
 					type: "bufferInit",
@@ -544,29 +600,38 @@ async function startStreaming(
 				});
 				samplesDecoded += resampledFrames;
 				self.postMessage({ type: "decoded", samplesDecoded });
+
+				if (!didSignalSeeked) {
+					didSignalSeeked = true;
+					self.postMessage({ type: "seeked", sampleOffset: samplesDecoded });
+				}
 			}
 		},
 		error(e: DOMException) {
-			self.postMessage({ type: "error", message: e.message });
+			self.postMessage({ type: "error", code: "DECODE", message: e.message });
 		},
 	});
 
 	try {
-		const response = await fetch(url, { signal });
-		if (!response.ok) {
+		const response = await fetchWithRetry(url, signal, retryConfig, byteOffset);
+		if (!response.ok && response.status !== 206) {
 			self.postMessage({
 				type: "error",
+				code: "NETWORK",
 				message: `Fetch failed: ${response.status} ${response.statusText}`,
 			});
 			return;
 		}
 		if (!response.body) {
-			self.postMessage({ type: "error", message: "Response has no body" });
+			self.postMessage({
+				type: "error",
+				code: "NETWORK",
+				message: "Response has no body",
+			});
 			return;
 		}
 
-		const contentLength = response.headers.get("content-length");
-		totalBytes = contentLength ? Number.parseInt(contentLength, 10) : null;
+		totalBytes = parseTotalBytes(response, byteOffset);
 
 		const body =
 			throttle > 0
@@ -576,7 +641,21 @@ async function startStreaming(
 		let configuredDecoder = false;
 		let decodedAnyPacket = false;
 
+		// When seeking, use cached codec config to configure decoder immediately
+		if (isSeeking && cachedCodecConfig) {
+			decoder.configure({
+				codec: "vorbis",
+				sampleRate: cachedCodecConfig.sampleRate,
+				numberOfChannels: cachedCodecConfig.channels,
+				description: cachedCodecConfig.codecPrivate,
+			});
+			configuredDecoder = true;
+			streamChannels = cachedCodecConfig.channels;
+			streamSampleRate = cachedCodecConfig.sampleRate;
+		}
+
 		while (true) {
+			await gate.wait();
 			const { done, value } = await reader.read();
 			if (done) break;
 
@@ -596,6 +675,11 @@ async function startStreaming(
 					numberOfChannels: streamChannels,
 					description: parsed.track.codecPrivate,
 				});
+				cachedCodecConfig = {
+					sampleRate: streamSampleRate,
+					channels: streamChannels,
+					codecPrivate: new Uint8Array(parsed.track.codecPrivate),
+				};
 				configuredDecoder = true;
 			}
 
@@ -617,6 +701,7 @@ async function startStreaming(
 		} else {
 			self.postMessage({
 				type: "error",
+				code: "FORMAT_UNSUPPORTED",
 				message: "No WebM Vorbis packets found in the stream",
 			});
 			return;
@@ -639,6 +724,7 @@ async function startStreaming(
 		} else {
 			self.postMessage({
 				type: "error",
+				code: "DECODE",
 				message: e instanceof Error ? e.message : String(e),
 			});
 		}

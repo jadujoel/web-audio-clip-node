@@ -5,6 +5,8 @@ import type { StreamFormat } from "./streaming";
 import {
 	createCdnWorkerFactory,
 	detectStreamFormat,
+	detectStreamFormatFromResponse,
+	formatFromContentType,
 	usesBufferedContainerDecode,
 	workerFileMap,
 } from "./streaming";
@@ -136,6 +138,135 @@ describe("usesBufferedContainerDecode", () => {
 		expect(usesBufferedContainerDecode("RawOpusFramed")).toBe(false);
 		expect(usesBufferedContainerDecode("Aac")).toBe(false);
 		expect(usesBufferedContainerDecode("Mp4Aac")).toBe(true);
+	});
+});
+
+describe("detectStreamFormat - URL parsing robustness", () => {
+	test("handles URLs with query parameters", () => {
+		expect(
+			detectStreamFormat(
+				"https://cdn.example.com/audio.opus?token=abc123&expires=999",
+			),
+		).toBe("OggOpus");
+		expect(detectStreamFormat("https://cdn.example.com/audio.mp3?v=2")).toBe(
+			"Mp3",
+		);
+	});
+
+	test("handles URLs with fragments", () => {
+		expect(detectStreamFormat("https://example.com/audio.flac#section")).toBe(
+			"Flac",
+		);
+	});
+
+	test("handles URLs without extensions as Mp3 fallback", () => {
+		expect(detectStreamFormat("https://cdn.example.com/audio/abc123")).toBe(
+			"Mp3",
+		);
+	});
+
+	test("handles relative URLs", () => {
+		expect(detectStreamFormat("/sounds/track.opus")).toBe("OggOpus");
+		expect(detectStreamFormat("audio.mp3")).toBe("Mp3");
+	});
+
+	test("handles blob URLs as Mp3 fallback", () => {
+		expect(detectStreamFormat("blob:https://example.com/some-uuid")).toBe(
+			"Mp3",
+		);
+	});
+});
+
+describe("formatFromContentType", () => {
+	test("maps standard audio content types", () => {
+		expect(formatFromContentType("audio/opus")).toBe("OggOpus");
+		expect(formatFromContentType("audio/ogg")).toBe("OggOpus");
+		expect(formatFromContentType("audio/mpeg")).toBe("Mp3");
+		expect(formatFromContentType("audio/mp3")).toBe("Mp3");
+		expect(formatFromContentType("audio/mp4")).toBe("Mp4Aac");
+		expect(formatFromContentType("audio/aac")).toBe("Aac");
+		expect(formatFromContentType("audio/flac")).toBe("Flac");
+		expect(formatFromContentType("audio/x-flac")).toBe("Flac");
+		expect(formatFromContentType("audio/webm")).toBe("WebmOpus");
+	});
+
+	test("maps content types with codec parameters", () => {
+		expect(formatFromContentType("audio/ogg; codecs=opus")).toBe("OggOpus");
+		expect(formatFromContentType("audio/ogg; codecs=vorbis")).toBe("OggVorbis");
+		expect(formatFromContentType("audio/ogg; codecs=flac")).toBe("OggFlac");
+		expect(formatFromContentType("audio/webm; codecs=opus")).toBe("WebmOpus");
+		expect(formatFromContentType("audio/webm; codecs=vorbis")).toBe(
+			"WebmVorbis",
+		);
+	});
+
+	test("handles case insensitivity and whitespace", () => {
+		expect(formatFromContentType("Audio/MPEG")).toBe("Mp3");
+		expect(formatFromContentType("  audio/flac  ")).toBe("Flac");
+	});
+
+	test("returns null for unknown content types", () => {
+		expect(formatFromContentType("text/html")).toBeNull();
+		expect(formatFromContentType("application/octet-stream")).toBeNull();
+	});
+});
+
+describe("detectStreamFormatFromResponse", () => {
+	test("returns extension-based format without making a request", async () => {
+		const result = await detectStreamFormatFromResponse(
+			"https://example.com/audio.opus",
+		);
+		expect(result).toBe("OggOpus");
+	});
+
+	test("falls back to HEAD request for URLs without extensions", async () => {
+		// Mock fetch to return a Content-Type header
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = (async (_input: unknown, _init: unknown) => {
+			return new Response(null, {
+				headers: { "Content-Type": "audio/flac" },
+			});
+		}) as typeof fetch;
+		try {
+			const result = await detectStreamFormatFromResponse(
+				"https://cdn.example.com/audio/abc123",
+			);
+			expect(result).toBe("Flac");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("falls back to Mp3 when HEAD request fails", async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = (async () => {
+			throw new Error("Network error");
+		}) as unknown as typeof fetch;
+		try {
+			const result = await detectStreamFormatFromResponse(
+				"https://cdn.example.com/audio/abc123",
+			);
+			expect(result).toBe("Mp3");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("falls back to Mp3 when HEAD returns unknown Content-Type", async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = (async () => {
+			return new Response(null, {
+				headers: { "Content-Type": "application/octet-stream" },
+			});
+		}) as unknown as typeof fetch;
+		try {
+			const result = await detectStreamFormatFromResponse(
+				"https://cdn.example.com/audio/abc123",
+			);
+			expect(result).toBe("Mp3");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 });
 

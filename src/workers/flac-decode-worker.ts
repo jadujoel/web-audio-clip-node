@@ -5,11 +5,17 @@
 // @ts-expect-error redeclare self as DedicatedWorkerGlobalScope
 declare const self: DedicatedWorkerGlobalScope;
 
+import { parseVorbisComment } from "./vorbis-comment-parser";
 import {
+	BackpressureGate,
 	concat,
 	createThrottleStream,
+	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
+	fetchWithRetry,
+	parseTotalBytes,
 	resampleChannel,
+	type StreamRetryConfig,
 } from "./worker-utils";
 
 // ── FLAC metadata parser ─────────────────────────────────────────────
@@ -100,6 +106,33 @@ export function parseFlacMetadata(buf: Uint8Array): FlacMetadata | null {
 	};
 }
 
+/**
+ * Find the VORBIS_COMMENT metadata block (type 4) in a FLAC buffer.
+ * Returns the comment data (without the 4-byte block header), or null.
+ */
+export function findFlacVorbisComment(buf: Uint8Array): Uint8Array | null {
+	if (buf.length < 8) return null;
+	// Validate "fLaC" magic
+	for (let i = 0; i < 4; i++) {
+		if (buf[i] !== FLAC_MAGIC[i]) return null;
+	}
+	let offset = 4;
+	while (offset + 4 <= buf.length) {
+		const header = buf[offset];
+		const isLast = (header & 0x80) !== 0;
+		const blockType = header & 0x7f;
+		const blockLength =
+			(buf[offset + 1] << 16) | (buf[offset + 2] << 8) | buf[offset + 3];
+		if (offset + 4 + blockLength > buf.length) return null;
+		if (blockType === 4) {
+			return buf.subarray(offset + 4, offset + 4 + blockLength);
+		}
+		offset += 4 + blockLength;
+		if (isLast) break;
+	}
+	return null;
+}
+
 // ── FLAC frame boundary detection (sync-to-sync scanning) ────────────
 
 export interface FlacFrameResult {
@@ -149,24 +182,69 @@ function toOwned(bytes: Uint8Array): Uint8Array {
 // ── Worker entry point ───────────────────────────────────────────────
 
 let abortController: AbortController | null = null;
+const gate = new BackpressureGate();
+let currentPort: MessagePort | null = null;
+let currentUrl = "";
+let currentThrottle = 0;
+let currentTargetSampleRate = 0;
+let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
+// Cached codec config for seek (FLAC needs metadata blocks to configure)
+let cachedCodecConfig: {
+	sampleRate: number;
+	channels: number;
+	description: Uint8Array;
+	audioDataOffset: number;
+} | null = null;
 
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate } = ev.data as {
+		const { port, url, throttle, targetSampleRate, retry } = ev.data as {
 			port: MessagePort;
 			url: string;
 			throttle?: number;
 			targetSampleRate?: number;
+			retry?: StreamRetryConfig | null;
 		};
+		currentPort = port;
+		currentUrl = url;
+		currentThrottle = throttle ?? 0;
+		currentTargetSampleRate = targetSampleRate ?? 0;
+		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
 			port,
 			url,
 			abortController.signal,
-			throttle ?? 0,
-			targetSampleRate ?? 0,
+			currentThrottle,
+			currentTargetSampleRate,
+			currentRetryConfig,
+			0,
+			0,
 		);
+	} else if (type === "seek") {
+		const { sampleOffset, byteOffset } = ev.data as {
+			sampleOffset: number;
+			byteOffset: number;
+		};
+		abortController?.abort();
+		abortController = new AbortController();
+		if (currentPort) {
+			startStreaming(
+				currentPort,
+				currentUrl,
+				abortController.signal,
+				currentThrottle,
+				currentTargetSampleRate,
+				currentRetryConfig,
+				byteOffset,
+				sampleOffset,
+			);
+		}
+	} else if (type === "pause-fetch") {
+		gate.pause();
+	} else if (type === "resume-fetch") {
+		gate.resume();
 	} else if (type === "abort") {
 		abortController?.abort();
 	}
@@ -178,14 +256,21 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
+	retryConfig: StreamRetryConfig,
+	byteOffset = 0,
+	sampleOffset = 0,
 ) {
+	const isSeeking = byteOffset > 0;
 	let totalBytes: number | null = null;
 	let bytesReceived = 0;
-	let samplesDecoded = 0;
-	let initialized = false;
-	let didSendMeta = false;
+	let samplesDecoded = sampleOffset;
+	let initialized = isSeeking;
+	let didSendMeta = isSeeking;
+	let didSignalSeeked = !isSeeking;
 	let streamSampleRate = 44100;
-	let timestampUs = 0;
+	let timestampUs = isSeeking
+		? Math.round((sampleOffset / 48_000) * 1_000_000)
+		: 0;
 
 	const decoder = new AudioDecoder({
 		output(audioData: AudioData) {
@@ -211,6 +296,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: streamSampleRate,
 					targetSampleRate: dstRate,
+					format: "Flac",
 				});
 				self.postMessage({
 					type: "streamMeta",
@@ -228,6 +314,7 @@ async function startStreaming(
 					bitrate: null,
 					sourceSampleRate: streamSampleRate,
 					targetSampleRate: dstRate,
+					format: "Flac",
 				});
 				processorPort.postMessage({
 					type: "bufferInit",
@@ -254,31 +341,40 @@ async function startStreaming(
 				});
 				samplesDecoded += resampledFrames;
 				self.postMessage({ type: "decoded", samplesDecoded });
+
+				if (!didSignalSeeked) {
+					didSignalSeeked = true;
+					self.postMessage({ type: "seeked", sampleOffset: samplesDecoded });
+				}
 			}
 
 			timestampUs += Math.round((numFrames / streamSampleRate) * 1_000_000);
 		},
 		error(e: DOMException) {
-			self.postMessage({ type: "error", message: e.message });
+			self.postMessage({ type: "error", code: "DECODE", message: e.message });
 		},
 	});
 
 	try {
-		const response = await fetch(url, { signal });
-		if (!response.ok) {
+		const response = await fetchWithRetry(url, signal, retryConfig, byteOffset);
+		if (!response.ok && response.status !== 206) {
 			self.postMessage({
 				type: "error",
+				code: "NETWORK",
 				message: `Fetch failed: ${response.status} ${response.statusText}`,
 			});
 			return;
 		}
 		if (!response.body) {
-			self.postMessage({ type: "error", message: "Response has no body" });
+			self.postMessage({
+				type: "error",
+				code: "NETWORK",
+				message: "Response has no body",
+			});
 			return;
 		}
 
-		const contentLength = response.headers.get("content-length");
-		totalBytes = contentLength ? Number.parseInt(contentLength, 10) : null;
+		totalBytes = parseTotalBytes(response, byteOffset);
 
 		const body =
 			throttle > 0
@@ -293,7 +389,28 @@ async function startStreaming(
 		let configuredDecoder = false;
 		let decodedAnyFrame = false;
 
+		// When seeking, use cached codec config to skip metadata accumulation
+		if (isSeeking && cachedCodecConfig) {
+			decoder.configure({
+				codec: "flac",
+				sampleRate: cachedCodecConfig.sampleRate,
+				numberOfChannels: cachedCodecConfig.channels,
+				description: cachedCodecConfig.description,
+			});
+			configuredDecoder = true;
+			streamSampleRate = cachedCodecConfig.sampleRate;
+			metadata = {
+				sampleRate: cachedCodecConfig.sampleRate,
+				channels: cachedCodecConfig.channels,
+				bitsPerSample: 16,
+				totalSamples: 0,
+				descriptionBytes: cachedCodecConfig.description,
+				audioDataOffset: cachedCodecConfig.audioDataOffset,
+			};
+		}
+
 		while (true) {
+			await gate.wait();
 			const { done, value } = await reader.read();
 			if (done) break;
 
@@ -306,6 +423,16 @@ async function startStreaming(
 				metadata = parseFlacMetadata(accumulated);
 				if (!metadata) continue;
 
+				// Extract Vorbis comment tags if present
+				const commentBlock = findFlacVorbisComment(accumulated);
+				if (commentBlock) {
+					const audioMeta = parseVorbisComment(commentBlock);
+					if (audioMeta) {
+						audioMeta.codec = "flac";
+						self.postMessage({ type: "metadata", metadata: audioMeta });
+					}
+				}
+
 				// Metadata parsed — configure decoder
 				streamSampleRate = metadata.sampleRate;
 
@@ -315,6 +442,12 @@ async function startStreaming(
 					numberOfChannels: metadata.channels,
 					description: metadata.descriptionBytes,
 				});
+				cachedCodecConfig = {
+					sampleRate: metadata.sampleRate,
+					channels: metadata.channels,
+					description: metadata.descriptionBytes,
+					audioDataOffset: metadata.audioDataOffset,
+				};
 				configuredDecoder = true;
 
 				// If we know total samples, send exact estimate
@@ -380,6 +513,7 @@ async function startStreaming(
 		} else {
 			self.postMessage({
 				type: "error",
+				code: "FORMAT_UNSUPPORTED",
 				message: "No FLAC frames found in the stream",
 			});
 			return;
@@ -393,7 +527,7 @@ async function startStreaming(
 	} catch (err) {
 		if (signal.aborted) return;
 		const msg = err instanceof Error ? err.message : String(err);
-		self.postMessage({ type: "error", message: msg });
+		self.postMessage({ type: "error", code: "DECODE", message: msg });
 	} finally {
 		try {
 			decoder.close();

@@ -5093,10 +5093,10 @@ describe("Streaming Loop", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Ping-pong looping
+// Boomerang looping
 // ---------------------------------------------------------------------------
 
-describe("Ping-pong looping", () => {
+describe("Boomerang looping", () => {
 	const SR = 48000;
 
 	it("PP1: findIndexesNormal reverses at loopEnd and again at loopStart", () => {
@@ -5105,7 +5105,7 @@ describe("Ping-pong looping", () => {
 			playhead: 990,
 			bufferLength: 1000,
 			loop: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playbackDirection: 1,
 			loopStartSamples: 0,
 			loopEndSamples: 1000,
@@ -5129,7 +5129,7 @@ describe("Ping-pong looping", () => {
 			playhead: 200,
 			bufferLength: 1000,
 			loop: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playbackDirection: -1,
 			loopStartSamples: 100,
 			loopEndSamples: 900,
@@ -5144,12 +5144,12 @@ describe("Ping-pong looping", () => {
 		expect(r.playhead).toBeGreaterThanOrEqual(100);
 	});
 
-	it("PP3: ping-pong with playback rates reverses at boundaries", () => {
+	it("PP3: boomerang with playback rates reverses at boundaries", () => {
 		const p: BlockParameters = {
 			playhead: 895,
 			bufferLength: 1000,
 			loop: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playbackDirection: 1,
 			loopStartSamples: 0,
 			loopEndSamples: 900,
@@ -5166,7 +5166,7 @@ describe("Ping-pong looping", () => {
 		expect(afterTurn).toBeGreaterThan(0);
 	});
 
-	it("PP4: full processBlock with ping-pong flips direction", () => {
+	it("PP4: full processBlock with boomerang flips direction", () => {
 		const bufLen = 48000;
 		const buffer = [
 			new Float32Array(bufLen).fill(0.5),
@@ -5176,7 +5176,7 @@ describe("Ping-pong looping", () => {
 			{
 				buffer,
 				loop: true,
-				loopMode: "ping-pong",
+				loopMode: "boomerang",
 				state: State.Started,
 				playhead: 47900,
 				startWhen: 0,
@@ -5218,7 +5218,7 @@ describe("Ping-pong looping", () => {
 			{
 				buffer,
 				loop: true,
-				loopMode: "ping-pong",
+				loopMode: "boomerang",
 				loopStart: 0.1,
 				loopEnd: 0.9,
 				state: State.Started,
@@ -5279,11 +5279,11 @@ describe("Ping-pong looping", () => {
 
 		handleProcessorMessage(
 			props,
-			{ type: "loopMode", data: "ping-pong" },
+			{ type: "loopMode", data: "boomerang" },
 			SR,
 			0,
 		);
-		expect(props.loopMode).toBe("ping-pong");
+		expect(props.loopMode).toBe("boomerang");
 		expect(props.playbackDirection).toBe(1);
 	});
 });
@@ -5738,9 +5738,9 @@ describe("Loop crossfade: comprehensive", () => {
 		}
 	});
 
-	// --- Crossfade + Ping-pong ---
+	// --- Crossfade + Boomerang ---
 
-	it("XF18: crossfade with ping-pong mode — no NaN over many blocks", () => {
+	it("XF18: crossfade with boomerang mode — no NaN over many blocks", () => {
 		const buffer = makeSineBuffer(SR, 440, SR);
 		const props = makeLoopProps({
 			buffer,
@@ -5749,7 +5749,7 @@ describe("Loop crossfade: comprehensive", () => {
 			loopEnd: 0.9,
 			loopCrossfade: 0.05,
 			enableLoopCrossfade: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playhead: Math.floor(0.1 * SR),
 		});
 		const { allOutputs } = simulateBlocks(props, 500);
@@ -5758,7 +5758,7 @@ describe("Loop crossfade: comprehensive", () => {
 		}
 	});
 
-	it("XF19: DC buffer + ping-pong + crossfade — output stays at DC", () => {
+	it("XF19: DC buffer + boomerang + crossfade — output stays at DC", () => {
 		const dc = 0.6;
 		const buffer = makeDCBuffer(SR, dc);
 		const props = makeLoopProps({
@@ -5768,7 +5768,7 @@ describe("Loop crossfade: comprehensive", () => {
 			loopEnd: 0.9,
 			loopCrossfade: 0.05,
 			enableLoopCrossfade: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playhead: Math.floor(0.1 * SR),
 		});
 		const { allOutputs } = simulateBlocks(props, 300);
@@ -5777,7 +5777,7 @@ describe("Loop crossfade: comprehensive", () => {
 		}
 	});
 
-	it("XF20: ping-pong + short loop + crossfade — no NaN", () => {
+	it("XF20: boomerang + short loop + crossfade — no NaN", () => {
 		const buffer = makeUniform(SR, 0.8);
 		const loopStartSamples = 1000;
 		const loopEndSamples = 1200; // 200 samples
@@ -5788,7 +5788,7 @@ describe("Loop crossfade: comprehensive", () => {
 			loopEnd: loopEndSamples / SR,
 			loopCrossfade: 0.002,
 			enableLoopCrossfade: true,
-			loopMode: "ping-pong",
+			loopMode: "boomerang",
 			playhead: loopStartSamples,
 		});
 		const { allOutputs } = simulateBlocks(props, 300);

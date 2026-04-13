@@ -6251,3 +6251,178 @@ describe("15. Zero Playback Rate", () => {
 		expect(props.playhead).toBe(0);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Muted property
+// ---------------------------------------------------------------------------
+
+describe("muted", () => {
+	it("silences output when muted is true", () => {
+		const buf = makeSine(SR);
+		const props = makeStartedProps({ buffer: buf, muted: true });
+		const out = [makeOutput()];
+		processBlock(
+			props,
+			out,
+			defaultParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			defaultFilterState(),
+		);
+		expect(hasSound(out[0])).toBe(false);
+	});
+
+	it("produces sound when muted is false", () => {
+		const buf = makeSine(SR);
+		const props = makeStartedProps({ buffer: buf, muted: false });
+		const out = [makeOutput()];
+		processBlock(
+			props,
+			out,
+			defaultParams(),
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			defaultFilterState(),
+		);
+		expect(hasSound(out[0])).toBe(true);
+	});
+
+	it("handleProcessorMessage sets muted property", () => {
+		const buf = makeSine(SR);
+		const props = makeStartedProps({ buffer: buf });
+		expect(props.muted).toBe(false);
+		handleProcessorMessage(props, { type: "mute", data: true }, 0, SR);
+		expect(props.muted).toBe(true);
+		handleProcessorMessage(props, { type: "mute", data: false }, 0, SR);
+		expect(props.muted).toBe(false);
+	});
+});
+
+describe("bufferState message emission", () => {
+	it("emits bufferState when pending writes are applied", () => {
+		const props = makeStartedProps({});
+		// Reset to empty streaming state
+		props.streamBuffer.streaming = true;
+		props.streamBuffer.writtenSpans = [];
+		props.streamBuffer.committedLength = 0;
+		props.streamBuffer.totalLength = null;
+		props.streamBuffer.streamEnded = false;
+		props.buffer = [new Float32Array(48_000)];
+		props.streamBuffer.pendingWrites = [
+			{
+				startSample: 0,
+				channelData: [new Float32Array(24_000)],
+			},
+		];
+		const { messages } = processBlocks(props, 1);
+		const bufferStateMsg = messages.find((m) => m.type === "bufferState");
+		expect(bufferStateMsg).toBeDefined();
+		const bs = bufferStateMsg?.data as {
+			committedLength: number;
+			totalLength: number | null;
+			streamEnded: boolean;
+			writtenSpans: { startSample: number; endSample: number }[];
+		};
+		expect(bs.committedLength).toBe(24_000);
+		expect(bs.writtenSpans).toEqual([{ startSample: 0, endSample: 24_000 }]);
+	});
+
+	it("does NOT emit bufferState when no pending writes", () => {
+		const props = makeStartedProps({
+			buffer: [new Float32Array(48_000)],
+		});
+		props.streamBuffer.streaming = true;
+		props.streamBuffer.pendingWrites = [];
+		const { messages } = processBlocks(props, 1);
+		const bufferStateMsg = messages.find((m) => m.type === "bufferState");
+		expect(bufferStateMsg).toBeUndefined();
+	});
+});
+
+describe("underrun recovery crossfade", () => {
+	it("applies fade-in when recovering from buffer underrun", () => {
+		// Create a streaming buffer where the first half is committed
+		const bufLen = 48_000;
+		const bufData = makeSine(bufLen, 440, 1);
+		const props = makeStartedProps({
+			buffer: bufData,
+		});
+		props.streamBuffer.streaming = true;
+		props.streamBuffer.committedLength = bufLen; // fully committed initially
+		props.streamBuffer.streamEnded = false;
+		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
+
+		// First, play a few normal blocks
+		processBlocks(props, 2);
+
+		// Now simulate underrun: reduce committedLength so playhead is past it
+		props.streamBuffer.committedLength = Math.floor(props.playhead);
+		// Process one block to trigger underrun detection
+		processBlocks(props, 1);
+		expect(props.streamBuffer.underrunActive).toBe(true);
+
+		// Now "recover" — extend committedLength past the playhead again
+		props.streamBuffer.committedLength = bufLen;
+		const recoveryResult = processBlocks(props, 1);
+		expect(props.streamBuffer.underrunActive).toBe(false);
+
+		// The first samples of recovery should be faded in (gain < 1)
+		const output = recoveryResult.outputs[0];
+		// First few samples should be reduced compared to what they'd normally be
+		expect(Math.abs(output[0][0])).toBeLessThan(0.1); // Near zero at start
+		// After half a block the fade should be partially applied
+		expect(props.streamBuffer.underrunRecoveryPosition).toBeGreaterThan(0);
+	});
+
+	it("recovery fade-in reaches full volume after specified samples", () => {
+		const bufLen = 48_000;
+		const bufData = makeConstant(bufLen, 1.0, 1);
+		const props = makeStartedProps({
+			buffer: bufData,
+		});
+		props.streamBuffer.streaming = true;
+		props.streamBuffer.committedLength = bufLen;
+		props.streamBuffer.streamEnded = false;
+		props.streamBuffer.underrunRecoverySamples = 128; // exactly one block
+		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
+
+		// Play to advance playhead
+		processBlocks(props, 2);
+
+		// Trigger underrun
+		props.streamBuffer.committedLength = Math.floor(props.playhead);
+		processBlocks(props, 1);
+		expect(props.streamBuffer.underrunActive).toBe(true);
+
+		// Recover
+		props.streamBuffer.committedLength = bufLen;
+		processBlocks(props, 1);
+
+		// After exactly 128 samples (one block), recovery should be complete
+		expect(props.streamBuffer.underrunRecoveryPosition).toBe(128);
+
+		// Next block should be at full volume (no fade applied)
+		const output2 = processBlocks(props, 1).outputs[0];
+		// The output should have sound at full volume (assuming constant 1.0 buffer)
+		const hasFullVolume = output2[0].some((v) => Math.abs(v) >= 0.99);
+		expect(hasFullVolume).toBe(true);
+	});
+
+	it("no fade-in when there was no underrun", () => {
+		const bufLen = 48_000;
+		const bufData = makeConstant(bufLen, 1.0, 1);
+		const props = makeStartedProps({
+			buffer: bufData,
+		});
+		props.streamBuffer.streaming = true;
+		props.streamBuffer.committedLength = bufLen;
+		props.streamBuffer.streamEnded = false;
+		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
+
+		// Process normally — no underrun, no recovery
+		processBlocks(props, 1);
+		// The first sample should not be faded
+		expect(props.streamBuffer.underrunActive).toBe(false);
+		expect(props.streamBuffer.underrunRecoveryPosition).toBeGreaterThanOrEqual(
+			props.streamBuffer.underrunRecoverySamples,
+		);
+	});
+});

@@ -42,6 +42,7 @@ export function App() {
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
+		loopMode: controls.loopMode,
 		setValue: controls.setValue,
 	});
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
@@ -381,7 +382,7 @@ export function App() {
 								}
 							>
 								<option value="forward">Forward</option>
-								<option value="ping-pong">Ping-Pong</option>
+								<option value="boomerang">Boomerang</option>
 							</select>
 						)}
 					</div>

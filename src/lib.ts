@@ -1,6 +1,8 @@
 // Core audio
 export { ClipNode } from "./audio/ClipNode";
 export { Coordinator, StreamingClipNode } from "./audio/Coordinator";
+export type { MediaSessionOptions } from "./audio/media-session";
+export { bindMediaSession } from "./audio/media-session";
 export { processorCode } from "./audio/processor-code";
 // Processor kernel (for advanced / testing)
 export {
@@ -12,7 +14,10 @@ export {
 } from "./audio/processor-kernel";
 // Types
 export type {
+	AudioMetadata,
+	BufferedRange,
 	BufferRangeWrite,
+	ClipNodeEventMap,
 	ClipNodeState,
 	ClipProcessorOptions,
 	ClipProcessorState,
@@ -22,6 +27,11 @@ export type {
 	LoopMode,
 	StreamBufferSpan,
 	StreamBufferState,
+	StreamError,
+	StreamErrorCode,
+	StreamingClipNodeEventMap,
+	StreamPreload,
+	StreamReadyState,
 } from "./audio/types";
 export { State } from "./audio/types";
 export type { SliderPreset, TempoRelativeSnap } from "./audio/utils";

@@ -10,6 +10,43 @@ export const State = {
 
 export type ClipProcessorState = (typeof State)[keyof typeof State];
 
+// ---------------------------------------------------------------------------
+// Streaming error types
+// ---------------------------------------------------------------------------
+
+export type StreamErrorCode =
+	| "NETWORK"
+	| "DECODE"
+	| "FORMAT_UNSUPPORTED"
+	| "ABORTED";
+
+export interface StreamError {
+	code: StreamErrorCode;
+	message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Audio metadata
+// ---------------------------------------------------------------------------
+
+export interface AudioMetadata {
+	title?: string;
+	artist?: string;
+	album?: string;
+	trackNumber?: number;
+	year?: number;
+	genre?: string;
+	duration?: number;
+	sampleRate?: number;
+	channels?: number;
+	bitrate?: number;
+	codec?: string;
+	picture?: {
+		data: ArrayBuffer;
+		mimeType: string;
+	};
+}
+
 export interface ClipProcessorOptions {
 	buffer?: Float32Array[];
 	streamBuffer?: StreamBufferState;
@@ -44,13 +81,14 @@ export interface ClipProcessorOptions {
 	enableDetune?: boolean;
 	enablePlaybackRate?: boolean;
 	enableFrameReporting?: boolean;
+	muted?: boolean;
 }
 
 export interface ClipWorkletOptions extends AudioWorkletNodeOptions {
 	processorOptions?: ClipProcessorOptions;
 }
 
-export type LoopMode = "forward" | "ping-pong";
+export type LoopMode = "forward" | "boomerang";
 
 export type ClipNodeState =
 	| "initial"
@@ -61,6 +99,56 @@ export type ClipNodeState =
 	| "resumed"
 	| "ended"
 	| "disposed";
+
+export type StreamReadyState =
+	| "empty"
+	| "loading"
+	| "canplay"
+	| "canplaythrough"
+	| "complete";
+
+export type StreamPreload = "none" | "metadata" | "auto";
+
+// ---------------------------------------------------------------------------
+// Event maps for on()/off() support
+// ---------------------------------------------------------------------------
+
+export interface ClipNodeEventMap {
+	scheduled: [];
+	started: [];
+	paused: [];
+	resumed: [];
+	ended: [];
+	looped: [];
+	stopped: [];
+	frame: [FrameData];
+	disposed: [];
+	statechange: [ClipNodeState];
+	durationchange: [number];
+	ratechange: [number];
+	timeupdate: [number];
+	seeking: [];
+	seeked: [];
+}
+
+export interface StreamingClipNodeEventMap extends ClipNodeEventMap {
+	error: [StreamError];
+	progress: [number];
+	done: [];
+	bufferchange: [BufferedRange[]];
+	waiting: [];
+	canplay: [];
+	canplaythrough: [];
+	loadstart: [];
+	readystatechange: [StreamReadyState];
+	retry: [attempt: number, delay: number, error: string];
+	metadata: [AudioMetadata];
+}
+
+export interface BufferedRange {
+	start: number;
+	end: number;
+}
 
 export type FrameData = readonly [
 	currentTime: number,
@@ -128,7 +216,8 @@ export type ClipProcessorMessageRx =
 	| ClipProcessorLoopCrossfadeOffsetMessageRx
 	| ClipProcessorToggleMessageRx
 	| ClipProcessorLogStateMessageRx
-	| ClipProcessorEnableFrameReportingMessageRx;
+	| ClipProcessorEnableFrameReportingMessageRx
+	| ClipProcessorMuteMessageRx;
 
 export type ClipProcessorMessageType =
 	| "buffer"
@@ -166,6 +255,11 @@ export interface ClipProcessorEnableFrameReportingMessageRx {
 	readonly data: boolean;
 }
 
+export interface ClipProcessorMuteMessageRx {
+	readonly type: "mute";
+	readonly data: boolean;
+}
+
 export interface ClipProcessorToggleMessageRx {
 	readonly type: ClipProcessorToggleMessageType;
 	readonly data?: boolean;
@@ -199,6 +293,12 @@ export interface StreamBufferState {
 	lowWaterThreshold: number;
 	lowWaterNotified: boolean;
 	lastUnderrunSample: number | null;
+	/** True when the processor is outputting silence due to buffer underrun. */
+	underrunActive: boolean;
+	/** Number of samples to fade-in over when recovering from underrun. */
+	underrunRecoverySamples: number;
+	/** Current sample position within the recovery fade-in (0 = start). */
+	underrunRecoveryPosition: number;
 }
 
 export interface ClipProcessorBufferInitMessageRx {

@@ -142,7 +142,7 @@ Full no-bundler demos: [examples/cdn-vanilla](examples/cdn-vanilla/) and [exampl
 - AudioWorklet-based clip playback with explicit transport control
 - **Pause / resume** and **reusable start** — no need to recreate the node after stopping
 - **Buffer hot-swap** — assign `clip.buffer` on a live node and it switches immediately
-- Loop start, loop end, loop crossfade, and `loopMode` (`"forward"` | `"ping-pong"`)
+- Loop start, loop end, loop crossfade, and `loopMode` (`"forward"` | `"boomerang"`)
 - Real-time playhead readback and sample-accurate seeking via `clip.playhead`
 - Sample-accurate fade in and fade out without external helper nodes
 - Playback rate from `-2` to `2`

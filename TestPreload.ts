@@ -85,14 +85,26 @@ globalThis.navigator.userActivation ??= {
  * Try to create a real AudioContext; fall back to OfflineAudioContext when
  * no audio device is available (e.g. CI runners).
  */
+/**
+ * Create an AudioContext for tests.
+ *
+ * Defaults to OfflineAudioContext so that no native real-time audio thread is
+ * spawned (node-web-audio-api / isomorphic-web-audio-api creates a live Rust
+ * audio thread per AudioContext, and unclosed contexts accumulate rapidly
+ * across a test suite, causing 800 %+ CPU saturation and timeouts).
+ *
+ * Pass `preferOffline: false` only when you explicitly need real-time
+ * behaviour (e.g. testing AudioContext.state transitions).
+ */
 export function createContext(opts?: {
 	sampleRate?: number;
 	length?: number;
 	channels?: number;
+	/** @default true */
 	preferOffline?: boolean;
 }): AudioContext | OfflineAudioContext {
 	const sampleRate = opts?.sampleRate ?? 44100;
-	if (opts?.preferOffline) {
+	if (opts?.preferOffline !== false) {
 		return new OfflineAudioContext(
 			opts?.channels ?? 1,
 			opts?.length ?? sampleRate,

@@ -178,8 +178,8 @@ test.describe("Playground example", () => {
 		await expect(loopMode).toBeVisible();
 		await expect(loopMode).toHaveValue("forward");
 
-		// Switch to ping-pong
-		await loopMode.selectOption("ping-pong");
-		await expect(loopMode).toHaveValue("ping-pong");
+		// Switch to boomerang
+		await loopMode.selectOption("boomerang");
+		await expect(loopMode).toHaveValue("boomerang");
 	});
 });

@@ -48,6 +48,7 @@ export async function createStreamingWorker(
 }
 
 export function detectStreamFormat(url: string): StreamFormat {
+	// Check compound patterns first (before simple extension match)
 	const normalized = url.toLowerCase();
 	if (normalized.includes(".fopus") || normalized.includes(".opuspkt")) {
 		return "RawOpusFramed";
@@ -55,31 +56,99 @@ export function detectStreamFormat(url: string): StreamFormat {
 	if (normalized.includes("-vorbis.webm")) {
 		return "WebmVorbis";
 	}
-	if (normalized.includes(".webm")) {
-		return "WebmOpus";
-	}
-	if (normalized.includes(".opus")) {
-		return "OggOpus";
-	}
 	if (normalized.includes("-flac.oga") || normalized.includes(".flac.ogg")) {
 		return "OggFlac";
 	}
-	if (normalized.includes(".oga") || normalized.includes(".ogg")) {
-		return "OggVorbis";
+
+	// Simple extension match
+	const ext = getExtensionFromUrl(url);
+	if (ext) {
+		const mapped = EXTENSION_MAP[ext];
+		if (mapped) return mapped;
 	}
-	if (normalized.includes(".flac")) {
-		return "Flac";
-	}
-	if (normalized.includes(".mp3")) {
-		return "Mp3";
-	}
-	if (normalized.includes(".aac")) {
-		return "Aac";
-	}
-	if (normalized.includes(".m4a") || normalized.includes(".mp4")) {
-		return "Mp4Aac";
-	}
+
 	return "Mp3";
+}
+
+const EXTENSION_MAP: Record<string, StreamFormat> = {
+	webm: "WebmOpus",
+	opus: "OggOpus",
+	oga: "OggVorbis",
+	ogg: "OggVorbis",
+	flac: "Flac",
+	mp3: "Mp3",
+	aac: "Aac",
+	m4a: "Mp4Aac",
+	mp4: "Mp4Aac",
+	fopus: "RawOpusFramed",
+	opuspkt: "RawOpusFramed",
+};
+
+function getExtensionFromUrl(url: string): string | null {
+	try {
+		const pathname = new URL(url).pathname;
+		const ext = pathname.split(".").pop()?.toLowerCase();
+		return ext && ext.length <= 8 ? ext : null;
+	} catch {
+		// Relative URLs or malformed
+		const cleaned = url.split("?")[0].split("#")[0];
+		const ext = cleaned.split(".").pop()?.toLowerCase();
+		return ext && ext.length <= 8 ? ext : null;
+	}
+}
+
+const CONTENT_TYPE_MAP: Record<string, StreamFormat> = {
+	"audio/opus": "OggOpus",
+	"audio/ogg": "OggOpus",
+	"audio/ogg; codecs=opus": "OggOpus",
+	"audio/ogg; codecs=vorbis": "OggVorbis",
+	"audio/ogg; codecs=flac": "OggFlac",
+	"audio/webm": "WebmOpus",
+	"audio/webm; codecs=opus": "WebmOpus",
+	"audio/webm; codecs=vorbis": "WebmVorbis",
+	"audio/mpeg": "Mp3",
+	"audio/mp3": "Mp3",
+	"audio/mp4": "Mp4Aac",
+	"audio/aac": "Aac",
+	"audio/flac": "Flac",
+	"audio/x-flac": "Flac",
+};
+
+export function formatFromContentType(
+	contentType: string,
+): StreamFormat | null {
+	const ct = contentType.toLowerCase().trim();
+	const mapped = CONTENT_TYPE_MAP[ct];
+	if (mapped) return mapped;
+	const baseType = ct.split(";")[0].trim();
+	return CONTENT_TYPE_MAP[baseType] ?? null;
+}
+
+export async function detectStreamFormatFromResponse(
+	url: string,
+	signal?: AbortSignal,
+): Promise<StreamFormat> {
+	const fromExt = detectStreamFormat(url);
+	// If extension gave a definitive match (not the Mp3 fallback), use it
+	if (fromExt !== "Mp3") return fromExt;
+
+	// Check if URL actually has an mp3 extension (vs fallback)
+	const ext = getExtensionFromUrl(url);
+	if (ext === "mp3") return fromExt;
+
+	// No definitive extension — try HEAD request for Content-Type
+	try {
+		const resp = await fetch(url, { method: "HEAD", signal });
+		const ct = resp.headers.get("Content-Type");
+		if (ct) {
+			const mapped = formatFromContentType(ct);
+			if (mapped) return mapped;
+		}
+	} catch {
+		// HEAD not supported or CORS issue — continue with fallback
+	}
+
+	return fromExt;
 }
 
 export function usesBufferedContainerDecode(format: StreamFormat): boolean {

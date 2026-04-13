@@ -2,6 +2,133 @@ import { estimateTotalSamplesFromContentLength } from "../streamTimeline";
 
 export { estimateTotalSamplesFromContentLength };
 
+export type StreamErrorCode =
+	| "NETWORK"
+	| "DECODE"
+	| "FORMAT_UNSUPPORTED"
+	| "ABORTED";
+
+export function postError(code: StreamErrorCode, message: string): void {
+	self.postMessage({ type: "error", code, message });
+}
+
+export function classifyFetchError(err: unknown): StreamErrorCode {
+	if (err instanceof DOMException && err.name === "AbortError")
+		return "ABORTED";
+	return "NETWORK";
+}
+
+/**
+ * A gate that can pause and resume an async loop.
+ * Call `await gate.wait()` at the top of a fetch loop to block when paused.
+ */
+export class BackpressureGate {
+	private _paused = false;
+	private _resolve: (() => void) | null = null;
+
+	get paused(): boolean {
+		return this._paused;
+	}
+
+	pause(): void {
+		this._paused = true;
+	}
+
+	resume(): void {
+		this._paused = false;
+		if (this._resolve) {
+			this._resolve();
+			this._resolve = null;
+		}
+	}
+
+	/** Returns immediately if not paused; blocks until resume() otherwise. */
+	wait(): Promise<void> | void {
+		if (!this._paused) return;
+		return new Promise<void>((resolve) => {
+			this._resolve = resolve;
+		});
+	}
+}
+
+export interface StreamRetryConfig {
+	maxRetries: number;
+	retryDelayMs: number;
+	backoffMultiplier: number;
+	maxRetryDelayMs: number;
+}
+
+export const DEFAULT_RETRY_CONFIG: StreamRetryConfig = {
+	maxRetries: 3,
+	retryDelayMs: 1000,
+	backoffMultiplier: 2,
+	maxRetryDelayMs: 30_000,
+};
+
+/**
+ * Fetch with automatic retry and exponential backoff.
+ * Posts `{ type: "retry", attempt, delay, error }` to the main thread on each retry.
+ */
+export async function fetchWithRetry(
+	url: string,
+	signal: AbortSignal,
+	config: StreamRetryConfig | null,
+	bytesReceived = 0,
+): Promise<Response> {
+	const maxRetries = config?.maxRetries ?? 0;
+	let delay = config?.retryDelayMs ?? 1000;
+	const backoff = config?.backoffMultiplier ?? 2;
+	const maxDelay = config?.maxRetryDelayMs ?? 30_000;
+
+	let attempt = 0;
+
+	while (true) {
+		try {
+			const headers: HeadersInit = {};
+			if (bytesReceived > 0) {
+				headers.Range = `bytes=${bytesReceived}-`;
+			}
+			const response = await fetch(url, { signal, headers });
+			if (!response.ok && response.status !== 206) {
+				throw new Error(
+					`Fetch failed: ${response.status} ${response.statusText}`,
+				);
+			}
+			return response;
+		} catch (err) {
+			if (signal.aborted) throw err;
+			attempt++;
+			if (attempt > maxRetries) throw err;
+
+			const errMsg =
+				err instanceof Error ? err.message : "Unknown network error";
+			self.postMessage({ type: "retry", attempt, delay, error: errMsg });
+			await new Promise((r) => setTimeout(r, delay));
+			delay = Math.min(delay * backoff, maxDelay);
+		}
+	}
+}
+
+/**
+ * Parse total byte size from a response, handling both normal and Range (206) responses.
+ * For 206 responses, extracts total from Content-Range header (`bytes X-Y/TOTAL`).
+ */
+export function parseTotalBytes(
+	response: Response,
+	byteOffset = 0,
+): number | null {
+	const contentLength = response.headers.get("content-length");
+	if (response.status === 206) {
+		const contentRange = response.headers.get("content-range");
+		const totalMatch = contentRange?.match(/\/(\d+)/);
+		if (totalMatch) return Number.parseInt(totalMatch[1], 10);
+		return contentLength
+			? byteOffset + Number.parseInt(contentLength, 10)
+			: null;
+	}
+	return contentLength ? Number.parseInt(contentLength, 10) : null;
+}
+
 export function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 	const out = new Uint8Array(a.length + b.length);
 	out.set(a);
