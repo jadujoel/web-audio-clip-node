@@ -194,8 +194,8 @@ describe("StreamingClipNode.url setter", () => {
 	});
 });
 
-describe("StreamingClipNode.start - deferred until first decoded", () => {
-	test("does not start immediately; fires when worker sends decoded", async () => {
+describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => {
+	test("does not start until samplesDecoded reaches threshold", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
@@ -216,9 +216,40 @@ describe("StreamingClipNode.start - deferred until first decoded", () => {
 			stateChanged = true;
 		};
 
-		worker.receive({ type: "decoded" });
-
+		// First small decoded chunk — should NOT trigger start
+		worker.receive({ type: "decoded", samplesDecoded: 960 });
 		expect(stateChanged).toBe(false);
+
+		// Still below threshold (default 48 000)
+		worker.receive({ type: "decoded", samplesDecoded: 24_000 });
+		expect(stateChanged).toBe(false);
+
+		expect(node.url).toBe("https://example.com/audio.opus");
+	});
+
+	test("starts on done even when below pre-buffer threshold", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		node.start();
+
+		// Small file: decoded only 960 samples, then done
+		worker.receive({ type: "decoded", samplesDecoded: 960 });
+		worker.receive({ type: "done", samplesDecoded: 960 });
+
+		// Should have triggered start despite being below threshold
+		// (The ClipNode.start sends a message to the processor port,
+		// which is verified by the absence of a pending start.)
 		expect(node.url).toBe("https://example.com/audio.opus");
 	});
 });

@@ -6,14 +6,14 @@ Live demo: https://jadujoel.github.io/web-audio-clip-node/
 
 ## Why this library
 
-`AudioBufferSourceNode` is good at one-shot playback, but it does not give you some things clip-based apps usually need:
+`AudioBufferSourceNode` is good at one-shot playback, but it does not give you some things more advanced apps usually need:
 
-- **Pause and resume** — `AudioBufferSourceNode` has no pause; you must stop and recreate
+- **Real-time playhead** get/set access in samples
+- **Pause and resume** — `AudioBufferSourceNode` has no pause; you must stop and recreate, or set playbackrate to zero and back, which is awkward.
 - **Reusable start** — call `start()` again after `stop()` without creating a new node
 - **Buffer hot-swap** — assign a new `AudioBuffer` to a playing node and it switches seamlessly
 - **Loop callback** when the playhead wraps (`onlooped`)
 - **Loop crossfade** built into the source itself
-- **Real-time playhead** get/set access in samples
 - **Sample-accurate fade in / fade out** without wiring extra gain nodes around every source
 - **Streaming** — start playback before the full file has been fetched, via `StreamingClipNode`
 
@@ -22,10 +22,10 @@ Live demo: https://jadujoel.github.io/web-audio-clip-node/
 ## Install
 
 ```sh
-npm install @jadujoel/web-audio-clip-node
+bun install @jadujoel/web-audio-clip-node
 ```
 
-> **Tip:** Use **Ogg Opus** encoded at **48 kHz** for best performance. Most browsers run Web Audio at 48 kHz internally; matching the source sample rate avoids resampling overhead on decode.
+> **Tip:** Use **Ogg Opus** encoded at **48 kHz** for best performance, and set audio context to same sample rate. Matching the source sample rate avoids resampling overhead on decode.
 
 ## Quick Start
 
@@ -64,9 +64,9 @@ clip.start();
 Use `Coordinator` to share a single worklet module load and create `StreamingClipNode` instances that start playback before the full file has been fetched.
 
 ```ts
-import { Coordinator, getProcessorBlobUrl } from "@jadujoel/web-audio-clip-node";
+import { Coordinator } from "@jadujoel/web-audio-clip-node";
 
-const ctx = new AudioContext();
+const ctx = new AudioContext({ sampleRate: 48_000 });
 const coordinator = Coordinator.fromContext(ctx);
 await coordinator.addModule(); // loads the worklet once
 
@@ -126,7 +126,7 @@ Use the bundled entry point when you want a single browser import and load the p
   import {
     ClipNode,
     getProcessorCdnUrl,
-  } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
+  } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
 
   const ctx = new AudioContext();
   await ctx.audioWorklet.addModule(getProcessorCdnUrl("latest"));
@@ -150,6 +150,45 @@ Full no-bundler demos: [examples/cdn-vanilla](examples/cdn-vanilla/) and [exampl
 - Detune, gain, stereo pan, highpass, and lowpass controls
 - **Streaming** — `StreamingClipNode` fetches and decodes incrementally; playback starts on the first decoded chunk
 - Optional React hooks and ready-made controls
+
+## Performance
+
+`StreamingClipNode` uses a **three-thread architecture** so that decoding and playback never block the main thread:
+
+```mermaid
+flowchart LR
+  subgraph Main Thread
+    A["fetch()"] -->|Response body| B[StreamingClipNode]
+  end
+
+  subgraph Worker Thread
+    C[Decode Worker]
+    C -->|"demux → AudioDecoder → Float32"| C
+  end
+
+  subgraph Audio Thread
+    D["ClipProcessor\n(AudioWorklet)"]
+    D -->|"128 samples / quantum"| E[🔊 destination]
+  end
+
+  B -- "port1 ➜ Worker\n(transferred)" --> C
+  B -- "port2 ➜ Processor\n(transferred)" --> D
+  C -. "PCM via MessagePort\n(bypasses main thread)" .-> D
+
+  style A fill:#3b82f6,color:#fff,stroke:none
+  style B fill:#3b82f6,color:#fff,stroke:none
+  style C fill:#f59e0b,color:#fff,stroke:none
+  style D fill:#10b981,color:#fff,stroke:none
+  style E fill:#10b981,color:#fff,stroke:none
+```
+
+1. **Main thread** starts a `fetch()` and hands the response stream to a dedicated **Worker**.
+2. The **Worker** demuxes the container (Ogg, WebM, MP4, ADTS, …), feeds frames into the platform `AudioDecoder`, resamples if needed, and posts the decoded Float32 PCM through a **transferred `MessagePort`**.
+3. The **AudioWorklet processor** receives samples directly from the worker — the main thread is never in the hot path. Playback begins as soon as the first chunk lands.
+
+Because the `MessagePort` is transferred to both ends, decoded audio travels **Worker → Processor** without touching the main thread, keeping UI jank at zero even while decoding large files.
+
+> **Tip:** Use **Ogg Opus at 48 kHz** and create your `AudioContext` at the same rate. Matching sample rates avoids resampling in the decode worker, giving the lowest possible latency from fetch to first audible sample.
 
 ## Lifecycle Callbacks
 

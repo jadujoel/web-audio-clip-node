@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import {
+	injectAudioMonitor,
+	measureAudioSustain,
+} from "../helpers/audio-monitor";
 import { openExample } from "../helpers/navigation";
 
 test.describe("Streaming example", () => {
@@ -318,5 +322,55 @@ test.describe("Streaming example", () => {
 		// Switch to ping-pong
 		await loopMode.selectOption("ping-pong");
 		await expect(loopMode).toHaveValue("ping-pong");
+	});
+
+	test("streaming audio does not go silent during playback", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming playhead not supported in headless Firefox",
+		);
+		test.skip(
+			browserName === "webkit",
+			"streaming playhead not supported in headless WebKit",
+		);
+
+		// Inject audio monitor before navigating
+		await injectAudioMonitor(page);
+		await openExample(page, "streaming");
+
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const slider = page.locator(".playhead-slider [role='slider']");
+
+		await streamBtn.click();
+
+		// Wait for playhead to advance (audio has started)
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+
+		// Give audio a moment to stabilize, then measure for 5 seconds
+		await page.waitForTimeout(500);
+
+		const result = await measureAudioSustain(page, 5000, 100);
+
+		// At least 80% of samples should have audio
+		const activeRatio = result.activeSamples / result.totalSamples;
+		expect(
+			activeRatio,
+			`Audio was active for only ${(activeRatio * 100).toFixed(1)}% of samples. ` +
+				`RMS values: [${result.rmsValues.map((v) => v.toFixed(4)).join(", ")}]`,
+		).toBeGreaterThanOrEqual(0.8);
+
+		// No silence gap longer than 5 consecutive samples (500ms at 100ms interval)
+		expect(
+			result.longestSilentRun,
+			`Longest silent gap was ${result.longestSilentRun} consecutive samples ` +
+				`(${result.longestSilentRun * 100}ms). ` +
+				`RMS values: [${result.rmsValues.map((v) => v.toFixed(4)).join(", ")}]`,
+		).toBeLessThanOrEqual(5);
 	});
 });

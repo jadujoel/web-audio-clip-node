@@ -2,6 +2,10 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, parse as parsePath } from "node:path";
 
+export async function latestCdnVersion(): Promise<string> {
+	return (await Bun.$`bun info @jadujoel/web-audio-clip-node version`.text()).trim();
+}
+
 /**
  * Write a file and also emit a hash-suffixed copy next to it.
  * E.g. `foo.min.js` → `foo.min.a1b2c3d4.js`

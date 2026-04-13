@@ -39,7 +39,7 @@
 			"default": "./dist/styles.css"
 		}
 	},
-	"main": "./dist/lib.js",
+	"main": "./dist/lib.bundle.js",
 	"types": "./dist/lib.d.ts",
 	"files": [
 		"dist",

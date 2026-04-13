@@ -10,22 +10,38 @@ export interface PendingStart {
 	duration?: number;
 }
 
+/** Default pre-buffer: 1 second at 48 kHz. */
+const DEFAULT_PRE_BUFFER_SAMPLES = 48_000;
+
 export interface StreamingClipNodeOptions {
 	defaultFormat: StreamFormat | null;
 	targetSampleRate: number;
 	/** Injectable worker factory — used for testing without mocking globals. */
 	createWorker?: (format: StreamFormat) => Worker | Promise<Worker>;
+	/**
+	 * Minimum decoded samples before playback starts.
+	 * Prevents audible underruns when streaming over slow connections.
+	 * Defaults to 48 000 (~1 s at 48 kHz).
+	 */
+	preBufferSamples?: number;
 }
 
 export interface CoordinatorStreamingOptions {
 	format?: StreamFormat;
+	/**
+	 * Minimum decoded samples before playback starts.
+	 * Prevents audible underruns when streaming over slow connections.
+	 * Defaults to 48 000 (~1 s at 48 kHz).
+	 */
+	preBufferSamples?: number;
 }
 
 export class StreamingClipNode extends ClipNode {
 	private _url: string | undefined;
 	private _worker: Worker | null = null;
 	private _pendingStart: PendingStart | null = null;
-	private _firstDecoded = false;
+	private _readyToPlay = false;
+	private _streamDone = false;
 	private _streamOptions: StreamingClipNodeOptions;
 
 	onerror?: (message: string) => void;
@@ -58,7 +74,8 @@ export class StreamingClipNode extends ClipNode {
 			this._worker = null;
 		}
 
-		this._firstDecoded = false;
+		this._readyToPlay = false;
+		this._streamDone = false;
 
 		const format = this._streamOptions.defaultFormat ?? detectStreamFormat(url);
 
@@ -70,25 +87,25 @@ export class StreamingClipNode extends ClipNode {
 		const channel = new MessageChannel();
 		this.transferPort(channel.port2);
 
+		const threshold =
+			this._streamOptions.preBufferSamples ?? DEFAULT_PRE_BUFFER_SAMPLES;
+
 		worker.onmessage = (ev: MessageEvent) => {
 			const msg = ev.data as {
 				type: string;
 				bytesReceived?: number;
+				samplesDecoded?: number;
 				message?: string;
 			};
 
 			if (msg.type === "decoded") {
-				if (!this._firstDecoded) {
-					this._firstDecoded = true;
-					if (this._pendingStart !== null) {
-						const { when, offset, duration } = this._pendingStart;
-						this._pendingStart = null;
-						super.start(when, offset, duration);
-					}
-				}
+				this._tryStart(msg.samplesDecoded ?? 0, threshold);
 			} else if (msg.type === "progress") {
 				this.onprogress?.(msg.bytesReceived ?? 0);
 			} else if (msg.type === "done") {
+				this._streamDone = true;
+				// If the entire stream is shorter than the threshold, start now
+				this._tryStart(msg.samplesDecoded ?? 0, 0);
 				this.ondone?.();
 			} else if (msg.type === "error") {
 				this.onerror?.(msg.message ?? "Unknown streaming error");
@@ -106,12 +123,23 @@ export class StreamingClipNode extends ClipNode {
 		);
 	}
 
+	private _tryStart(samplesDecoded: number, threshold: number): void {
+		if (this._readyToPlay) return;
+		if (samplesDecoded < threshold && !this._streamDone) return;
+		this._readyToPlay = true;
+		if (this._pendingStart !== null) {
+			const { when, offset, duration } = this._pendingStart;
+			this._pendingStart = null;
+			super.start(when, offset, duration);
+		}
+	}
+
 	start(when?: number, offset?: number, duration?: number): void {
-		if (this._firstDecoded || this._url === "") {
-			// Data ready (or no streaming URL set) — start immediately
+		if (this._readyToPlay || this._url === "") {
+			// Enough data buffered (or no streaming URL set) — start immediately
 			super.start(when, offset, duration);
 		} else {
-			// Defer until the first decoded chunk arrives
+			// Defer until enough decoded data has been buffered
 			this._pendingStart = { when, offset, duration };
 		}
 	}
@@ -171,6 +199,7 @@ export class Coordinator {
 			defaultFormat: streamingOptions?.format ?? null,
 			targetSampleRate: this._context.sampleRate,
 			createWorker: this._workerFactory,
+			preBufferSamples: streamingOptions?.preBufferSamples,
 		});
 		this._nodes.add(node);
 		return node;

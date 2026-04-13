@@ -47,7 +47,7 @@
 
   <script type="module">
     // Ogg Opus at 48 kHz recommended — avoids resampling overhead
-    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/lib.bundle.js";
+    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
 
     const playBtn = document.getElementById("play");
     const pauseBtn = document.getElementById("pause");
@@ -66,7 +66,7 @@
 
     async function main() {
       const context = new AudioContext({ sampleRate: 48000 });
-      await context.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@latest/dist/processor.js");
+      await context.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
       statusEl.textContent = "AudioWorklet loaded";
 
       const clip = new ClipNode(context, {

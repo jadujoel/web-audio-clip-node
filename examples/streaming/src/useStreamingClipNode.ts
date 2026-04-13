@@ -369,7 +369,7 @@ export function useStreamingClipNode({
 							}
 						}
 						if (
-							samplesDecoded > 0 &&
+							samplesDecoded >= ctx.sampleRate &&
 							clipRef.current?.state === "initial"
 						) {
 							clipRef.current.start();
@@ -395,6 +395,11 @@ export function useStreamingClipNode({
 							setAudioDuration(duration);
 							setSeekableDuration(duration);
 							setSeekableSamples(samples);
+						}
+						// Start playback if stream was too short to meet pre-buffer threshold
+						if (clipRef.current?.state === "initial") {
+							clipRef.current.start();
+							setStatus("Streaming & playing…");
 						}
 						break;
 					}
