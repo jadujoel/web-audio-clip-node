@@ -155,39 +155,61 @@ export class StreamingClipNode extends ClipNode {
 }
 
 export class Coordinator {
-	private _context: BaseAudioContext;
-	private _moduleLoaded = false;
-	private _nodes = new Set<ClipNode>();
-	private _workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>;
+
 
 	private constructor(
-		context: BaseAudioContext,
-		workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>,
-	) {
-		this._context = context;
-		this._workerFactory = workerFactory;
+		public context: BaseAudioContext,
+		public workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>,
+		private moduleLoaded?: undefined | Promise<void>,
+		private nodes = new Set<ClipNode>(),
+	) {}
+
+	static default() {
+		const context = new AudioContext({
+			sampleRate: 48000,
+			latencyHint: "playback",
+		});
+		const coordinator = Coordinator.fromContext(context);
+		coordinator.addModule();
+		return coordinator;
 	}
 
 	static fromContext(
 		context: BaseAudioContext,
-		options?: {
-			workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>;
-		},
 	): Coordinator {
-		return new Coordinator(context, options?.workerFactory);
+		const coordinator = new Coordinator(context);
+		coordinator.addModule();
+		return coordinator;
+	}
+
+	static fromWorkerFactory(
+		workerFactory: (format: StreamFormat) => Worker | Promise<Worker>,
+	) {
+		const context = new AudioContext({
+			sampleRate: 48000,
+			latencyHint: "playback",
+		});
+		const coordinator = new Coordinator(context, workerFactory);
+		coordinator.addModule();
+		return coordinator;
 	}
 
 	async addModule(processorUrl?: string): Promise<void> {
-		if (this._moduleLoaded) return;
-		await this._context.audioWorklet.addModule(
-			processorUrl ?? getProcessorBlobUrl(),
-		);
-		this._moduleLoaded = true;
+		if (this.moduleLoaded !== undefined) {
+			return this.moduleLoaded;
+		}
+		this.moduleLoaded = this.context.audioWorklet
+			.addModule(processorUrl ?? getProcessorBlobUrl())
+			.catch((err) => {
+				this.moduleLoaded = undefined;
+				console.warn("Failed to load AudioWorklet module:", err);
+			});
+		return this.moduleLoaded;
 	}
 
 	ClipNode(options?: ClipWorkletOptions): ClipNode {
-		const node = new ClipNode(this._context, options ?? {});
-		this._nodes.add(node);
+		const node = new ClipNode(this.context, options ?? {});
+		this.nodes.add(node);
 		return node;
 	}
 
@@ -195,20 +217,20 @@ export class Coordinator {
 		options?: ClipWorkletOptions,
 		streamingOptions?: CoordinatorStreamingOptions,
 	): StreamingClipNode {
-		const node = new StreamingClipNode(this._context, options ?? {}, {
+		const node = new StreamingClipNode(this.context, options ?? {}, {
 			defaultFormat: streamingOptions?.format ?? null,
-			targetSampleRate: this._context.sampleRate,
-			createWorker: this._workerFactory,
+			targetSampleRate: this.context.sampleRate,
+			createWorker: this.workerFactory,
 			preBufferSamples: streamingOptions?.preBufferSamples,
 		});
-		this._nodes.add(node);
+		this.nodes.add(node);
 		return node;
 	}
 
 	dispose(): void {
-		for (const node of this._nodes) {
-			node.stop();
+		for (const node of this.nodes) {
+			node.dispose();
 		}
-		this._nodes.clear();
+		this.nodes.clear();
 	}
 }

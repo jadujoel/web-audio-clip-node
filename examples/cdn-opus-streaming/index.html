@@ -42,10 +42,7 @@
   </main>
 
   <script type="module">
-    import {
-      Coordinator,
-      getProcessorCdnUrl,
-    } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
+    import { Coordinator } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
 
     const btn = document.getElementById("start");
     const status = document.getElementById("status");
@@ -57,7 +54,7 @@
     async function main() {
       const context = new AudioContext({ sampleRate: 48000 });
       const coordinator = Coordinator.fromContext(context);
-      await coordinator.addModule(getProcessorCdnUrl());
+      await coordinator.addModule();
       const clip = coordinator.StreamingClipNode();
       clip.connect(context.destination);
 

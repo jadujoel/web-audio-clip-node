@@ -123,16 +123,15 @@ Use the bundled entry point when you want a single browser import and load the p
 
 ```html
 <script type="module">
-  import {
-    ClipNode,
-    getProcessorCdnUrl,
-  } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
+  import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node";
 
   const ctx = new AudioContext();
-  await ctx.audioWorklet.addModule(getProcessorCdnUrl("latest"));
+  await ctx.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
 
   const clip = new ClipNode(ctx);
   clip.connect(ctx.destination);
+  clip.buffer = await ctx.decodeAudioData(await fetch("https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus").then(r => r.arrayBuffer()));
+  clip.start();
 </script>
 ```
 
