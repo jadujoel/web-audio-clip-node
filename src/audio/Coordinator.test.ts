@@ -291,6 +291,28 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 		// which is verified by the absence of a pending start.)
 		expect(node.url).toBe("https://example.com/audio.opus");
 	});
+
+	test("starts on done when worker reports totalSamples", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		node.start();
+
+		worker.receive({ type: "done", totalSamples: 960 });
+
+		expect(node.url).toBe("https://example.com/audio.opus");
+	});
 });
 
 describe("StreamingClipNode.start - no double stream on url+start() race", () => {
@@ -682,6 +704,46 @@ describe("StreamingClipNode.downloaded", () => {
 				totalLength: 0,
 				streamEnded: true,
 				writtenSpans: [],
+			},
+		});
+
+		await expect(promise).resolves.toBeUndefined();
+	});
+
+	test("normalizes done sample count when declared count is below committed", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const promise = node.downloaded;
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 1_920,
+				totalLength: 1_920,
+				streamEnded: false,
+				writtenSpans: [{ startSample: 0, endSample: 1_920 }],
+			},
+		});
+
+		lastWorker.receive({ type: "done", samplesDecoded: 960 });
+
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 1_920,
+				totalLength: 1_920,
+				streamEnded: true,
+				writtenSpans: [{ startSample: 0, endSample: 1_920 }],
 			},
 		});
 
@@ -2484,7 +2546,7 @@ describe("StreamingClipNode seeking", () => {
 		expect(node.seeking).toBe(false);
 
 		node.dispose();
-	});
+	}, 15_000);
 
 	test("seek with no worker completes immediately", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });

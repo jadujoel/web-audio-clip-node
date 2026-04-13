@@ -128,4 +128,45 @@ test.describe("Coordinator streaming example", () => {
 				.join(", ")}]`,
 		).toBeLessThanOrEqual(10);
 	});
+
+	test("stream does not transition to ended prematurely", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"timing-sensitive stream completion checks are flaky in headless Firefox/WebKit",
+		);
+		test.setTimeout(90_000);
+
+		const streamUrl =
+			"https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
+		const expectedDuration = await page.evaluate(async (url) => {
+			const audio = new Audio(url);
+			audio.preload = "metadata";
+			await new Promise<void>((resolve, reject) => {
+				audio.onloadedmetadata = () => resolve();
+				audio.onerror = () => reject(new Error("failed to load metadata"));
+			});
+			return Number.isFinite(audio.duration) ? audio.duration : 0;
+		}, streamUrl);
+
+		const earlyEndGuardSeconds = Math.min(
+			20,
+			Math.max(6, Math.floor(expectedDuration * 0.45)),
+		);
+
+		await page.locator("button#start").click();
+		const status = page.locator("#status");
+
+		await expect
+			.poll(async () => (await status.textContent())?.trim() ?? "", {
+				timeout: 20000,
+			})
+			.toMatch(/^(Streaming\.\.\.|Stream Downloaded\.)$/);
+
+		await page.waitForTimeout(earlyEndGuardSeconds * 1000);
+		await expect(status).not.toContainText("Stream Ended.");
+		await expect(status).not.toContainText("Error:");
+	});
 });

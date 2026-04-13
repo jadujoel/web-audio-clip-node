@@ -1,7 +1,7 @@
 import {
 	estimateTotalSamplesFromContentLength,
-	postBufferRange,
 	FrameBatcher,
+	postBufferRange,
 	postDecodedRange,
 	resampleChannel,
 } from "./worker-utils";
@@ -316,7 +316,7 @@ export class StreamingOpusDecoder {
 				});
 				// Flush partial batch immediately on seek signal for responsiveness
 				const flushed = this.batcher.flush();
-				if (flushed !== null && flushed[0] && flushed[0].length > 0) {
+				if (flushed?.[0] && flushed[0].length > 0) {
 					const fSamples = flushed[0].length;
 					const fStart = this.samplesDecodedCount - fSamples;
 					postBufferRange(this.processorPort, fStart, flushed);

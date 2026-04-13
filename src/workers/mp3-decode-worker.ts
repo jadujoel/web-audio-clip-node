@@ -12,11 +12,11 @@ import {
 	createThrottleStream,
 	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
-	fetchWithRetry,
 	FrameBatcher,
-	postDecodedRange,
+	fetchWithRetry,
 	parseTotalBytes,
 	postBufferRange,
+	postDecodedRange,
 	resampleChannel,
 	type StreamRetryConfig,
 } from "./worker-utils";
@@ -124,14 +124,13 @@ let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate, retry } =
-			ev.data as {
-				port: MessagePort;
-				url: string;
-				throttle?: number;
-				targetSampleRate?: number;
-				retry?: StreamRetryConfig | null;
-			};
+		const { port, url, throttle, targetSampleRate, retry } = ev.data as {
+			port: MessagePort;
+			url: string;
+			throttle?: number;
+			targetSampleRate?: number;
+			retry?: StreamRetryConfig | null;
+		};
 		currentPort = port;
 		currentUrl = url;
 		currentThrottle = throttle ?? 0;

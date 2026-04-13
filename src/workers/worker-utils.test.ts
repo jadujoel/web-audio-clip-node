@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
 	BackpressureGate,
 	DEFAULT_RETRY_CONFIG,
-	fetchWithRetry,
 	FrameBatcher,
+	fetchWithRetry,
 	float32ToInt16,
 	maybeConvertToInt16,
 	parseTotalBytes,
@@ -362,7 +362,7 @@ describe("FrameBatcher", () => {
 		// 4th add: 4 * 512 = 2048 → should return batched channels
 		const batch = batcher.add([frame]);
 		expect(batch).not.toBeNull();
-		expect(batch![0].length).toBe(2048);
+		if (batch !== null) expect(batch[0].length).toBe(2048);
 	});
 
 	test("concatenates channel data correctly at threshold", () => {
@@ -374,16 +374,18 @@ describe("FrameBatcher", () => {
 		const ch1b = new Float32Array(1024).fill(-0.9);
 		const batch = batcher.add([ch0b, ch1b]); // 2048 → triggers flush
 		expect(batch).not.toBeNull();
-		expect(batch!.length).toBe(2);
-		expect(batch![0].length).toBe(2048);
-		expect(batch![1].length).toBe(2048);
-		// First 1024 samples come from the first frame
-		expect(batch![0][0]).toBeCloseTo(0.1);
-		expect(batch![0][1023]).toBeCloseTo(0.1);
-		// Next 1024 come from the second frame
-		expect(batch![0][1024]).toBeCloseTo(0.9);
-		expect(batch![1][0]).toBeCloseTo(-0.1);
-		expect(batch![1][1024]).toBeCloseTo(-0.9);
+		if (batch !== null) {
+			expect(batch.length).toBe(2);
+			expect(batch[0].length).toBe(2048);
+			expect(batch[1].length).toBe(2048);
+			// First 1024 samples come from the first frame
+			expect(batch[0][0]).toBeCloseTo(0.1);
+			expect(batch[0][1023]).toBeCloseTo(0.1);
+			// Next 1024 come from the second frame
+			expect(batch[0][1024]).toBeCloseTo(0.9);
+			expect(batch[1][0]).toBeCloseTo(-0.1);
+			expect(batch[1][1024]).toBeCloseTo(-0.9);
+		}
 	});
 
 	test("flush returns accumulated frames and resets batcher", () => {
@@ -393,7 +395,7 @@ describe("FrameBatcher", () => {
 		batcher.add([frame]);
 		const flushed = batcher.flush();
 		expect(flushed).not.toBeNull();
-		expect(flushed![0].length).toBe(1024);
+		if (flushed !== null) expect(flushed[0].length).toBe(1024);
 		// After flush, batcher is empty
 		expect(batcher.flush()).toBeNull();
 		expect(batcher.bufferedSamples).toBe(0);
@@ -422,6 +424,6 @@ describe("FrameBatcher", () => {
 		const big = new Float32Array(4096).fill(0.7);
 		const batch = batcher.add([big]);
 		expect(batch).not.toBeNull();
-		expect(batch![0].length).toBe(4096);
+		if (batch !== null) expect(batch[0].length).toBe(4096);
 	});
 });

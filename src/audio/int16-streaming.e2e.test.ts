@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { applyBufferRangeWrite, getProperties, processBlock } from "./processor-kernel";
+import {
+	applyBufferRangeWrite,
+	getProperties,
+	processBlock,
+} from "./processor-kernel";
 import { State } from "./types";
 
 describe("float32 streaming pipeline (end-to-end)", () => {

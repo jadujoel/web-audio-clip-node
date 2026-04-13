@@ -10,13 +10,13 @@ import type {
 	AudioMetadata,
 	BufferedRange,
 	ClipWorkletOptions,
+	StreamBufferSpan,
 	StreamError,
 	StreamErrorCode,
 	StreamingClipNodeEventMap,
 	StreamPreload,
 	StreamReadyState,
 } from "./types";
-import type { StreamBufferSpan } from "./types";
 import { getProcessorBlobUrl } from "./workletUrl";
 
 export interface PendingStart {
@@ -441,6 +441,7 @@ export class StreamingClipNode extends ClipNode {
 				type: string;
 				bytesReceived?: number;
 				samplesDecoded?: number;
+				totalSamples?: number;
 				startSample?: number;
 				endSample?: number;
 				message?: string;
@@ -471,10 +472,11 @@ export class StreamingClipNode extends ClipNode {
 				this.onmetadata?.(msg.metadata);
 				this.emit("metadata", msg.metadata);
 			} else if (msg.type === "done") {
+				const completionSamples = this._resolveCompletionSamples(msg);
 				this._streamDone = true;
 				this._streamDoneAcked = true;
 				// If the entire stream is shorter than the threshold, start now
-				this._tryStart(msg.samplesDecoded ?? 0, 0);
+				this._tryStart(completionSamples, 0);
 				this._finalizeDownloadedIfReady();
 				this.ondone?.();
 				this.emit("done");
@@ -500,6 +502,7 @@ export class StreamingClipNode extends ClipNode {
 				type: "init",
 				port: channel.port1,
 				url,
+				useInt16: this._streamOptions.useInt16 ?? false,
 				targetSampleRate: this._streamOptions.targetSampleRate,
 				retry:
 					this._streamOptions.retry === false
@@ -515,10 +518,33 @@ export class StreamingClipNode extends ClipNode {
 	 * This replaces the old writtenSpans tracking that was done on the audio thread.
 	 */
 	private _applyDecodedRange(startSample: number, endSample: number): void {
-		this._writtenSpans = mergeWrittenSpanIntoArray(this._writtenSpans, startSample, endSample);
+		if (
+			!Number.isFinite(startSample) ||
+			!Number.isFinite(endSample) ||
+			endSample <= startSample ||
+			startSample < 0
+		) {
+			return;
+		}
+		this._writtenSpans = mergeWrittenSpanIntoArray(
+			this._writtenSpans,
+			startSample,
+			endSample,
+		);
 		const ranges = this.buffered;
 		this.onbufferchange?.(ranges);
 		this.emit("bufferchange", ranges);
+	}
+
+	private _resolveCompletionSamples(msg: {
+		samplesDecoded?: number;
+		totalSamples?: number;
+	}): number {
+		const declared = msg.samplesDecoded ?? msg.totalSamples ?? 0;
+		if (!Number.isFinite(declared) || declared < 0) {
+			return this._committedLength;
+		}
+		return Math.max(declared, this._committedLength);
 	}
 
 	private _finalizeDownloadedIfReady(): void {

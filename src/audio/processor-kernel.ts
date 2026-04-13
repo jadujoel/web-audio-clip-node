@@ -8,7 +8,6 @@ import {
 	type ClipProcessorOptions,
 	type LoopMode,
 	State,
-	type StreamBufferSpan,
 	type StreamBufferState,
 } from "./types";
 
@@ -70,6 +69,9 @@ function reconcileStreamEndedState(streamBuffer: StreamBufferState): void {
 		streamBuffer.streamEnded = true;
 		return;
 	}
+	if (streamBuffer.totalLength < streamBuffer.maxWrittenSample) {
+		streamBuffer.totalLength = streamBuffer.maxWrittenSample;
+	}
 	streamBuffer.streamEnded =
 		streamBuffer.committedLength >= streamBuffer.totalLength;
 }
@@ -96,7 +98,10 @@ function drainSeekSpans(streamBuffer: StreamBufferState): void {
 		merged = false;
 		for (let i = 0; i < streamBuffer.seekSpans.length; i++) {
 			const span = streamBuffer.seekSpans[i];
-			if (span !== undefined && span.startSample <= streamBuffer.committedLength) {
+			if (
+				span !== undefined &&
+				span.startSample <= streamBuffer.committedLength
+			) {
 				if (span.endSample > streamBuffer.committedLength) {
 					streamBuffer.committedLength = span.endSample;
 				}
@@ -123,7 +128,8 @@ function addSeekSpan(
 	// Try to merge with an existing overlapping or adjacent span
 	for (let i = 0; i < streamBuffer.seekSpans.length; i++) {
 		const span = streamBuffer.seekSpans[i];
-		if (span !== undefined &&
+		if (
+			span !== undefined &&
 			startSample <= span.endSample &&
 			endSample >= span.startSample
 		) {
@@ -136,8 +142,10 @@ function addSeekSpan(
 	if (streamBuffer.seekSpans.length >= MAX_SEEK_SPANS) {
 		let minIdx = 0;
 		for (let i = 1; i < streamBuffer.seekSpans.length; i++) {
-			if ((streamBuffer.seekSpans[i]?.endSample ?? 0) <
-				(streamBuffer.seekSpans[minIdx]?.endSample ?? 0)) {
+			if (
+				(streamBuffer.seekSpans[i]?.endSample ?? 0) <
+				(streamBuffer.seekSpans[minIdx]?.endSample ?? 0)
+			) {
 				minIdx = i;
 			}
 		}
@@ -157,19 +165,16 @@ function ensureBufferCapacity(
 		return;
 	}
 
-	// Guard: do not reallocate while streaming — that would cause a catastrophic
-	// GC pause in the audio render thread. Clamp to the existing buffer length.
-	if (properties.streamBuffer.streamingActive) {
-		if (process.env.NODE_ENV !== "production") {
-			console.warn(
-				`ensureBufferCapacity: over-size write during streaming — clamping write to buffer bounds. ` +
-				`requiredLength=${requiredLength}, bufferLength=${currentLength}`,
-			);
-		}
-		return;
-	}
-
-	const nextLength = Math.max(currentLength, requiredLength);
+	// During streaming, the initial total length is often an estimate.
+	// Grow with headroom to avoid repeated reallocations on subsequent chunks.
+	const streamingGrowthHeadroom = SAMPLE_BLOCK_SIZE * 512;
+	const nextLength = properties.streamBuffer.streamingActive
+		? Math.max(
+				requiredLength,
+				Math.floor(currentLength * 1.5),
+				currentLength + streamingGrowthHeadroom,
+			)
+		: Math.max(currentLength, requiredLength);
 	const nextChannels = Math.max(currentChannels, requiredChannels);
 	const nextBuffer = createSilentBuffer(nextChannels, nextLength);
 	for (let ch = 0; ch < currentChannels; ch++) {
@@ -193,10 +198,11 @@ export function applyBufferRangeWrite(
 	const requestedTotalLength = write.totalLength ?? null;
 
 	if (requestedTotalLength != null) {
-		properties.streamBuffer.totalLength = requestedTotalLength;
+		properties.streamBuffer.totalLength = Math.max(
+			requestedTotalLength,
+			properties.streamBuffer.maxWrittenSample,
+		);
 	}
-
-	const bufferLength = getBufferLength(properties.buffer);
 
 	if (writeLength > 0) {
 		const requiredLength = Math.max(
@@ -208,8 +214,9 @@ export function applyBufferRangeWrite(
 			Math.max(write.channelData.length, properties.buffer.length, 1),
 			requiredLength,
 		);
+		const bufferLength = getBufferLength(properties.buffer);
 
-		// Clamp write to buffer bounds (streaming guard may have suppressed realloc)
+		// Clamp writes to bounds as a safety net when the producer sends oversize chunks.
 		const clampedEnd = Math.min(startSample + writeLength, bufferLength);
 		writeLength = Math.max(clampedEnd - startSample, 0);
 
@@ -852,9 +859,15 @@ export function handleProcessorMessage(
 			applyBufferRangeWrite(properties, data as BufferRangeWrite);
 			return [];
 		case "bufferEnd": {
-			const endData = data as { totalLength?: number } | undefined;
-			if (endData?.totalLength != null) {
-				properties.streamBuffer.totalLength = endData.totalLength;
+			const endData = data as
+				| { totalLength?: number; totalSamples?: number }
+				| undefined;
+			const declaredLength = endData?.totalLength ?? endData?.totalSamples;
+			if (declaredLength != null) {
+				properties.streamBuffer.totalLength = Math.max(
+					declaredLength,
+					properties.streamBuffer.maxWrittenSample,
+				);
 			}
 			properties.streamBuffer.endRequested = true;
 			reconcileStreamEndedState(properties.streamBuffer);

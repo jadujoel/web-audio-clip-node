@@ -4826,7 +4826,7 @@ describe("applyBufferRangeWrite streaming write correctness", () => {
 		expect(props.streamBuffer.seekSpans.length).toBe(0);
 	});
 
-	it("6b: over-size write during streaming is clamped — buffer not reallocated", () => {
+	it("6b: over-size write during streaming grows buffer instead of truncating", () => {
 		const props = makeStreamingPlayingProps(256);
 		expect(props.buffer[0].length).toBe(256);
 
@@ -4839,12 +4839,33 @@ describe("applyBufferRangeWrite streaming write correctness", () => {
 			],
 		});
 
-		// Buffer must NOT be reallocated
-		expect(props.buffer[0].length).toBe(256);
-		// committedLength is clamped to buffer bounds
-		expect(props.streamBuffer.committedLength).toBe(256);
-		// maxWrittenSample also clamped to buffer length
-		expect(props.streamBuffer.maxWrittenSample).toBeLessThanOrEqual(256);
+		// Buffer grows to hold the full write so playback is not truncated.
+		expect(props.buffer[0].length).toBeGreaterThanOrEqual(512);
+		expect(props.streamBuffer.committedLength).toBe(512);
+		expect(props.streamBuffer.maxWrittenSample).toBe(512);
+	});
+
+	it("6d: bufferEnd accepts totalSamples and updates final totalLength", () => {
+		const props = makeStreamingPlayingProps(256);
+
+		applyBufferRangeWrite(props, {
+			startSample: 0,
+			channelData: [
+				new Float32Array(512).fill(0.5),
+				new Float32Array(512).fill(0.5),
+			],
+		});
+
+		handleProcessorMessage(
+			props,
+			{ type: "bufferEnd", data: { totalSamples: 512 } },
+			0,
+			SR,
+		);
+
+		expect(props.streamBuffer.totalLength).toBe(512);
+		expect(props.streamBuffer.endRequested).toBe(true);
+		expect(props.streamBuffer.streamEnded).toBe(true);
 	});
 
 	it("6c: bufferRange write via handleProcessorMessage is visible to the next process() call", () => {
@@ -4881,7 +4902,13 @@ describe("applyBufferRangeWrite streaming write correctness", () => {
 			lowpass: createFilterState(),
 			highpass: createFilterState(),
 		};
-		processBlock(props, outputs, params, { currentTime: 0.001, currentFrame: 0, sampleRate: SR }, filterState);
+		processBlock(
+			props,
+			outputs,
+			params,
+			{ currentTime: 0.001, currentFrame: 0, sampleRate: SR },
+			filterState,
+		);
 
 		// Output must be non-silent — data was immediately applied
 		expect(checkNans(outputs[0])).toBe(0);

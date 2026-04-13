@@ -288,7 +288,7 @@ export interface StreamBufferState {
 	endRequested: boolean;
 	streamEnded: boolean;
 	streaming: boolean;
-	/** True when streaming is active — prevents buffer reallocation during writes. */
+	/** True when streaming is active — enables streaming-specific buffer write behavior. */
 	streamingActive: boolean;
 	/** Furthest sample written into the buffer (may be beyond committedLength for sparse writes). */
 	maxWrittenSample: number;
@@ -326,6 +326,7 @@ export interface ClipProcessorBufferEndMessageRx {
 	readonly type: "bufferEnd";
 	readonly data?: {
 		readonly totalLength?: number;
+		readonly totalSamples?: number;
 	};
 }
 

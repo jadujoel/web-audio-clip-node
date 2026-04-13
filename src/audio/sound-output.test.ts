@@ -20,6 +20,7 @@
 
 import { describe, expect, it } from "bun:test";
 import {
+	applyBufferRangeWrite,
 	checkNans,
 	createFilterState,
 	getProperties,
@@ -6297,40 +6298,29 @@ describe("muted", () => {
 });
 
 describe("bufferState message emission", () => {
-	it("emits bufferState when pending writes are applied", () => {
+	it("bufferRange write is applied immediately and updates committedLength", () => {
 		const props = makeStartedProps({});
 		// Reset to empty streaming state
 		props.streamBuffer.streaming = true;
-		props.streamBuffer.writtenSpans = [];
 		props.streamBuffer.committedLength = 0;
 		props.streamBuffer.totalLength = null;
 		props.streamBuffer.streamEnded = false;
 		props.buffer = [new Float32Array(48_000)];
-		props.streamBuffer.pendingWrites = [
-			{
-				startSample: 0,
-				channelData: [new Float32Array(24_000)],
-			},
-		];
-		const { messages } = processBlocks(props, 1);
-		const bufferStateMsg = messages.find((m) => m.type === "bufferState");
-		expect(bufferStateMsg).toBeDefined();
-		const bs = bufferStateMsg?.data as {
-			committedLength: number;
-			totalLength: number | null;
-			streamEnded: boolean;
-			writtenSpans: { startSample: number; endSample: number }[];
-		};
-		expect(bs.committedLength).toBe(24_000);
-		expect(bs.writtenSpans).toEqual([{ startSample: 0, endSample: 24_000 }]);
+		props.streamBuffer.streamingActive = true;
+		// Apply write immediately via applyBufferRangeWrite (no pending queue)
+		applyBufferRangeWrite(props, {
+			startSample: 0,
+			channelData: [new Float32Array(24_000)],
+		});
+		// Write is visible immediately — no processBlock needed
+		expect(props.streamBuffer.committedLength).toBe(24_000);
 	});
 
-	it("does NOT emit bufferState when no pending writes", () => {
+	it("processBlock does NOT emit bufferState (emitted by processor.ts)", () => {
 		const props = makeStartedProps({
 			buffer: [new Float32Array(48_000)],
 		});
 		props.streamBuffer.streaming = true;
-		props.streamBuffer.pendingWrites = [];
 		const { messages } = processBlocks(props, 1);
 		const bufferStateMsg = messages.find((m) => m.type === "bufferState");
 		expect(bufferStateMsg).toBeUndefined();
@@ -6348,7 +6338,6 @@ describe("underrun recovery crossfade", () => {
 		props.streamBuffer.streaming = true;
 		props.streamBuffer.committedLength = bufLen; // fully committed initially
 		props.streamBuffer.streamEnded = false;
-		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
 
 		// First, play a few normal blocks
 		processBlocks(props, 2);
@@ -6382,7 +6371,6 @@ describe("underrun recovery crossfade", () => {
 		props.streamBuffer.committedLength = bufLen;
 		props.streamBuffer.streamEnded = false;
 		props.streamBuffer.underrunRecoverySamples = 128; // exactly one block
-		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
 
 		// Play to advance playhead
 		processBlocks(props, 2);
@@ -6415,7 +6403,6 @@ describe("underrun recovery crossfade", () => {
 		props.streamBuffer.streaming = true;
 		props.streamBuffer.committedLength = bufLen;
 		props.streamBuffer.streamEnded = false;
-		props.streamBuffer.writtenSpans = [{ startSample: 0, endSample: bufLen }];
 
 		// Process normally — no underrun, no recovery
 		processBlocks(props, 1);
