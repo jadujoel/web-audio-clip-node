@@ -116,6 +116,7 @@ export class StreamingClipNode extends ClipNode {
 	private _totalBytesReceived = 0;
 	private _fetchPaused = false;
 	private _streamStarting = false;
+	private _streamDoneAcked = false;
 
 	onerror?: (error: StreamError) => void;
 	onprogress?: (bytesReceived: number) => void;
@@ -203,6 +204,8 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	protected override onBufferStateChanged(): void {
+		this._finalizeDownloadedIfReady();
+
 		const ranges = this.buffered;
 		this.onbufferchange?.(ranges);
 		this.emit("bufferchange", ranges);
@@ -374,6 +377,7 @@ export class StreamingClipNode extends ClipNode {
 		this._lastError = null;
 		this._totalBytesReceived = 0;
 		this._streamStartTime = performance.now();
+		this._streamDoneAcked = false;
 
 		this._setReadyState("loading");
 		this.onloadstart?.();
@@ -434,10 +438,11 @@ export class StreamingClipNode extends ClipNode {
 				this.emit("metadata", msg.metadata);
 			} else if (msg.type === "done") {
 				this._streamDone = true;
+				this._streamDoneAcked = true;
 				// If the entire stream is shorter than the threshold, start now
 				this._tryStart(msg.samplesDecoded ?? 0, 0);
 				this._setReadyState("complete");
-				this._downloaded.resolve();
+				this._finalizeDownloadedIfReady();
 				this._worker?.terminate();
 				this._worker = null;
 				this.ondone?.();
@@ -473,6 +478,13 @@ export class StreamingClipNode extends ClipNode {
 			},
 			[channel.port1],
 		);
+	}
+
+	private _finalizeDownloadedIfReady(): void {
+		if (!this._streamDoneAcked) return;
+		if (!this._streamEnded) return;
+		this._streamDoneAcked = false;
+		this._downloaded.resolve();
 	}
 
 	private _tryStart(samplesDecoded: number, threshold: number): void {

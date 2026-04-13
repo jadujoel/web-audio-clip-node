@@ -550,6 +550,15 @@ describe("StreamingClipNode callbacks", () => {
 });
 
 describe("StreamingClipNode.downloaded", () => {
+	const callHandleMessage = (
+		node: StreamingClipNode,
+		msg: { type: string; data: unknown },
+	) => {
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({ data: msg } as MessageEvent);
+	};
+
 	test("resolves when stream completes", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
@@ -566,6 +575,15 @@ describe("StreamingClipNode.downloaded", () => {
 
 		const promise = node.downloaded;
 		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 0,
+				totalLength: 0,
+				streamEnded: true,
+				writtenSpans: [],
+			},
+		});
 		await expect(promise).resolves.toBeUndefined();
 	});
 
@@ -604,6 +622,15 @@ describe("StreamingClipNode.downloaded", () => {
 
 		const firstPromise = node.downloaded;
 		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 0,
+				totalLength: 0,
+				streamEnded: true,
+				writtenSpans: [],
+			},
+		});
 		await firstPromise;
 
 		// Setting a new URL should create a fresh promise
@@ -613,7 +640,52 @@ describe("StreamingClipNode.downloaded", () => {
 		const secondPromise = node.downloaded;
 		expect(secondPromise).not.toBe(firstPromise);
 		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 0,
+				totalLength: 0,
+				streamEnded: true,
+				writtenSpans: [],
+			},
+		});
 		await expect(secondPromise).resolves.toBeUndefined();
+	});
+
+	test("does not resolve on done until streamEnd is committed", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const promise = node.downloaded;
+		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+
+		const beforeCommit = await Promise.race([
+			promise.then(() => "resolved"),
+			Promise.resolve("pending"),
+		]);
+		expect(beforeCommit).toBe("pending");
+
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 0,
+				totalLength: 0,
+				streamEnded: true,
+				writtenSpans: [],
+			},
+		});
+
+		await expect(promise).resolves.toBeUndefined();
 	});
 
 	test("stays pending when no stream started", async () => {
