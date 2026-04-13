@@ -1,5 +1,9 @@
 import type { StreamFormat } from "../streaming";
-import { createStreamingWorker, detectStreamFormat } from "../streaming";
+import {
+	createCdnWorkerFactory,
+	createStreamingWorker,
+	detectStreamFormat,
+} from "../streaming";
 import { ClipNode } from "./ClipNode";
 import type { ClipWorkletOptions } from "./types";
 import { getProcessorBlobUrl } from "./workletUrl";
@@ -145,18 +149,25 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	stop(when?: number): void {
+		this._terminateWorker();
+		super.stop(when);
+	}
+
+	dispose(): void {
+		this._terminateWorker();
+		super.dispose();
+	}
+
+	private _terminateWorker(): void {
 		if (this._worker) {
 			this._worker.postMessage({ type: "abort" });
 			this._worker.terminate();
 			this._worker = null;
 		}
-		super.stop(when);
 	}
 }
 
 export class Coordinator {
-
-
 	private constructor(
 		public context: BaseAudioContext,
 		public workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>,
@@ -164,21 +175,27 @@ export class Coordinator {
 		private nodes = new Set<ClipNode>(),
 	) {}
 
-	static default() {
+	/** One-line setup using embedded workers. All format workers are bundled —
+	 *  no CDN fetch needed for worker scripts. */
+	static fromCdn(options?: { sampleRate?: number }): Coordinator {
 		const context = new AudioContext({
-			sampleRate: 48000,
+			sampleRate: options?.sampleRate ?? 48000,
 			latencyHint: "playback",
 		});
-		const coordinator = Coordinator.fromContext(context);
+		const coordinator = new Coordinator(context, createCdnWorkerFactory());
 		coordinator.addModule();
 		return coordinator;
 	}
 
 	static fromContext(
 		context: BaseAudioContext,
+		options?: {
+			workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>;
+			processorUrl?: string;
+		},
 	): Coordinator {
-		const coordinator = new Coordinator(context);
-		coordinator.addModule();
+		const coordinator = new Coordinator(context, options?.workerFactory);
+		coordinator.addModule(options?.processorUrl);
 		return coordinator;
 	}
 

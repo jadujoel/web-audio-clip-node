@@ -7,11 +7,9 @@ import {
 import {
 	ClipNode,
 	detectStreamFormat,
-	float32ArrayFromAudioBuffer,
 	getProcessorBlobUrl,
 	getStreamingWorkerUrl,
 	linFromDb,
-	usesBufferedContainerDecode,
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
@@ -233,68 +231,6 @@ export function useStreamingClipNode({
 				setSeekableDuration(null);
 				setSeekableSamples(null);
 				setProgress(0);
-
-				if (usesBufferedContainerDecode(selectedFormat)) {
-					const absoluteUrl = new URL(url, location.href).href;
-					const response = await fetch(absoluteUrl);
-					if (!response.ok) {
-						throw new Error(
-							`Fetch failed: ${response.status} ${response.statusText}`,
-						);
-					}
-					if (!response.body) {
-						throw new Error("Response has no body");
-					}
-
-					const contentLength = response.headers.get("content-length");
-					const totalBytes = contentLength
-						? Number.parseInt(contentLength, 10)
-						: null;
-					const reader = response.body.getReader();
-					const chunks: Uint8Array[] = [];
-					let bytesReceived = 0;
-
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
-						chunks.push(value);
-						bytesReceived += value.length;
-						if (totalBytes != null) {
-							setProgress(bytesReceived / totalBytes);
-							setStatus(
-								`Downloading container… ${((bytesReceived / 1024) | 0)} / ${((totalBytes / 1024) | 0)} KB`,
-							);
-						} else {
-							setStatus(`Downloading container… ${((bytesReceived / 1024) | 0)} KB`);
-						}
-					}
-
-					const combined = new Uint8Array(bytesReceived);
-					let offset = 0;
-					for (const chunk of chunks) {
-						combined.set(chunk, offset);
-						offset += chunk.length;
-					}
-
-					setStatus("Decoding container audio…");
-					const decoded = await ctx.decodeAudioData(combined.buffer);
-					const clip = new ClipNode(ctx, {
-						processorOptions: {
-							buffer: float32ArrayFromAudioBuffer(decoded),
-						},
-					});
-					configureClip(ctx, clip);
-					finalDurationRef.current = decoded.duration;
-					setAudioDuration(decoded.duration);
-					setSeekableDuration(decoded.duration);
-					setSeekableSamples(decoded.length);
-					setProgress(1);
-					clip.start();
-					setStatus(
-						`Buffered & playing… ${decoded.sampleRate} Hz, ${decoded.numberOfChannels} ch`,
-					);
-					return;
-				}
 
 				// Create ClipNode (no buffer — streaming mode)
 				const clip = new ClipNode(ctx);

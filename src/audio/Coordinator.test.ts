@@ -52,7 +52,9 @@ afterEach(() => {
 describe("Coordinator.fromContext", () => {
 	test("returns a Coordinator instance", () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		const coordinator = Coordinator.fromContext(ctx);
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "./dist/audio/processor.js",
+		});
 		expect(coordinator).toBeInstanceOf(Coordinator);
 	});
 });
@@ -60,8 +62,12 @@ describe("Coordinator.fromContext", () => {
 describe("Coordinator.addModule", () => {
 	test("calls ctx.audioWorklet.addModule with the processor URL", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		const coordinator = Coordinator.fromContext(ctx);
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
 		await coordinator.addModule("./dist/audio/processor.js");
+		// Second call is idempotent — returns the same cached promise
 		await coordinator.addModule("./dist/audio/processor.js");
 		expect(true).toBe(true);
 	});
@@ -73,6 +79,7 @@ describe("Coordinator.ClipNode", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 		const node = coordinator.ClipNode();
 		expect(node).toBeInstanceOf(ClipNode);
@@ -86,6 +93,7 @@ describe("Coordinator.StreamingClipNode", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 		const node = coordinator.StreamingClipNode();
 		expect(node).toBeInstanceOf(StreamingClipNode);
@@ -105,6 +113,7 @@ describe("Coordinator.StreamingClipNode", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 		const node = coordinator.StreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -122,6 +131,7 @@ describe("Coordinator.dispose", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const regular = coordinator.ClipNode();
@@ -129,7 +139,8 @@ describe("Coordinator.dispose", () => {
 			format: "OggOpus",
 		});
 		streaming.url = "https://example.com/audio.opus";
-		await Promise.resolve();
+		// _startStream is async; flush enough microtasks for the worker to be set
+		await new Promise((r) => setTimeout(r, 0));
 		expect(regular).toBeInstanceOf(ClipNode);
 
 		const worker = lastWorker;
@@ -145,6 +156,7 @@ describe("StreamingClipNode.url setter", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -166,6 +178,7 @@ describe("StreamingClipNode.url setter", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -187,6 +200,7 @@ describe("StreamingClipNode.url setter", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 		const node = coordinator.StreamingClipNode();
 		node.url = "https://example.com/audio.opus";
@@ -200,6 +214,7 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -232,6 +247,7 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -260,6 +276,7 @@ describe("StreamingClipNode.stop", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -279,6 +296,7 @@ describe("StreamingClipNode.stop", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -301,6 +319,7 @@ describe("StreamingClipNode callbacks", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -323,6 +342,7 @@ describe("StreamingClipNode callbacks", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -345,6 +365,7 @@ describe("StreamingClipNode callbacks", () => {
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 
 		const node = coordinator.StreamingClipNode(undefined, {
@@ -378,6 +399,7 @@ describe("StreamingClipNode format auto-detection", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
+			processorUrl: "./dist/audio/processor.js",
 		});
 		const node = coordinator.StreamingClipNode();
 		node.url = "https://example.com/audio.opus";

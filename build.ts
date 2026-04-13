@@ -3,7 +3,9 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, parse as parsePath } from "node:path";
 
 export async function latestCdnVersion(): Promise<string> {
-	return (await Bun.$`bun info @jadujoel/web-audio-clip-node version`.text()).trim();
+	return (
+		await Bun.$`bun info @jadujoel/web-audio-clip-node version`.text()
+	).trim();
 }
 
 /**
@@ -312,11 +314,89 @@ async function buildProcessorCodeModule(): Promise<string> {
 	return code;
 }
 
+/** Map from StreamFormat to build entry, output code module path, and export name. */
+const workerCodeModules = [
+	{
+		entry: "./src/workers/aac-adts-decode-worker.ts",
+		file: "src/workers/aac-worker-code.ts",
+		exportName: "aacWorkerCode",
+	},
+	{
+		entry: "./src/workers/flac-decode-worker.ts",
+		file: "src/workers/flac-worker-code.ts",
+		exportName: "flacWorkerCode",
+	},
+	{
+		entry: "./src/workers/mp3-decode-worker.ts",
+		file: "src/workers/mp3-worker-code.ts",
+		exportName: "mp3WorkerCode",
+	},
+	{
+		entry: "./src/workers/mp4-aac-decode-worker.ts",
+		file: "src/workers/mp4-aac-worker-code.ts",
+		exportName: "mp4AacWorkerCode",
+	},
+	{
+		entry: "./src/workers/ogg-flac-decode-worker.ts",
+		file: "src/workers/ogg-flac-worker-code.ts",
+		exportName: "oggFlacWorkerCode",
+	},
+	{
+		entry: "./src/workers/ogg-opus-decode-worker.ts",
+		file: "src/workers/ogg-opus-worker-code.ts",
+		exportName: "oggOpusWorkerCode",
+	},
+	{
+		entry: "./src/workers/ogg-vorbis-decode-worker.ts",
+		file: "src/workers/ogg-vorbis-worker-code.ts",
+		exportName: "oggVorbisWorkerCode",
+	},
+	{
+		entry: "./src/workers/raw-opus-framed-decode-worker.ts",
+		file: "src/workers/raw-opus-framed-worker-code.ts",
+		exportName: "rawOpusFramedWorkerCode",
+	},
+	{
+		entry: "./src/workers/webm-opus-decode-worker.ts",
+		file: "src/workers/webm-opus-worker-code.ts",
+		exportName: "webmOpusWorkerCode",
+	},
+	{
+		entry: "./src/workers/webm-vorbis-decode-worker.ts",
+		file: "src/workers/webm-vorbis-worker-code.ts",
+		exportName: "webmVorbisWorkerCode",
+	},
+] as const;
+
+async function buildWorkerCodeModules(): Promise<void> {
+	for (const mod of workerCodeModules) {
+		const result = await Bun.build({
+			entrypoints: [mod.entry],
+			target: "browser",
+			minify: true,
+			format: "iife",
+		});
+		if (!result.success) {
+			throw new Error(
+				`Worker build failed for ${mod.entry}: ${result.logs.join("\n")}`,
+			);
+		}
+		const code = await result.outputs[0].text();
+		await Bun.write(
+			mod.file,
+			`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const ${mod.exportName} =\n\t${JSON.stringify(code)};\n`,
+		);
+	}
+}
+
 export async function buildLibrary(): Promise<void> {
 	await rm(distDir, { force: true, recursive: true });
 
 	// 1. Compile processor and generate embedded code module
 	const processorSource = await buildProcessorCodeModule();
+
+	// 1b. Compile all streaming workers and generate embedded code modules
+	await buildWorkerCodeModules();
 
 	// 2. Write standalone processor.js for CDN usage (with hashed variant)
 	await writeWithHash("dist/processor.js", processorSource);

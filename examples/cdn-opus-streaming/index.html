@@ -52,11 +52,9 @@
     }
 
     async function main() {
-      const context = new AudioContext({ sampleRate: 48000 });
-      const coordinator = Coordinator.fromContext(context);
-      await coordinator.addModule();
+      const coordinator = Coordinator.fromCdn();
       const clip = coordinator.StreamingClipNode();
-      clip.connect(context.destination);
+      clip.connect(coordinator.context.destination);
 
       clip.onprogress = (bytes) => {
         const kb = (bytes / 1024) | 0;
@@ -70,7 +68,7 @@
       btn.onclick = async () => {
         clip.url ??= "https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
         if (clip.state !== "started") {
-          await context.resume();
+          await coordinator.context.resume();
           clip.start();
           btn.innerText = "Stop";
         } else {

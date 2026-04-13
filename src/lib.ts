@@ -72,15 +72,16 @@ export { loadFromCache } from "./data/cache";
 export type { StoredFile } from "./data/fileStore";
 export { loadUploadedFile, saveUploadedFile } from "./data/fileStore";
 export { getDefaultUrlForFormat } from "./streamFormat";
-export type { StreamFormat } from "./streaming";
-export {
-	createStreamingWorker,
-	detectStreamFormat,
-	getStreamingWorkerUrl,
-} from "./streaming";
+export * from "./streaming";
 export {
 	clampSeekTargetSamples,
 	clampSeekTargetSeconds,
 	estimateTotalSamplesFromContentLength,
 	secondsFromSamples,
 } from "./streamTimeline";
+export { oggOpusWorkerCode } from "./workers/ogg-opus-worker-code";
+export {
+	createOggOpusWorkerFromBlob,
+	createWorkerFromBlob,
+	getWorkerCode,
+} from "./workers/workerUrl";

@@ -1,3 +1,5 @@
+import { createWorkerFromBlob, getWorkerCode } from "./workers/workerUrl";
+
 export type StreamFormat =
 	| "Aac"
 	| "Flac"
@@ -10,7 +12,7 @@ export type StreamFormat =
 	| "WebmOpus"
 	| "WebmVorbis";
 
-export const workerFileMap: Record<StreamFormat, string> = {
+export const workerFileMap = {
 	Aac: "aac-adts-decode-worker.min.js",
 	Flac: "flac-decode-worker.min.js",
 	Mp3: "mp3-decode-worker.min.js",
@@ -21,7 +23,17 @@ export const workerFileMap: Record<StreamFormat, string> = {
 	RawOpusFramed: "raw-opus-framed-decode-worker.min.js",
 	WebmOpus: "webm-opus-decode-worker.min.js",
 	WebmVorbis: "webm-vorbis-decode-worker.min.js",
-};
+} as const;
+workerFileMap satisfies Record<StreamFormat, string>;
+
+export function createCdnWorkerFactory(): (
+	format: StreamFormat,
+) => Promise<Worker> {
+	return async (format: StreamFormat) => {
+		const code = await getWorkerCode(format);
+		return createWorkerFromBlob(code);
+	};
+}
 
 export function getStreamingWorkerUrl(format: StreamFormat): string {
 	const file = workerFileMap[format];
@@ -31,19 +43,8 @@ export function getStreamingWorkerUrl(format: StreamFormat): string {
 export async function createStreamingWorker(
 	format: StreamFormat,
 ): Promise<Worker> {
-	const url = getStreamingWorkerUrl(format);
-	// Cross-origin worker scripts are blocked by browsers.
-	// Fetch the script and load it via a blob URL instead.
-	if (new URL(url).origin !== location.origin) {
-		const res = await fetch(url);
-		const text = await res.text();
-		const blob = new Blob([text], { type: "application/javascript" });
-		const blobUrl = URL.createObjectURL(blob);
-		const worker = new Worker(blobUrl, { type: "classic" });
-		URL.revokeObjectURL(blobUrl);
-		return worker;
-	}
-	return new Worker(url, { type: "classic" });
+	const code = await getWorkerCode(format);
+	return createWorkerFromBlob(code);
 }
 
 export function detectStreamFormat(url: string): StreamFormat {

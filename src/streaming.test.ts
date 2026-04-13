@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { detectStreamFormat, usesBufferedContainerDecode } from "./streaming";
+import type { StreamFormat } from "./streaming";
+import {
+	createCdnWorkerFactory,
+	detectStreamFormat,
+	usesBufferedContainerDecode,
+	workerFileMap,
+} from "./streaming";
+import { oggOpusWorkerCode } from "./workers/ogg-opus-worker-code";
+import { getWorkerCode } from "./workers/workerUrl";
 
 describe("streaming build output", () => {
 	const workerFiles = [
@@ -128,5 +136,85 @@ describe("usesBufferedContainerDecode", () => {
 		expect(usesBufferedContainerDecode("RawOpusFramed")).toBe(false);
 		expect(usesBufferedContainerDecode("Aac")).toBe(false);
 		expect(usesBufferedContainerDecode("Mp4Aac")).toBe(true);
+	});
+});
+
+describe("oggOpusWorkerCode", () => {
+	test("is a non-empty string containing valid IIFE code", () => {
+		expect(typeof oggOpusWorkerCode).toBe("string");
+		expect(oggOpusWorkerCode.length).toBeGreaterThan(100);
+		// Should be IIFE — no module syntax
+		expect(oggOpusWorkerCode).not.toMatch(/\bexport\s/);
+		expect(oggOpusWorkerCode).not.toMatch(/\bimport\s/);
+	});
+});
+
+describe("embedded worker code modules", () => {
+	const allFormats: StreamFormat[] = [
+		"Aac",
+		"Flac",
+		"Mp3",
+		"Mp4Aac",
+		"OggFlac",
+		"OggOpus",
+		"OggVorbis",
+		"RawOpusFramed",
+		"WebmOpus",
+		"WebmVorbis",
+	];
+
+	for (const format of allFormats) {
+		test(`getWorkerCode("${format}") returns non-empty IIFE code`, async () => {
+			const code = await getWorkerCode(format);
+			expect(typeof code).toBe("string");
+			expect(code.length).toBeGreaterThan(100);
+			expect(code).not.toMatch(/\bexport\s/);
+			expect(code).not.toMatch(/\bimport\s/);
+		});
+	}
+
+	test("all embedded worker code files exist in src/workers/", () => {
+		const codeFiles = [
+			"aac-worker-code.ts",
+			"flac-worker-code.ts",
+			"mp3-worker-code.ts",
+			"mp4-aac-worker-code.ts",
+			"ogg-flac-worker-code.ts",
+			"ogg-opus-worker-code.ts",
+			"ogg-vorbis-worker-code.ts",
+			"raw-opus-framed-worker-code.ts",
+			"webm-opus-worker-code.ts",
+			"webm-vorbis-worker-code.ts",
+		];
+		for (const file of codeFiles) {
+			expect(existsSync(join("src", "workers", file))).toBe(true);
+		}
+	});
+});
+
+describe("createCdnWorkerFactory", () => {
+	test("returns a function", () => {
+		const factory = createCdnWorkerFactory();
+		expect(typeof factory).toBe("function");
+	});
+
+	test("workerFileMap contains all StreamFormat values", () => {
+		const formats: StreamFormat[] = [
+			"Aac",
+			"Flac",
+			"Mp3",
+			"Mp4Aac",
+			"OggFlac",
+			"OggOpus",
+			"OggVorbis",
+			"RawOpusFramed",
+			"WebmOpus",
+			"WebmVorbis",
+		];
+		for (const format of formats) {
+			expect(workerFileMap[format]).toBeDefined();
+			expect(typeof workerFileMap[format]).toBe("string");
+			expect(workerFileMap[format]).toMatch(/\.min\.js$/);
+		}
 	});
 });
