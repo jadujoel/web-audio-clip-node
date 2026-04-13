@@ -38,7 +38,10 @@ export function estimateTotalSamplesFromContentLength({
 			: (format && FORMAT_DEFAULT_BITRATE[format]) || FALLBACK_BITRATE_BPS;
 	const durationSeconds = (totalBytes * 8) / safeBitrate;
 	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
-	const totalSamples = Math.ceil(durationSeconds * targetSampleRate);
+	// Apply a 10% safety margin so the pre-allocated buffer is unlikely to be
+	// exceeded during streaming, avoiding reallocation in the audio render thread.
+	const baseSamples = Math.ceil(durationSeconds * targetSampleRate);
+	const totalSamples = Math.ceil((baseSamples * 11) / 10);
 	return Number.isFinite(totalSamples) && totalSamples > 0
 		? totalSamples
 		: null;

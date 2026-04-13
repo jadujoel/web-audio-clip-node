@@ -1,15 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { getProperties, processBlock } from "./processor-kernel";
+import { applyBufferRangeWrite, getProperties, processBlock } from "./processor-kernel";
 import { State } from "./types";
 
-describe("int16 streaming pipeline (end-to-end)", () => {
-	test("applies int16 bufferRange writes and exposes normalized float samples", () => {
+describe("float32 streaming pipeline (end-to-end)", () => {
+	test("applies float32 bufferRange writes and exposes correct samples", () => {
 		const sampleRate = 48_000;
 		const props = getProperties({}, sampleRate);
 		props.state = State.Initial;
-		props.streamBuffer.pendingWrites.push({
+		// Set up a small streaming buffer and apply a write immediately via applyBufferRangeWrite
+		props.buffer = [new Float32Array(5), new Float32Array(5)];
+		props.streamBuffer.streamingActive = true;
+		const sampleValues = [-1, -0.5, 0, 0.5, 32767 / 32768];
+		applyBufferRangeWrite(props, {
 			startSample: 0,
-			channelData: [new Int16Array([-32768, -16384, 0, 16384, 32767])],
+			channelData: [new Float32Array(sampleValues)],
 		});
 
 		const outputs = [[new Float32Array(128)]];

@@ -15,7 +15,8 @@ describe("streamTimeline", () => {
 			sourceSampleRate: 44_100,
 			targetSampleRate: 48_000,
 		});
-		expect(estimated).toBe(384_000);
+		// 128_000 * 8 / 128_000 = 8 seconds → 384_000 base samples + 10% margin → 422_400
+		expect(estimated).toBe(422_400);
 	});
 
 	it("prefers frame bitrate when provided", () => {
@@ -25,7 +26,8 @@ describe("streamTimeline", () => {
 			sourceSampleRate: 48_000,
 			targetSampleRate: 48_000,
 		});
-		expect(estimated).toBe(96_000);
+		// 48_000 * 8 / 192_000 = 2 seconds → 96_000 base samples + 10% margin → 105_600
+		expect(estimated).toBe(105_600);
 	});
 
 	it("returns null for invalid inputs", () => {
@@ -47,8 +49,8 @@ describe("streamTimeline", () => {
 			targetSampleRate: 48_000,
 			format: "Flac",
 		});
-		// 100_000 * 8 / 800_000 = 1 second → 48_000 samples
-		expect(estimated).toBe(48_000);
+		// 100_000 * 8 / 800_000 = 1 second → 48_000 base samples + 10% margin → 52_800
+		expect(estimated).toBe(52_800);
 	});
 
 	it("uses format-specific default bitrate for Mp3 (~192kbps)", () => {
@@ -59,8 +61,8 @@ describe("streamTimeline", () => {
 			targetSampleRate: 48_000,
 			format: "Mp3",
 		});
-		// 24_000 * 8 / 192_000 = 1 second → 48_000 samples
-		expect(estimated).toBe(48_000);
+		// 24_000 * 8 / 192_000 = 1 second → 48_000 base samples + 10% margin → 52_800
+		expect(estimated).toBe(52_800);
 	});
 
 	it("explicit bitrate overrides format default", () => {
@@ -71,8 +73,8 @@ describe("streamTimeline", () => {
 			targetSampleRate: 48_000,
 			format: "Flac",
 		});
-		// bitrate 192kbps takes precedence over Flac's 800kbps default
-		expect(estimated).toBe(96_000);
+		// bitrate 192kbps takes precedence over Flac's 800kbps default → 96_000 + 10% → 105_600
+		expect(estimated).toBe(105_600);
 	});
 
 	it("unknown format falls back to generic 128kbps", () => {
@@ -83,8 +85,8 @@ describe("streamTimeline", () => {
 			targetSampleRate: 48_000,
 			format: "UnknownFormat",
 		});
-		// 128_000 * 8 / 128_000 = 8 seconds → 384_000 samples
-		expect(estimated).toBe(384_000);
+		// 128_000 * 8 / 128_000 = 8 seconds → 384_000 base samples + 10% margin → 422_400
+		expect(estimated).toBe(422_400);
 	});
 
 	it("converts decoded samples to seconds", () => {

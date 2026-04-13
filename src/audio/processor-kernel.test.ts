@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	applyBufferRangeWrite,
 	checkNans,
 	copy,
 	createFilterState,
@@ -4670,12 +4671,48 @@ describe("Buffer swap during playback", () => {
 		}
 
 		// committedLength should be 512 after processing
-		runBlocks(props, 1); // triggers applyPendingBufferWrites
+		runBlocks(props, 1); // writes already applied immediately
 		expect(props.streamBuffer.committedLength).toBe(512);
 
 		// Play all
 		const result = runBlocks(props, 3);
 		expect(result.totalNans).toBe(0);
+	});
+
+	it("B6b: drains large pending write queue incrementally across blocks", () => {
+		const props = makePlayingProps();
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 1536, streaming: true },
+			},
+			0,
+			SR,
+		);
+
+		for (let i = 0; i < 12; i++) {
+			handleProcessorMessage(
+				props,
+				{
+					type: "bufferRange",
+					data: {
+						startSample: i * 128,
+						channelData: [
+							new Float32Array(128).fill(0.2),
+							new Float32Array(128).fill(0.2),
+						],
+					},
+				},
+				0,
+				SR,
+			);
+		}
+
+		// Only a bounded number of writes should be drained in one block.
+		// Writes are applied immediately — no pending queue
+		runBlocks(props, 1);
+		expect(props.streamBuffer.committedLength).toBe(1536);
 	});
 
 	it("B7: replace same region twice with different data — second write wins", () => {
@@ -4733,6 +4770,133 @@ describe("Buffer swap during playback", () => {
 // ---------------------------------------------------------------------------
 // E2E: fade-in/crossfade set via message (regression for DD-CLIP-14)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// applyBufferRangeWrite — streaming write correctness
+// ---------------------------------------------------------------------------
+
+describe("applyBufferRangeWrite streaming write correctness", () => {
+	const SR = 48000;
+
+	function makeStreamingPlayingProps(
+		totalLength: number,
+	): Required<ClipProcessorOptions> {
+		const props = getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength, streaming: true },
+			},
+			0,
+			SR,
+		);
+		return props;
+	}
+
+	it("6a: sequential write advances committedLength via fast path (no seek span needed)", () => {
+		const props = makeStreamingPlayingProps(512);
+
+		// Write 4 consecutive 128-sample chunks
+		for (let i = 0; i < 4; i++) {
+			applyBufferRangeWrite(props, {
+				startSample: i * 128,
+				channelData: [
+					new Float32Array(128).fill(0.4),
+					new Float32Array(128).fill(0.4),
+				],
+			});
+			expect(props.streamBuffer.committedLength).toBe((i + 1) * 128);
+		}
+		// Total: 512 committed, seek spans ring should remain empty
+		expect(props.streamBuffer.committedLength).toBe(512);
+		expect(props.streamBuffer.seekSpans.length).toBe(0);
+	});
+
+	it("6b: over-size write during streaming is clamped — buffer not reallocated", () => {
+		const props = makeStreamingPlayingProps(256);
+		expect(props.buffer[0].length).toBe(256);
+
+		// Attempt to write 512 samples into a 256-sample buffer while streaming
+		applyBufferRangeWrite(props, {
+			startSample: 0,
+			channelData: [
+				new Float32Array(512).fill(0.5),
+				new Float32Array(512).fill(0.5),
+			],
+		});
+
+		// Buffer must NOT be reallocated
+		expect(props.buffer[0].length).toBe(256);
+		// committedLength is clamped to buffer bounds
+		expect(props.streamBuffer.committedLength).toBe(256);
+		// maxWrittenSample also clamped to buffer length
+		expect(props.streamBuffer.maxWrittenSample).toBeLessThanOrEqual(256);
+	});
+
+	it("6c: bufferRange write via handleProcessorMessage is visible to the next process() call", () => {
+		const props = makeStreamingPlayingProps(512);
+
+		// Write 512 non-silent samples before any process() call
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferRange",
+				data: {
+					startSample: 0,
+					channelData: [
+						new Float32Array(512).fill(0.6),
+						new Float32Array(512).fill(0.6),
+					],
+				},
+			},
+			0,
+			SR,
+		);
+
+		// Immediately process one block (128 samples)
+		const outputs = [makeOutput(2)];
+		const params = {
+			playbackRate: new Float32Array([1]),
+			detune: new Float32Array([0]),
+			lowpass: new Float32Array([20000]),
+			highpass: new Float32Array([20]),
+			gain: new Float32Array([1]),
+			pan: new Float32Array([0]),
+		};
+		const filterState = {
+			lowpass: createFilterState(),
+			highpass: createFilterState(),
+		};
+		processBlock(props, outputs, params, { currentTime: 0.001, currentFrame: 0, sampleRate: SR }, filterState);
+
+		// Output must be non-silent — data was immediately applied
+		expect(checkNans(outputs[0])).toBe(0);
+		expect(hasSound(outputs[0])).toBe(true);
+	});
+
+	function hasSound(output: Float32Array[], threshold = 1e-10): boolean {
+		for (const ch of output) {
+			for (let i = 0; i < ch.length; i++) {
+				if (Math.abs(ch[i]) > threshold) return true;
+			}
+		}
+		return false;
+	}
+});
 
 describe("fade via message is audible (DD-CLIP-14)", () => {
 	const SR = 48000;

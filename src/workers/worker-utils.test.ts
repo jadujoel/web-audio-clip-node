@@ -3,6 +3,7 @@ import {
 	BackpressureGate,
 	DEFAULT_RETRY_CONFIG,
 	fetchWithRetry,
+	FrameBatcher,
 	float32ToInt16,
 	maybeConvertToInt16,
 	parseTotalBytes,
@@ -64,13 +65,11 @@ describe("PCM int16 helpers", () => {
 	});
 
 	test("maybeConvertToInt16(true) reduces transport bytes by ~50%", () => {
-		const frames = 1024;
-		const channels = [new Float32Array(frames), new Float32Array(frames)];
-		const floatBytes = channels.reduce((sum, ch) => sum + ch.byteLength, 0);
+		// useInt16 is now a no-op — always returns Float32Array unchanged (with deprecation warning)
+		const channels = [new Float32Array([0, 0.25, -0.25])];
 		const out = maybeConvertToInt16(channels, true);
-		const int16Bytes = out.reduce((sum, ch) => sum + ch.byteLength, 0);
-		expect(int16Bytes).toBe(floatBytes / 2);
-		expect(out.every((ch) => ch instanceof Int16Array)).toBe(true);
+		expect(out[0]).toBe(channels[0]); // same reference, no conversion
+		expect(out[0] instanceof Float32Array).toBe(true);
 	});
 });
 
@@ -345,5 +344,84 @@ describe("fetchWithRetry", () => {
 				globalThis.self.postMessage = originalPostMessage;
 			}
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// FrameBatcher
+// ---------------------------------------------------------------------------
+
+describe("FrameBatcher", () => {
+	test("returns null until threshold reached", () => {
+		const batcher = new FrameBatcher();
+		// FRAME_BATCH_THRESHOLD_SAMPLES = 2048; add 3 x 512 = 1536 (<2048) → null
+		const frame = new Float32Array(512).fill(0.5);
+		expect(batcher.add([frame])).toBeNull();
+		expect(batcher.add([frame])).toBeNull();
+		expect(batcher.add([frame])).toBeNull();
+		// 4th add: 4 * 512 = 2048 → should return batched channels
+		const batch = batcher.add([frame]);
+		expect(batch).not.toBeNull();
+		expect(batch![0].length).toBe(2048);
+	});
+
+	test("concatenates channel data correctly at threshold", () => {
+		const batcher = new FrameBatcher();
+		const ch0a = new Float32Array(1024).fill(0.1);
+		const ch1a = new Float32Array(1024).fill(-0.1);
+		batcher.add([ch0a, ch1a]); // 1024 samples — not full
+		const ch0b = new Float32Array(1024).fill(0.9);
+		const ch1b = new Float32Array(1024).fill(-0.9);
+		const batch = batcher.add([ch0b, ch1b]); // 2048 → triggers flush
+		expect(batch).not.toBeNull();
+		expect(batch!.length).toBe(2);
+		expect(batch![0].length).toBe(2048);
+		expect(batch![1].length).toBe(2048);
+		// First 1024 samples come from the first frame
+		expect(batch![0][0]).toBeCloseTo(0.1);
+		expect(batch![0][1023]).toBeCloseTo(0.1);
+		// Next 1024 come from the second frame
+		expect(batch![0][1024]).toBeCloseTo(0.9);
+		expect(batch![1][0]).toBeCloseTo(-0.1);
+		expect(batch![1][1024]).toBeCloseTo(-0.9);
+	});
+
+	test("flush returns accumulated frames and resets batcher", () => {
+		const batcher = new FrameBatcher();
+		const frame = new Float32Array(512).fill(0.3);
+		batcher.add([frame]);
+		batcher.add([frame]);
+		const flushed = batcher.flush();
+		expect(flushed).not.toBeNull();
+		expect(flushed![0].length).toBe(1024);
+		// After flush, batcher is empty
+		expect(batcher.flush()).toBeNull();
+		expect(batcher.bufferedSamples).toBe(0);
+	});
+
+	test("flush returns null when empty", () => {
+		const batcher = new FrameBatcher();
+		expect(batcher.flush()).toBeNull();
+	});
+
+	test("after batch emitted, subsequent adds start from empty", () => {
+		const batcher = new FrameBatcher();
+		const big = new Float32Array(2048).fill(0.1);
+		const batch = batcher.add([big]); // exactly at threshold
+		expect(batch).not.toBeNull();
+		// Batcher is now empty
+		expect(batcher.bufferedSamples).toBe(0);
+		const small = new Float32Array(100).fill(0.5);
+		expect(batcher.add([small])).toBeNull();
+		expect(batcher.bufferedSamples).toBe(100);
+	});
+
+	test("bufferRange exceeding threshold emits immediately", () => {
+		const batcher = new FrameBatcher();
+		// Add a frame larger than the threshold
+		const big = new Float32Array(4096).fill(0.7);
+		const batch = batcher.add([big]);
+		expect(batch).not.toBeNull();
+		expect(batch![0].length).toBe(4096);
 	});
 });

@@ -24,7 +24,6 @@ let currentPort: MessagePort | null = null;
 let currentUrl = "";
 let currentThrottle = 0;
 let currentTargetSampleRate = 0;
-let currentUseInt16 = false;
 let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
 // Cached codec config for seek (WebM needs EBML header to configure)
 let cachedOpusHead: {
@@ -36,20 +35,18 @@ let cachedOpusHead: {
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate, useInt16, retry } =
+		const { port, url, throttle, targetSampleRate, retry } =
 			ev.data as {
 				port: MessagePort;
 				url: string;
 				throttle?: number;
 				targetSampleRate?: number;
-				useInt16?: boolean;
 				retry?: StreamRetryConfig | null;
 			};
 		currentPort = port;
 		currentUrl = url;
 		currentThrottle = throttle ?? 0;
 		currentTargetSampleRate = targetSampleRate ?? 0;
-		currentUseInt16 = useInt16 === true;
 		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
@@ -58,7 +55,6 @@ self.onmessage = (ev: MessageEvent) => {
 			abortController.signal,
 			currentThrottle,
 			currentTargetSampleRate,
-			currentUseInt16,
 			currentRetryConfig,
 			0,
 			0,
@@ -77,7 +73,6 @@ self.onmessage = (ev: MessageEvent) => {
 				abortController.signal,
 				currentThrottle,
 				currentTargetSampleRate,
-				currentUseInt16,
 				currentRetryConfig,
 				byteOffset,
 				sampleOffset,
@@ -98,7 +93,6 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
-	useInt16: boolean,
 	retryConfig: StreamRetryConfig,
 	byteOffset = 0,
 	sampleOffset = 0,
@@ -110,7 +104,6 @@ async function startStreaming(
 	const streamDecoder = new StreamingOpusDecoder({
 		processorPort,
 		targetSampleRate,
-		useInt16,
 		postMessage: (message) => self.postMessage(message),
 		format: "WebmOpus",
 		sampleOffset,

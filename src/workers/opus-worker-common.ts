@@ -1,7 +1,8 @@
 import {
 	estimateTotalSamplesFromContentLength,
-	maybeConvertToInt16,
 	postBufferRange,
+	FrameBatcher,
+	postDecodedRange,
 	resampleChannel,
 } from "./worker-utils";
 
@@ -43,7 +44,6 @@ export function createFallbackOpusHead(channels: number): OpusHead {
 interface StreamingOpusDecoderOptions {
 	processorPort: MessagePort;
 	targetSampleRate: number;
-	useInt16?: boolean;
 	postMessage: (message: unknown) => void;
 	format?: string;
 	sampleOffset?: number;
@@ -53,10 +53,10 @@ interface StreamingOpusDecoderOptions {
 export class StreamingOpusDecoder {
 	private readonly processorPort: MessagePort;
 	private readonly targetSampleRate: number;
-	private readonly useInt16: boolean;
 	private readonly postMessage: (message: unknown) => void;
 	private readonly format: string | undefined;
 	private readonly decoder: AudioDecoder;
+	private readonly batcher = new FrameBatcher();
 	private totalBytes: number | null = null;
 	private samplesDecodedCount = 0;
 	private didSendMeta = false;
@@ -81,7 +81,6 @@ export class StreamingOpusDecoder {
 	constructor({
 		processorPort,
 		targetSampleRate,
-		useInt16 = false,
 		postMessage,
 		format,
 		sampleOffset = 0,
@@ -89,7 +88,6 @@ export class StreamingOpusDecoder {
 	}: StreamingOpusDecoderOptions) {
 		this.processorPort = processorPort;
 		this.targetSampleRate = targetSampleRate;
-		this.useInt16 = useInt16;
 		this.postMessage = postMessage;
 		this.format = format;
 		this.samplesDecodedCount = sampleOffset;
@@ -175,6 +173,14 @@ export class StreamingOpusDecoder {
 
 	async flush() {
 		await this.decoder.flush();
+		// Flush any remaining batched frames at end-of-stream
+		const flushed = this.batcher.flush();
+		if (flushed !== null && (flushed[0]?.length ?? 0) > 0) {
+			const fSamples = flushed[0]?.length ?? 0;
+			const fStart = this.samplesDecodedCount - fSamples;
+			postBufferRange(this.processorPort, fStart, flushed);
+			postDecodedRange(fStart, this.samplesDecodedCount);
+		}
 	}
 
 	close() {
@@ -287,23 +293,35 @@ export class StreamingOpusDecoder {
 		}
 
 		if (resampledFrames > 0) {
-			postBufferRange(
-				this.processorPort,
-				this.samplesDecodedCount,
-				maybeConvertToInt16(channelData, this.useInt16),
-			);
+			const startSample = this.samplesDecodedCount;
 			this.samplesDecodedCount += resampledFrames;
 			this.postMessage({
 				type: "decoded",
 				samplesDecoded: this.samplesDecodedCount,
 			});
 
+			const batch = this.batcher.add(channelData);
+			if (batch !== null) {
+				const batchSamples = batch[0]?.length ?? 0;
+				const batchStart = this.samplesDecodedCount - batchSamples;
+				postBufferRange(this.processorPort, batchStart, batch);
+				postDecodedRange(batchStart, this.samplesDecodedCount);
+			}
+
 			if (!this.didSignalSeeked) {
 				this.didSignalSeeked = true;
 				this.postMessage({
 					type: "seeked",
-					sampleOffset: this.samplesDecodedCount,
+					sampleOffset: startSample,
 				});
+				// Flush partial batch immediately on seek signal for responsiveness
+				const flushed = this.batcher.flush();
+				if (flushed !== null && flushed[0] && flushed[0].length > 0) {
+					const fSamples = flushed[0].length;
+					const fStart = this.samplesDecodedCount - fSamples;
+					postBufferRange(this.processorPort, fStart, flushed);
+					postDecodedRange(fStart, this.samplesDecodedCount);
+				}
 			}
 		}
 	};

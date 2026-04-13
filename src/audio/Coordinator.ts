@@ -16,6 +16,7 @@ import type {
 	StreamPreload,
 	StreamReadyState,
 } from "./types";
+import type { StreamBufferSpan } from "./types";
 import { getProcessorBlobUrl } from "./workletUrl";
 
 export interface PendingStart {
@@ -26,6 +27,30 @@ export interface PendingStart {
 
 /** Default pre-buffer: 1 second at 48 kHz. */
 const DEFAULT_PRE_BUFFER_SAMPLES = 48_000;
+
+/**
+ * Merge a new [startSample, endSample) span into an existing sorted, merged
+ * span array. Returns a new array (main thread — allocation is fine here).
+ */
+function mergeWrittenSpanIntoArray(
+	spans: StreamBufferSpan[],
+	startSample: number,
+	endSample: number,
+): StreamBufferSpan[] {
+	const next = { startSample, endSample };
+	const merged = [...spans, next].sort((a, b) => a.startSample - b.startSample);
+	const result: StreamBufferSpan[] = [];
+	for (const span of merged) {
+		const prev = result[result.length - 1];
+		if (!prev || span.startSample > prev.endSample) {
+			result.push({ startSample: span.startSample, endSample: span.endSample });
+		} else {
+			prev.endSample = Math.max(prev.endSample, span.endSample);
+		}
+	}
+	return result;
+}
+
 /** Default resume-fetch threshold: 10 seconds at 48 kHz. */
 const DEFAULT_RESUME_FETCH_AHEAD = 48_000 * 10;
 
@@ -362,6 +387,11 @@ export class StreamingClipNode extends ClipNode {
 
 	private async _startStream(url: string): Promise<void> {
 		this._streamStarting = true;
+		if (this._streamOptions.useInt16) {
+			console.warn(
+				"StreamingClipNode: useInt16 is deprecated and has no effect. Float32 is always used for transfer to avoid audio-thread GC.",
+			);
+		}
 		// Tear down any previous worker
 		if (this._worker) {
 			this._worker.postMessage({ type: "abort" });
@@ -411,6 +441,8 @@ export class StreamingClipNode extends ClipNode {
 				type: string;
 				bytesReceived?: number;
 				samplesDecoded?: number;
+				startSample?: number;
+				endSample?: number;
 				message?: string;
 				code?: StreamErrorCode;
 				attempt?: number;
@@ -422,6 +454,8 @@ export class StreamingClipNode extends ClipNode {
 			if (msg.type === "decoded") {
 				this._tryStart(msg.samplesDecoded ?? 0, threshold);
 				this._checkBackpressure();
+			} else if (msg.type === "decodedRange") {
+				this._applyDecodedRange(msg.startSample ?? 0, msg.endSample ?? 0);
 			} else if (msg.type === "progress") {
 				this._totalBytesReceived = msg.bytesReceived ?? 0;
 				this.onprogress?.(this._totalBytesReceived);
@@ -441,10 +475,7 @@ export class StreamingClipNode extends ClipNode {
 				this._streamDoneAcked = true;
 				// If the entire stream is shorter than the threshold, start now
 				this._tryStart(msg.samplesDecoded ?? 0, 0);
-				this._setReadyState("complete");
 				this._finalizeDownloadedIfReady();
-				this._worker?.terminate();
-				this._worker = null;
 				this.ondone?.();
 				this.emit("done");
 			} else if (msg.type === "seeked") {
@@ -470,7 +501,6 @@ export class StreamingClipNode extends ClipNode {
 				port: channel.port1,
 				url,
 				targetSampleRate: this._streamOptions.targetSampleRate,
-				useInt16: this._streamOptions.useInt16 === true,
 				retry:
 					this._streamOptions.retry === false
 						? null
@@ -480,10 +510,24 @@ export class StreamingClipNode extends ClipNode {
 		);
 	}
 
+	/**
+	 * Apply a decoded range from the decode worker to the main-thread written spans.
+	 * This replaces the old writtenSpans tracking that was done on the audio thread.
+	 */
+	private _applyDecodedRange(startSample: number, endSample: number): void {
+		this._writtenSpans = mergeWrittenSpanIntoArray(this._writtenSpans, startSample, endSample);
+		const ranges = this.buffered;
+		this.onbufferchange?.(ranges);
+		this.emit("bufferchange", ranges);
+	}
+
 	private _finalizeDownloadedIfReady(): void {
 		if (!this._streamDoneAcked) return;
 		if (!this._streamEnded) return;
+		this._setReadyState("complete");
 		this._streamDoneAcked = false;
+		this._worker?.terminate();
+		this._worker = null;
 		this._downloaded.resolve();
 	}
 

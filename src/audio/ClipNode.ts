@@ -198,9 +198,7 @@ export class ClipNode extends AudioWorkletNode {
 					committedLength: number;
 					totalLength: number | null;
 					streamEnded: boolean;
-					writtenSpans: StreamBufferSpan[];
 				};
-				this._writtenSpans = bs.writtenSpans;
 				this._committedLength = bs.committedLength;
 				this._streamTotalLength = bs.totalLength;
 				this._streamEnded = bs.streamEnded;

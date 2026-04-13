@@ -21,6 +21,7 @@ declare function registerProcessor(
 ): void;
 
 import {
+	applyBufferRangeWrite,
 	createFilterState,
 	getProperties,
 	handleProcessorMessage,
@@ -68,6 +69,22 @@ class ClipProcessor extends AudioWorkletProcessor {
 		highpass: createFilterState(),
 	};
 	private lastFrameTime = 0;
+	/** Throttle bufferState postMessage to ≤10/sec (100ms minimum interval). */
+	private lastBufferStateReportMs = -Infinity;
+
+	private _reportBufferStateThrottled(): void {
+		const nowMs = currentTime * 1000;
+		if (nowMs - this.lastBufferStateReportMs < 100) return;
+		this.lastBufferStateReportMs = nowMs;
+		this.port.postMessage({
+			type: "bufferState",
+			data: {
+				committedLength: this.properties.streamBuffer.committedLength,
+				totalLength: this.properties.streamBuffer.totalLength,
+				streamEnded: this.properties.streamBuffer.streamEnded,
+			},
+		});
+	}
 
 	constructor(options?: ProcessorWorkletOptions) {
 		super(options);
@@ -76,6 +93,13 @@ class ClipProcessor extends AudioWorkletProcessor {
 			if (ev.data.type === "transferPort") {
 				const port = ev.data.data as MessagePort;
 				port.onmessage = (portEv: MessageEvent) => {
+					if (portEv.data.type === "bufferRange") {
+						// Apply writes immediately in onmessage — before the next process() call.
+						// This keeps process() free of variable-duration write work.
+						applyBufferRangeWrite(this.properties, portEv.data.data);
+						this._reportBufferStateThrottled();
+						return;
+					}
 					const messages = handleProcessorMessage(
 						this.properties,
 						portEv.data,

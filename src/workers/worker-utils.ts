@@ -156,7 +156,7 @@ export function resampleChannel(
 	return dst;
 }
 
-export type PcmChannelData = Float32Array | Int16Array;
+export type PcmChannelData = Float32Array;
 
 export function float32ToInt16(src: Float32Array): Int16Array {
 	const out = new Int16Array(src.length);
@@ -168,20 +168,23 @@ export function float32ToInt16(src: Float32Array): Int16Array {
 	return out;
 }
 
+/** @deprecated useInt16 is deprecated and has no effect. Float32 is always used for transfer. */
 export function maybeConvertToInt16(
 	channelData: Float32Array[],
 	useInt16: boolean,
-): PcmChannelData[] {
-	if (!useInt16) {
-		return channelData;
+): Float32Array[] {
+	if (useInt16) {
+		console.warn(
+			"useInt16 is deprecated and has no effect. Float32 is always used for transfer to avoid audio-thread GC.",
+		);
 	}
-	return channelData.map(float32ToInt16);
+	return channelData;
 }
 
 export function postBufferRange(
 	port: MessagePort,
 	startSample: number,
-	channelData: PcmChannelData[],
+	channelData: Float32Array[],
 ): void {
 	const transferables = channelData.map((channel) => channel.buffer);
 	port.postMessage(
@@ -213,4 +216,78 @@ export function createThrottleStream(
 			controller.enqueue(chunk);
 		},
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Frame batching — reduces postMessage frequency from ~50/sec to ~24/sec
+// ---------------------------------------------------------------------------
+
+/** Default batch threshold: 2048 samples (~43ms at 48kHz). */
+export const FRAME_BATCH_THRESHOLD_SAMPLES = 2048;
+
+function concatFrames(frames: Float32Array[][]): Float32Array[] {
+	const channels = frames[0]?.length ?? 0;
+	const result: Float32Array[] = [];
+	for (let ch = 0; ch < channels; ch++) {
+		let totalLen = 0;
+		for (const frame of frames) totalLen += frame[ch]?.length ?? 0;
+		const merged = new Float32Array(totalLen);
+		let offset = 0;
+		for (const frame of frames) {
+			const src = frame[ch];
+			if (src !== undefined) {
+				merged.set(src, offset);
+				offset += src.length;
+			}
+		}
+		result.push(merged);
+	}
+	return result;
+}
+
+/**
+ * Batches decoded audio frames and flushes when a sample threshold is reached.
+ * Reduces postMessage frequency and GC pressure on the audio render thread.
+ */
+export class FrameBatcher {
+	private frames: Float32Array[][] = [];
+	private sampleCount = 0;
+
+	constructor(
+		private readonly thresholdSamples: number = FRAME_BATCH_THRESHOLD_SAMPLES,
+	) {}
+
+	/**
+	 * Add a decoded frame. Returns a concatenated batch if the threshold is met,
+	 * or null if more frames are needed.
+	 */
+	add(channelData: Float32Array[]): Float32Array[] | null {
+		this.frames.push(channelData);
+		this.sampleCount += channelData[0]?.length ?? 0;
+		if (this.sampleCount >= this.thresholdSamples) {
+			return this.flush();
+		}
+		return null;
+	}
+
+	/** Flush any buffered frames regardless of threshold. Returns null if empty. */
+	flush(): Float32Array[] | null {
+		if (this.frames.length === 0) return null;
+		const result = concatFrames(this.frames);
+		this.frames = [];
+		this.sampleCount = 0;
+		return result;
+	}
+
+	get bufferedSamples(): number {
+		return this.sampleCount;
+	}
+}
+
+/**
+ * Post a decodedRange message to the main thread so it can track buffered
+ * regions without involving the audio render thread.
+ */
+export function postDecodedRange(startSample: number, endSample: number): void {
+	self.postMessage({ type: "decodedRange", startSample, endSample });
 }

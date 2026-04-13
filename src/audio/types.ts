@@ -277,7 +277,7 @@ export interface StreamBufferSpan {
 
 export interface BufferRangeWrite {
 	readonly startSample: number;
-	readonly channelData: Array<Float32Array | Int16Array>;
+	readonly channelData: Array<Float32Array>;
 	readonly totalLength?: number | null;
 	readonly streamEnded?: boolean;
 }
@@ -288,8 +288,15 @@ export interface StreamBufferState {
 	endRequested: boolean;
 	streamEnded: boolean;
 	streaming: boolean;
-	writtenSpans: StreamBufferSpan[];
-	pendingWrites: BufferRangeWrite[];
+	/** True when streaming is active — prevents buffer reallocation during writes. */
+	streamingActive: boolean;
+	/** Furthest sample written into the buffer (may be beyond committedLength for sparse writes). */
+	maxWrittenSample: number;
+	/**
+	 * Fixed-size ring (max 4) of non-sequential written spans, used to track
+	 * seek-origin writes without array allocation in the hot path.
+	 */
+	seekSpans: StreamBufferSpan[];
 	lowWaterThreshold: number;
 	lowWaterNotified: boolean;
 	lastUnderrunSample: number | null;

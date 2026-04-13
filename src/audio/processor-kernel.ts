@@ -18,6 +18,10 @@ import {
 
 export const SAMPLE_BLOCK_SIZE = 128;
 
+/** Maximum number of non-sequential (seek-origin) spans tracked in the worklet.
+ *  An O(4) scan replaces the previous dynamic array sort. */
+const MAX_SEEK_SPANS = 4;
+
 function createStreamBufferState(
 	buffer: Float32Array[] = [],
 ): StreamBufferState {
@@ -29,8 +33,9 @@ function createStreamBufferState(
 		endRequested: hasBuffer,
 		streamEnded: hasBuffer,
 		streaming: false,
-		writtenSpans: hasBuffer ? [{ startSample: 0, endSample: totalLength }] : [],
-		pendingWrites: [],
+		streamingActive: false,
+		maxWrittenSample: hasBuffer ? totalLength : 0,
+		seekSpans: [],
 		lowWaterThreshold: SAMPLE_BLOCK_SIZE * 4,
 		lowWaterNotified: false,
 		lastUnderrunSample: null,
@@ -54,34 +59,6 @@ function getLogicalBufferLength(
 
 function createSilentBuffer(channels: number, length: number): Float32Array[] {
 	return Array.from({ length: channels }, () => new Float32Array(length));
-}
-
-function mergeWrittenSpan(
-	spans: StreamBufferSpan[],
-	nextSpan: StreamBufferSpan,
-): StreamBufferSpan[] {
-	const merged = [...spans, nextSpan].sort(
-		(a, b) => a.startSample - b.startSample,
-	);
-	const result: StreamBufferSpan[] = [];
-	for (const span of merged) {
-		const previous = result[result.length - 1];
-		if (!previous || span.startSample > previous.endSample) {
-			result.push({ ...span });
-			continue;
-		}
-		previous.endSample = Math.max(previous.endSample, span.endSample);
-	}
-	return result;
-}
-
-function getCommittedLength(spans: StreamBufferSpan[]): number {
-	let committedLength = 0;
-	for (const span of spans) {
-		if (span.startSample > committedLength) break;
-		committedLength = Math.max(committedLength, span.endSample);
-	}
-	return committedLength;
 }
 
 function reconcileStreamEndedState(streamBuffer: StreamBufferState): void {
@@ -109,6 +86,66 @@ function resetLowWaterState(
 	}
 }
 
+/**
+ * Advance committedLength by consuming any seekSpans that start at or before
+ * the current committedLength. O(MAX_SEEK_SPANS) — no allocation.
+ */
+function drainSeekSpans(streamBuffer: StreamBufferState): void {
+	let merged = true;
+	while (merged && streamBuffer.seekSpans.length > 0) {
+		merged = false;
+		for (let i = 0; i < streamBuffer.seekSpans.length; i++) {
+			const span = streamBuffer.seekSpans[i];
+			if (span !== undefined && span.startSample <= streamBuffer.committedLength) {
+				if (span.endSample > streamBuffer.committedLength) {
+					streamBuffer.committedLength = span.endSample;
+				}
+				// Remove by swapping with last element (O(1))
+				const last = streamBuffer.seekSpans[streamBuffer.seekSpans.length - 1];
+				if (last !== undefined) streamBuffer.seekSpans[i] = last;
+				streamBuffer.seekSpans.pop();
+				merged = true;
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Add a non-sequential span to seekSpans, merging with existing overlapping
+ * entries. Evicts the smallest span when at MAX_SEEK_SPANS capacity.
+ */
+function addSeekSpan(
+	streamBuffer: StreamBufferState,
+	startSample: number,
+	endSample: number,
+): void {
+	// Try to merge with an existing overlapping or adjacent span
+	for (let i = 0; i < streamBuffer.seekSpans.length; i++) {
+		const span = streamBuffer.seekSpans[i];
+		if (span !== undefined &&
+			startSample <= span.endSample &&
+			endSample >= span.startSample
+		) {
+			span.startSample = Math.min(span.startSample, startSample);
+			span.endSample = Math.max(span.endSample, endSample);
+			return;
+		}
+	}
+	// Evict when at capacity: drop the span with smallest endSample
+	if (streamBuffer.seekSpans.length >= MAX_SEEK_SPANS) {
+		let minIdx = 0;
+		for (let i = 1; i < streamBuffer.seekSpans.length; i++) {
+			if ((streamBuffer.seekSpans[i]?.endSample ?? 0) <
+				(streamBuffer.seekSpans[minIdx]?.endSample ?? 0)) {
+				minIdx = i;
+			}
+		}
+		streamBuffer.seekSpans.splice(minIdx, 1);
+	}
+	streamBuffer.seekSpans.push({ startSample, endSample });
+}
+
 function ensureBufferCapacity(
 	properties: Required<ClipProcessorOptions>,
 	requiredChannels: number,
@@ -117,6 +154,18 @@ function ensureBufferCapacity(
 	const currentLength = getBufferLength(properties.buffer);
 	const currentChannels = properties.buffer.length;
 	if (currentLength >= requiredLength && currentChannels >= requiredChannels) {
+		return;
+	}
+
+	// Guard: do not reallocate while streaming — that would cause a catastrophic
+	// GC pause in the audio render thread. Clamp to the existing buffer length.
+	if (properties.streamBuffer.streamingActive) {
+		if (process.env.NODE_ENV !== "production") {
+			console.warn(
+				`ensureBufferCapacity: over-size write during streaming — clamping write to buffer bounds. ` +
+				`requiredLength=${requiredLength}, bufferLength=${currentLength}`,
+			);
+		}
 		return;
 	}
 
@@ -135,65 +184,73 @@ function ensureBufferCapacity(
 	}
 }
 
-function applyBufferRangeWrite(
+export function applyBufferRangeWrite(
 	properties: Required<ClipProcessorOptions>,
 	write: BufferRangeWrite,
 ): void {
 	const startSample = Math.max(Math.floor(write.startSample), 0);
-	const writeLength = write.channelData[0]?.length ?? 0;
+	let writeLength = write.channelData[0]?.length ?? 0;
 	const requestedTotalLength = write.totalLength ?? null;
-	const requiredLength = Math.max(
-		startSample + writeLength,
-		requestedTotalLength ?? 0,
-	);
-	ensureBufferCapacity(
-		properties,
-		Math.max(write.channelData.length, properties.buffer.length, 1),
-		requiredLength,
-	);
-
-	for (let ch = 0; ch < write.channelData.length; ch++) {
-		const channel = write.channelData[ch];
-		if (channel instanceof Int16Array) {
-			const asFloat32 = new Float32Array(channel.length);
-			for (let i = 0; i < channel.length; i++) {
-				asFloat32[i] = (channel[i] ?? 0) / 0x8000;
-			}
-			properties.buffer[ch].set(asFloat32, startSample);
-			continue;
-		}
-		properties.buffer[ch].set(channel, startSample);
-	}
 
 	if (requestedTotalLength != null) {
 		properties.streamBuffer.totalLength = requestedTotalLength;
 	}
+
+	const bufferLength = getBufferLength(properties.buffer);
+
 	if (writeLength > 0) {
-		properties.streamBuffer.writtenSpans = mergeWrittenSpan(
-			properties.streamBuffer.writtenSpans,
-			{ startSample, endSample: startSample + writeLength },
+		const requiredLength = Math.max(
+			startSample + writeLength,
+			requestedTotalLength ?? 0,
 		);
-		properties.streamBuffer.committedLength = getCommittedLength(
-			properties.streamBuffer.writtenSpans,
+		ensureBufferCapacity(
+			properties,
+			Math.max(write.channelData.length, properties.buffer.length, 1),
+			requiredLength,
+		);
+
+		// Clamp write to buffer bounds (streaming guard may have suppressed realloc)
+		const clampedEnd = Math.min(startSample + writeLength, bufferLength);
+		writeLength = Math.max(clampedEnd - startSample, 0);
+
+		for (let ch = 0; ch < write.channelData.length; ch++) {
+			const src = write.channelData[ch];
+			if (src !== undefined && writeLength > 0) {
+				properties.buffer[ch].set(
+					writeLength < src.length ? src.subarray(0, writeLength) : src,
+					startSample,
+				);
+			}
+		}
+
+		// Update committedLength — zero-allocation fast path for sequential writes
+		if (startSample === properties.streamBuffer.committedLength) {
+			properties.streamBuffer.committedLength += writeLength;
+			// Drain any seek spans that are now contiguous
+			if (properties.streamBuffer.seekSpans.length > 0) {
+				drainSeekSpans(properties.streamBuffer);
+			}
+		} else {
+			// Non-sequential (seek-origin) write — use the fixed seek span ring
+			addSeekSpan(
+				properties.streamBuffer,
+				startSample,
+				startSample + writeLength,
+			);
+			drainSeekSpans(properties.streamBuffer);
+		}
+
+		properties.streamBuffer.maxWrittenSample = Math.max(
+			properties.streamBuffer.maxWrittenSample,
+			startSample + writeLength,
 		);
 	}
+
 	if (write.streamEnded === true) {
 		properties.streamBuffer.endRequested = true;
 	}
 	reconcileStreamEndedState(properties.streamBuffer);
 	resetLowWaterState(properties.streamBuffer, properties.playhead);
-}
-
-function applyPendingBufferWrites(
-	properties: Required<ClipProcessorOptions>,
-): void {
-	if (properties.streamBuffer.pendingWrites.length === 0) {
-		return;
-	}
-	for (const write of properties.streamBuffer.pendingWrites) {
-		applyBufferRangeWrite(properties, write);
-	}
-	properties.streamBuffer.pendingWrites = [];
 }
 
 function setWholeBuffer(
@@ -779,18 +836,20 @@ export function handleProcessorMessage(
 				streaming?: boolean;
 			};
 			properties.buffer = createSilentBuffer(init.channels, init.totalLength);
+			const isStreaming = init.streaming ?? true;
 			properties.streamBuffer = {
 				...createStreamBufferState(),
 				totalLength: init.totalLength,
 				endRequested: false,
 				streamEnded: false,
-				streaming: init.streaming ?? true,
+				streaming: isStreaming,
+				streamingActive: isStreaming,
 			};
 			normalizeLoopBounds(properties, sampleRate);
 			return [];
 		}
 		case "bufferRange":
-			properties.streamBuffer.pendingWrites.push(data as BufferRangeWrite);
+			applyBufferRangeWrite(properties, data as BufferRangeWrite);
 			return [];
 		case "bufferEnd": {
 			const endData = data as { totalLength?: number } | undefined;
@@ -976,22 +1035,8 @@ export function processBlock(
 	let state = props.state;
 	if (state === State.Disposed) return { keepAlive: false, messages };
 
-	const hadPendingWrites = props.streamBuffer.pendingWrites.length > 0;
-	applyPendingBufferWrites(props);
-	if (hadPendingWrites) {
-		messages.push({
-			type: "bufferState",
-			data: {
-				committedLength: props.streamBuffer.committedLength,
-				totalLength: props.streamBuffer.totalLength,
-				streamEnded: props.streamBuffer.streamEnded,
-				writtenSpans: props.streamBuffer.writtenSpans.map((s) => ({
-					startSample: s.startSample,
-					endSample: s.endSample,
-				})),
-			},
-		});
-	}
+	// Buffer writes are now applied in port.onmessage before process() is called.
+	// No pending write queue to drain here.
 
 	if (state === State.Initial) return { keepAlive: true, messages };
 

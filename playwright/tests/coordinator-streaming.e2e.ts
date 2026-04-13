@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import {
+	injectAudioMonitor,
+	measureAudioSustain,
+} from "../helpers/audio-monitor";
 import { openExample } from "../helpers/navigation";
 
 test.describe("Coordinator streaming example", () => {
@@ -90,5 +94,38 @@ test.describe("Coordinator streaming example", () => {
 
 		expect(audioFetches).toBe(1);
 		await expect(status).not.toContainText("Error:");
+	});
+
+	test("streaming playback does not introduce multi-second silence gaps", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"streaming audio analysis is flaky in headless Firefox/WebKit",
+		);
+		test.setTimeout(90_000);
+
+		await injectAudioMonitor(page);
+		await openExample(page, "coordinator-streaming");
+
+		await page.locator("button#start").click();
+		const status = page.locator("#status");
+
+		await expect
+			.poll(async () => (await status.textContent())?.trim() ?? "", {
+				timeout: 20000,
+			})
+			.toMatch(/^(Streaming\.\.\.|Stream Downloaded\.)$/);
+
+		await page.waitForTimeout(500);
+		const result = await measureAudioSustain(page, 8000, 100);
+
+		expect(
+			result.longestSilentRun,
+			`Detected a long silence gap of ${result.longestSilentRun * 100}ms. RMS: [${result.rmsValues
+				.map((v) => v.toFixed(4))
+				.join(", ")}]`,
+		).toBeLessThanOrEqual(10);
 	});
 });

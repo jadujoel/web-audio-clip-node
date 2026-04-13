@@ -938,6 +938,19 @@ describe("StreamingClipNode auto-dispose worker", () => {
 
 		const worker = lastWorker;
 		worker.receive({ type: "done", samplesDecoded: 960 });
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferState",
+				data: {
+					committedLength: 960,
+					totalLength: 960,
+					streamEnded: true,
+					writtenSpans: [{ startSample: 0, endSample: 960 }],
+				},
+			},
+		} as MessageEvent);
 
 		expect(worker.terminated).toBe(true);
 	});
@@ -981,6 +994,19 @@ describe("StreamingClipNode auto-dispose worker", () => {
 
 		const worker = lastWorker;
 		worker.receive({ type: "done", samplesDecoded: 960 });
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferState",
+				data: {
+					committedLength: 960,
+					totalLength: 960,
+					streamEnded: true,
+					writtenSpans: [{ startSample: 0, endSample: 960 }],
+				},
+			},
+		} as MessageEvent);
 
 		// Worker already terminated by "done" handler
 		expect(worker.terminated).toBe(true);
@@ -1429,8 +1455,61 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 
 		// Stream completes
 		worker.receive({ type: "done", samplesDecoded: 48000 });
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferState",
+				data: {
+					committedLength: 48_000,
+					totalLength: 48_000,
+					streamEnded: true,
+					writtenSpans: [{ startSample: 0, endSample: 48_000 }],
+				},
+			},
+		} as MessageEvent);
 		expect(node.readyState).toBe("complete");
 		expect(states).toEqual(["loading", "canplay", "complete"]);
+	});
+
+	test("does not transition to complete until streamEnd is committed", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				preBufferSamples: 1000,
+			},
+		);
+
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+		worker.receive({ type: "decoded", samplesDecoded: 2000 });
+		expect(node.readyState).toBe("canplay");
+
+		worker.receive({ type: "done", samplesDecoded: 48000 });
+		expect(node.readyState).toBe("canplay");
+
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferState",
+				data: {
+					committedLength: 48_000,
+					totalLength: 48_000,
+					streamEnded: true,
+					writtenSpans: [{ startSample: 0, endSample: 48_000 }],
+				},
+			},
+		} as MessageEvent);
+
+		expect(node.readyState).toBe("complete");
 	});
 
 	test("onloadstart fires when url is set", async () => {
@@ -1565,6 +1644,19 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 
 		worker.receive({ type: "decoded", samplesDecoded: 200 });
 		worker.receive({ type: "done", samplesDecoded: 48000 });
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferState",
+				data: {
+					committedLength: 48_000,
+					totalLength: 48_000,
+					streamEnded: true,
+					writtenSpans: [{ startSample: 0, endSample: 48_000 }],
+				},
+			},
+		} as MessageEvent);
 
 		expect(states).toEqual(["loading", "canplay", "complete"]);
 	});

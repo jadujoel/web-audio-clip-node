@@ -13,7 +13,8 @@ import {
 	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
 	fetchWithRetry,
-	maybeConvertToInt16,
+	FrameBatcher,
+	postDecodedRange,
 	parseTotalBytes,
 	postBufferRange,
 	resampleChannel,
@@ -174,26 +175,23 @@ let currentPort: MessagePort | null = null;
 let currentUrl = "";
 let currentThrottle = 0;
 let currentTargetSampleRate = 0;
-let currentUseInt16 = false;
 let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
 
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate, useInt16, retry } =
+		const { port, url, throttle, targetSampleRate, retry } =
 			ev.data as {
 				port: MessagePort;
 				url: string;
 				throttle?: number;
 				targetSampleRate?: number;
-				useInt16?: boolean;
 				retry?: StreamRetryConfig | null;
 			};
 		currentPort = port;
 		currentUrl = url;
 		currentThrottle = throttle ?? 0;
 		currentTargetSampleRate = targetSampleRate ?? 0;
-		currentUseInt16 = useInt16 === true;
 		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
@@ -202,7 +200,6 @@ self.onmessage = (ev: MessageEvent) => {
 			abortController.signal,
 			currentThrottle,
 			currentTargetSampleRate,
-			currentUseInt16,
 			currentRetryConfig,
 			0,
 			0,
@@ -221,7 +218,6 @@ self.onmessage = (ev: MessageEvent) => {
 				abortController.signal,
 				currentThrottle,
 				currentTargetSampleRate,
-				currentUseInt16,
 				currentRetryConfig,
 				byteOffset,
 				sampleOffset,
@@ -242,7 +238,6 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
-	useInt16: boolean,
 	retryConfig: StreamRetryConfig,
 	byteOffset = 0,
 	sampleOffset = 0,
@@ -256,6 +251,7 @@ async function startStreaming(
 	let initialized = isSeeking;
 	let didSendMeta = isSeeking;
 	let didSignalSeeked = !isSeeking;
+	const batcher = new FrameBatcher();
 	let packetIndex = isSeeking ? 2 : 0; // Skip header packets when seeking
 	let activeSerial: number | null = null;
 	let streamChannels = 2;
@@ -356,17 +352,25 @@ async function startStreaming(
 			}
 
 			if (resampledFrames > 0) {
-				postBufferRange(
-					processorPort,
-					samplesDecoded,
-					maybeConvertToInt16(channelData, useInt16),
-				);
 				samplesDecoded += resampledFrames;
 				self.postMessage({ type: "decoded", samplesDecoded });
+				const batch = batcher.add(channelData);
+				if (batch !== null) {
+					const batchStart = samplesDecoded - (batch[0]?.length ?? 0);
+					postBufferRange(processorPort, batchStart, batch);
+					postDecodedRange(batchStart, samplesDecoded);
+				}
 
 				if (!didSignalSeeked) {
 					didSignalSeeked = true;
 					self.postMessage({ type: "seeked", sampleOffset: samplesDecoded });
+					const flushed = batcher.flush();
+					if (flushed !== null && (flushed[0]?.length ?? 0) > 0) {
+						const fSamples = flushed[0]?.length ?? 0;
+						const fStart = samplesDecoded - fSamples;
+						postBufferRange(processorPort, fStart, flushed);
+						postDecodedRange(fStart, samplesDecoded);
+					}
 				}
 			}
 
@@ -530,6 +534,13 @@ async function startStreaming(
 
 		if (configuredDecoder && decodedAnyPacket) {
 			await decoder.flush();
+			const trailing = batcher.flush();
+			if (trailing !== null && (trailing[0]?.length ?? 0) > 0) {
+				const trailSamples = trailing[0]?.length ?? 0;
+				const trailStart = samplesDecoded - trailSamples;
+				postBufferRange(processorPort, trailStart, trailing);
+				postDecodedRange(trailStart, samplesDecoded);
+			}
 		} else {
 			self.postMessage({
 				type: "error",
