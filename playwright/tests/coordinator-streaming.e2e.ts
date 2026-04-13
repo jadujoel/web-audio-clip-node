@@ -53,4 +53,42 @@ test.describe("Coordinator streaming example", () => {
 
 		await expect(status).not.toContainText("Error:");
 	});
+
+	test("single start click triggers a single audio fetch", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"streaming request timing is flaky in headless Firefox/WebKit",
+		);
+
+		let audioFetches = 0;
+		page.on("request", (request) => {
+			if (
+				request.resourceType() === "fetch" &&
+				request.url().includes("/sounds/example.opus")
+			) {
+				audioFetches++;
+			}
+		});
+
+		await page.locator("button#start").click();
+		const status = page.locator("#status");
+
+		await expect
+			.poll(async () => (await status.textContent())?.trim() ?? "", {
+				timeout: 20000,
+			})
+			.toMatch(/^(Streaming\.\.\.|Stream Downloaded\.)$/);
+
+		await expect
+			.poll(() => audioFetches, {
+				timeout: 10000,
+			})
+			.toBe(1);
+
+		expect(audioFetches).toBe(1);
+		await expect(status).not.toContainText("Error:");
+	});
 });

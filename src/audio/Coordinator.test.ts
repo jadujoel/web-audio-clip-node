@@ -327,6 +327,38 @@ describe("StreamingClipNode.start - no double stream on url+start() race", () =>
 		expect(workerCount).toBe(1);
 		expect(loadstartEvents.length).toBe(1);
 	});
+
+	test("calling start() twice initializes decoder only once", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+
+		let workerCount = 0;
+		const trackingFactory = (_format: StreamFormat): Worker => {
+			workerCount++;
+			lastWorker = new FakeWorker();
+			return lastWorker as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		node.url = "https://example.com/audio.opus";
+		node.start();
+		node.start();
+
+		// Flush microtasks so any racing async startup resolves
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+		expect(lastWorker.messages.filter((m) => m.type === "init").length).toBe(1);
+	});
 });
 
 describe("StreamingClipNode.stop", () => {
