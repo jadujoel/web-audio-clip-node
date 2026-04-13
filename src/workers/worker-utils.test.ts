@@ -3,6 +3,8 @@ import {
 	BackpressureGate,
 	DEFAULT_RETRY_CONFIG,
 	fetchWithRetry,
+	float32ToInt16,
+	maybeConvertToInt16,
 	parseTotalBytes,
 	type StreamRetryConfig,
 } from "./worker-utils";
@@ -43,6 +45,32 @@ describe("DEFAULT_RETRY_CONFIG", () => {
 			backoffMultiplier: 2,
 			maxRetryDelayMs: 30_000,
 		});
+	});
+});
+
+describe("PCM int16 helpers", () => {
+	test("float32ToInt16 clamps and scales normalized samples", () => {
+		const src = new Float32Array([-2, -1, -0.5, 0, 0.5, 1, 2]);
+		const out = float32ToInt16(src);
+		expect(Array.from(out)).toEqual([
+			-32768, -32768, -16384, 0, 16384, 32767, 32767,
+		]);
+	});
+
+	test("maybeConvertToInt16(false) preserves float32 channels", () => {
+		const channels = [new Float32Array([0, 0.25, -0.25])];
+		const out = maybeConvertToInt16(channels, false);
+		expect(out[0]).toBe(channels[0]);
+	});
+
+	test("maybeConvertToInt16(true) reduces transport bytes by ~50%", () => {
+		const frames = 1024;
+		const channels = [new Float32Array(frames), new Float32Array(frames)];
+		const floatBytes = channels.reduce((sum, ch) => sum + ch.byteLength, 0);
+		const out = maybeConvertToInt16(channels, true);
+		const int16Bytes = out.reduce((sum, ch) => sum + ch.byteLength, 0);
+		expect(int16Bytes).toBe(floatBytes / 2);
+		expect(out.every((ch) => ch instanceof Int16Array)).toBe(true);
 	});
 });
 

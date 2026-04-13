@@ -1,5 +1,7 @@
 import {
 	estimateTotalSamplesFromContentLength,
+	maybeConvertToInt16,
+	postBufferRange,
 	resampleChannel,
 } from "./worker-utils";
 
@@ -41,6 +43,7 @@ export function createFallbackOpusHead(channels: number): OpusHead {
 interface StreamingOpusDecoderOptions {
 	processorPort: MessagePort;
 	targetSampleRate: number;
+	useInt16?: boolean;
 	postMessage: (message: unknown) => void;
 	format?: string;
 	sampleOffset?: number;
@@ -50,6 +53,7 @@ interface StreamingOpusDecoderOptions {
 export class StreamingOpusDecoder {
 	private readonly processorPort: MessagePort;
 	private readonly targetSampleRate: number;
+	private readonly useInt16: boolean;
 	private readonly postMessage: (message: unknown) => void;
 	private readonly format: string | undefined;
 	private readonly decoder: AudioDecoder;
@@ -77,6 +81,7 @@ export class StreamingOpusDecoder {
 	constructor({
 		processorPort,
 		targetSampleRate,
+		useInt16 = false,
 		postMessage,
 		format,
 		sampleOffset = 0,
@@ -84,6 +89,7 @@ export class StreamingOpusDecoder {
 	}: StreamingOpusDecoderOptions) {
 		this.processorPort = processorPort;
 		this.targetSampleRate = targetSampleRate;
+		this.useInt16 = useInt16;
 		this.postMessage = postMessage;
 		this.format = format;
 		this.samplesDecodedCount = sampleOffset;
@@ -281,13 +287,11 @@ export class StreamingOpusDecoder {
 		}
 
 		if (resampledFrames > 0) {
-			this.processorPort.postMessage({
-				type: "bufferRange",
-				data: {
-					startSample: this.samplesDecodedCount,
-					channelData,
-				},
-			});
+			postBufferRange(
+				this.processorPort,
+				this.samplesDecodedCount,
+				maybeConvertToInt16(channelData, this.useInt16),
+			);
 			this.samplesDecodedCount += resampledFrames;
 			this.postMessage({
 				type: "decoded",

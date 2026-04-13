@@ -32,6 +32,8 @@ const DEFAULT_RESUME_FETCH_AHEAD = 48_000 * 10;
 export interface StreamingClipNodeOptions {
 	defaultFormat: StreamFormat | null;
 	targetSampleRate: number;
+	/** Send decoded PCM chunks as int16 to cut transfer memory roughly in half. */
+	useInt16?: boolean;
 	/** Injectable worker factory — used for testing without mocking globals. */
 	createWorker?: (format: StreamFormat) => Worker | Promise<Worker>;
 	/**
@@ -66,6 +68,8 @@ export interface StreamingClipNodeOptions {
 
 export interface CoordinatorStreamingOptions {
 	format?: StreamFormat;
+	/** Send decoded PCM chunks as int16 to cut transfer memory roughly in half. */
+	useInt16?: boolean;
 	/**
 	 * Minimum decoded samples before playback starts.
 	 * Prevents audible underruns when streaming over slow connections.
@@ -111,6 +115,7 @@ export class StreamingClipNode extends ClipNode {
 	private _streamStartTime = 0;
 	private _totalBytesReceived = 0;
 	private _fetchPaused = false;
+	private _streamStarting = false;
 
 	onerror?: (error: StreamError) => void;
 	onprogress?: (bytesReceived: number) => void;
@@ -353,6 +358,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	private async _startStream(url: string): Promise<void> {
+		this._streamStarting = true;
 		// Tear down any previous worker
 		if (this._worker) {
 			this._worker.postMessage({ type: "abort" });
@@ -373,15 +379,22 @@ export class StreamingClipNode extends ClipNode {
 		this.onloadstart?.();
 		this.emit("loadstart");
 
-		const format =
-			this._streamOptions.defaultFormat ??
-			this._detectedFormat ??
-			(await detectStreamFormatFromResponse(url));
-
-		const workerFactory =
-			this._streamOptions.createWorker ?? createStreamingWorker;
-		const worker = await workerFactory(format);
+		let format: StreamFormat;
+		let worker: Worker;
+		try {
+			format =
+				this._streamOptions.defaultFormat ??
+				this._detectedFormat ??
+				(await detectStreamFormatFromResponse(url));
+			const workerFactory =
+				this._streamOptions.createWorker ?? createStreamingWorker;
+			worker = await workerFactory(format);
+		} catch {
+			this._streamStarting = false;
+			return;
+		}
 		this._worker = worker;
+		this._streamStarting = false;
 
 		const channel = new MessageChannel();
 		this.transferPort(channel.port2);
@@ -452,6 +465,7 @@ export class StreamingClipNode extends ClipNode {
 				port: channel.port1,
 				url,
 				targetSampleRate: this._streamOptions.targetSampleRate,
+				useInt16: this._streamOptions.useInt16 === true,
 				retry:
 					this._streamOptions.retry === false
 						? null
@@ -482,7 +496,12 @@ export class StreamingClipNode extends ClipNode {
 
 	start(when?: number, offset?: number, duration?: number): void {
 		// If preload deferred fetching, start the stream now
-		if (this._url && !this._worker && !this._streamDone) {
+		if (
+			this._url &&
+			!this._worker &&
+			!this._streamStarting &&
+			!this._streamDone
+		) {
 			this._startStream(this._url);
 		}
 		if (this._readyToPlay || this._url === "") {
@@ -595,6 +614,7 @@ export class Coordinator {
 			defaultFormat: streamingOptions?.format ?? null,
 			targetSampleRate: this.context.sampleRate,
 			createWorker: this.workerFactory,
+			useInt16: streamingOptions?.useInt16,
 			preBufferSamples: streamingOptions?.preBufferSamples,
 			preload: streamingOptions?.preload,
 			pauseFetchAheadSamples: streamingOptions?.pauseFetchAheadSamples,

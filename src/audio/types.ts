@@ -277,7 +277,7 @@ export interface StreamBufferSpan {
 
 export interface BufferRangeWrite {
 	readonly startSample: number;
-	readonly channelData: Float32Array[];
+	readonly channelData: Array<Float32Array | Int16Array>;
 	readonly totalLength?: number | null;
 	readonly streamEnded?: boolean;
 }

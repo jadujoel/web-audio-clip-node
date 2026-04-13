@@ -12,7 +12,9 @@ import {
 	DEFAULT_RETRY_CONFIG,
 	estimateTotalSamplesFromContentLength,
 	fetchWithRetry,
+	maybeConvertToInt16,
 	parseTotalBytes,
+	postBufferRange,
 	resampleChannel,
 	type StreamRetryConfig,
 } from "./worker-utils";
@@ -447,6 +449,7 @@ let currentPort: MessagePort | null = null;
 let currentUrl = "";
 let currentThrottle = 0;
 let currentTargetSampleRate = 0;
+let currentUseInt16 = false;
 let currentRetryConfig: StreamRetryConfig = DEFAULT_RETRY_CONFIG;
 // Cached codec config for seek (Vorbis needs CodecPrivate from WebM header)
 let cachedCodecConfig: {
@@ -458,17 +461,20 @@ let cachedCodecConfig: {
 self.onmessage = (ev: MessageEvent) => {
 	const { type } = ev.data;
 	if (type === "init") {
-		const { port, url, throttle, targetSampleRate, retry } = ev.data as {
-			port: MessagePort;
-			url: string;
-			throttle?: number;
-			targetSampleRate?: number;
-			retry?: StreamRetryConfig | null;
-		};
+		const { port, url, throttle, targetSampleRate, useInt16, retry } =
+			ev.data as {
+				port: MessagePort;
+				url: string;
+				throttle?: number;
+				targetSampleRate?: number;
+				useInt16?: boolean;
+				retry?: StreamRetryConfig | null;
+			};
 		currentPort = port;
 		currentUrl = url;
 		currentThrottle = throttle ?? 0;
 		currentTargetSampleRate = targetSampleRate ?? 0;
+		currentUseInt16 = useInt16 === true;
 		currentRetryConfig = retry ?? DEFAULT_RETRY_CONFIG;
 		abortController = new AbortController();
 		startStreaming(
@@ -477,6 +483,7 @@ self.onmessage = (ev: MessageEvent) => {
 			abortController.signal,
 			currentThrottle,
 			currentTargetSampleRate,
+			currentUseInt16,
 			currentRetryConfig,
 			0,
 			0,
@@ -495,6 +502,7 @@ self.onmessage = (ev: MessageEvent) => {
 				abortController.signal,
 				currentThrottle,
 				currentTargetSampleRate,
+				currentUseInt16,
 				currentRetryConfig,
 				byteOffset,
 				sampleOffset,
@@ -515,6 +523,7 @@ async function startStreaming(
 	signal: AbortSignal,
 	throttle: number,
 	targetSampleRate: number,
+	useInt16: boolean,
 	retryConfig: StreamRetryConfig,
 	byteOffset = 0,
 	sampleOffset = 0,
@@ -591,13 +600,11 @@ async function startStreaming(
 			}
 
 			if (resampledFrames > 0) {
-				processorPort.postMessage({
-					type: "bufferRange",
-					data: {
-						startSample: samplesDecoded,
-						channelData,
-					},
-				});
+				postBufferRange(
+					processorPort,
+					samplesDecoded,
+					maybeConvertToInt16(channelData, useInt16),
+				);
 				samplesDecoded += resampledFrames;
 				self.postMessage({ type: "decoded", samplesDecoded });
 

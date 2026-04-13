@@ -153,7 +153,16 @@ function applyBufferRangeWrite(
 	);
 
 	for (let ch = 0; ch < write.channelData.length; ch++) {
-		properties.buffer[ch].set(write.channelData[ch], startSample);
+		const channel = write.channelData[ch];
+		if (channel instanceof Int16Array) {
+			const asFloat32 = new Float32Array(channel.length);
+			for (let i = 0; i < channel.length; i++) {
+				asFloat32[i] = (channel[i] ?? 0) / 0x8000;
+			}
+			properties.buffer[ch].set(asFloat32, startSample);
+			continue;
+		}
+		properties.buffer[ch].set(channel, startSample);
 	}
 
 	if (requestedTotalLength != null) {

@@ -5086,7 +5086,12 @@ describe("Streaming Loop", () => {
 		);
 
 		const afterTail = simulateBlocks(props, 2);
-		expect(afterTail.allOutputs[0][0][0]).toBeCloseTo(0.75, 5);
+		const resumedLeft = afterTail.allOutputs[0][0];
+		// The resumed block ramps in from underrun recovery, so it should be
+		// clearly non-silent while staying below full target amplitude.
+		const resumedPeak = Math.max(...resumedLeft);
+		expect(resumedPeak).toBeGreaterThan(0.3);
+		expect(resumedPeak).toBeLessThan(0.75);
 		expect(afterTail.messages.some((m) => m.type === "ended")).toBe(true);
 		expect(props.state).toBe(State.Ended);
 	});

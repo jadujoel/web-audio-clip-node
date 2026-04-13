@@ -32,6 +32,69 @@ import {
 	WaveShaperNode,
 } from "isomorphic-web-audio-api";
 
+type ManagedAudioContext = AudioContext | OfflineAudioContext;
+
+const registeredAudioContexts = new Set<ManagedAudioContext>();
+
+function isClosableAudioContext(
+	context: ManagedAudioContext,
+): context is AudioContext {
+	return typeof (context as AudioContext).close === "function";
+}
+
+function isAlreadyClosedError(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	const name = error.name.toLowerCase();
+	const message = error.message.toLowerCase();
+	return (
+		name.includes("invalidstate") ||
+		message.includes("closed") ||
+		message.includes("cannot close")
+	);
+}
+
+export function registerAudioContext<T extends ManagedAudioContext>(
+	context: T,
+): T {
+	registeredAudioContexts.add(context);
+	return context;
+}
+
+export function getRegisteredAudioContextCountForTest(): number {
+	return registeredAudioContexts.size;
+}
+
+export async function closeRegisteredAudioContexts(): Promise<void> {
+	const contexts = [...registeredAudioContexts];
+	registeredAudioContexts.clear();
+
+	for (const context of contexts) {
+		if (!isClosableAudioContext(context)) {
+			continue;
+		}
+
+		try {
+			await context.close();
+		} catch (error) {
+			if (isAlreadyClosedError(error)) {
+				continue;
+			}
+			throw error;
+		}
+	}
+}
+
+void (async () => {
+	try {
+		const { afterEach } = await import("bun:test");
+		afterEach(async () => {
+			await closeRegisteredAudioContexts();
+		});
+	} catch {
+		// Ignore when this preload is imported outside Bun's test runner.
+	}
+})();
+
 globalThis.AnalyserNode ??= AnalyserNode;
 globalThis.AudioBuffer ??= AudioBuffer;
 globalThis.AudioBufferSourceNode ??= AudioBufferSourceNode;
@@ -105,19 +168,23 @@ export function createContext(opts?: {
 }): AudioContext | OfflineAudioContext {
 	const sampleRate = opts?.sampleRate ?? 44100;
 	if (opts?.preferOffline !== false) {
-		return new OfflineAudioContext(
-			opts?.channels ?? 1,
-			opts?.length ?? sampleRate,
-			sampleRate,
+		return registerAudioContext(
+			new OfflineAudioContext(
+				opts?.channels ?? 1,
+				opts?.length ?? sampleRate,
+				sampleRate,
+			),
 		);
 	}
 	try {
-		return new AudioContext({ sampleRate });
+		return registerAudioContext(new AudioContext({ sampleRate }));
 	} catch {
-		return new OfflineAudioContext(
-			opts?.channels ?? 1,
-			opts?.length ?? sampleRate,
-			sampleRate,
+		return registerAudioContext(
+			new OfflineAudioContext(
+				opts?.channels ?? 1,
+				opts?.length ?? sampleRate,
+				sampleRate,
+			),
 		);
 	}
 }

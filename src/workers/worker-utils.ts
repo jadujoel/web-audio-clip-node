@@ -156,6 +156,46 @@ export function resampleChannel(
 	return dst;
 }
 
+export type PcmChannelData = Float32Array | Int16Array;
+
+export function float32ToInt16(src: Float32Array): Int16Array {
+	const out = new Int16Array(src.length);
+	for (let i = 0; i < src.length; i++) {
+		const clamped = Math.max(-1, Math.min(1, src[i] ?? 0));
+		out[i] =
+			clamped < 0 ? Math.round(clamped * 0x8000) : Math.round(clamped * 0x7fff);
+	}
+	return out;
+}
+
+export function maybeConvertToInt16(
+	channelData: Float32Array[],
+	useInt16: boolean,
+): PcmChannelData[] {
+	if (!useInt16) {
+		return channelData;
+	}
+	return channelData.map(float32ToInt16);
+}
+
+export function postBufferRange(
+	port: MessagePort,
+	startSample: number,
+	channelData: PcmChannelData[],
+): void {
+	const transferables = channelData.map((channel) => channel.buffer);
+	port.postMessage(
+		{
+			type: "bufferRange",
+			data: {
+				startSample,
+				channelData,
+			},
+		},
+		transferables,
+	);
+}
+
 export function createThrottleStream(
 	bytesPerSec: number,
 ): TransformStream<Uint8Array, Uint8Array> {

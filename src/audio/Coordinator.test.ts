@@ -172,6 +172,28 @@ describe("StreamingClipNode.url setter", () => {
 		expect(initMsg).toBeDefined();
 		expect(initMsg?.url).toBe(url);
 		expect(initMsg?.targetSampleRate).toBe(48_000);
+		expect(initMsg?.useInt16).toBe(false);
+	});
+
+	test("forwards useInt16=true to the decode worker init message", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			useInt16: true,
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		const initMsg = worker.messages.find((m) => m.type === "init");
+		expect(initMsg).toBeDefined();
+		expect(initMsg?.useInt16).toBe(true);
 	});
 
 	test("terminates previous worker when url is reassigned", async () => {
@@ -268,6 +290,42 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 		// (The ClipNode.start sends a message to the processor port,
 		// which is verified by the absence of a pending start.)
 		expect(node.url).toBe("https://example.com/audio.opus");
+	});
+});
+
+describe("StreamingClipNode.start - no double stream on url+start() race", () => {
+	test("setting url and immediately calling start() starts the stream only once", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+
+		let workerCount = 0;
+		const trackingFactory = (_format: StreamFormat): Worker => {
+			workerCount++;
+			lastWorker = new FakeWorker();
+			return lastWorker as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+
+		const loadstartEvents: number[] = [];
+		node.on("loadstart", () => loadstartEvents.push(1));
+
+		// Reproduce the race: set URL then immediately call start() without awaiting
+		node.url = "https://example.com/audio.opus";
+		node.start();
+
+		// Flush microtasks so the async _startStream completes
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+		expect(loadstartEvents.length).toBe(1);
 	});
 });
 

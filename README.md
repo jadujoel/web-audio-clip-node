@@ -83,6 +83,19 @@ clip.url = "/audio/clip.opus";
 clip.start();
 ```
 
+Optional: reduce worker-to-worklet transport memory with int16 chunks:
+
+```ts
+const clip = coordinator.createStreamingClipNode(undefined, {
+  useInt16: true,
+});
+```
+
+Tradeoffs:
+- `useInt16: true` roughly halves PCM chunk transfer size and can reduce peak memory pressure on mobile.
+- PCM data is quantized to 16-bit before transfer, so very low-level detail is slightly reduced compared to float32 transport.
+- Default behavior stays float32 when `useInt16` is omitted.
+
 See [examples/coordinator-streaming](examples/coordinator-streaming/) and [examples/cdn-opus-streaming](examples/cdn-opus-streaming/) for full working examples.
 
 ## React Quick Start
@@ -208,6 +221,284 @@ Because the `MessagePort` is transferred to both ends, decoded audio travels **W
 `ClipNode.timesLooped` tracks the total wrap count since the last `start()`. `ClipNode.state` holds the current `ClipNodeState` string.
 
 For per-render-quantum telemetry, assign `clip.onframe` to receive a `FrameData` object every audio block. Enabling `onframe` also populates `clip.cpu` with the processor's CPU usage estimate.
+
+## Event Listeners
+
+Every event has two equivalent ways to subscribe: a callback property (`clip.onended = fn`) and the `on` / `off` pair. Use the property form when you have a single handler and only need to remove it by nulling it out. Use `on` / `off` when you need multiple independent subscribers or want a structured teardown path.
+
+```ts
+// Callback property — simple, one at a time
+clip.onended = () => advancePlaylist();
+
+// on/off — multiple handlers, clean unsubscribe
+const handler = () => advancePlaylist();
+clip.on("ended", handler);
+// later:
+clip.off("ended", handler);
+```
+
+### ClipNode Event Listener Examples
+
+**`ended` — auto-advance a playlist**
+
+Fires once when a non-looping clip plays to its natural end. Use it to load the next track, update a playlist cursor, or trigger UI cleanup.
+
+```ts
+clip.on("ended", () => {
+  playlistIndex = (playlistIndex + 1) % playlist.length;
+  loadAndPlay(playlist[playlistIndex]);
+});
+```
+
+**`looped` — react to each wrap**
+
+Fires every time the playhead crosses the loop boundary. Use it to increment a loop counter, randomise loop parameters, or sync visuals to the loop beat.
+
+```ts
+clip.on("looped", () => {
+  loopCount++;
+  if (loopCount % 4 === 0) {
+    // change timbre every 4 loops
+    clip.buffer = alternateBuffer;
+  }
+});
+```
+
+**`statechange` — drive a single state machine**
+
+Receives the new `ClipNodeState` string on every transition (`"initial"` → `"scheduled"` → `"started"` → `"paused"` → …). A single handler here is cleaner than wiring many individual callbacks when you only need to update UI.
+
+```ts
+clip.on("statechange", (state) => {
+  playButton.textContent = state === "started" ? "Pause" : "Play";
+  statusBadge.dataset.state = state;
+});
+```
+
+**`paused` and `resumed` — sync transport UI**
+
+Use these when your UI tracks the `paused` / `playing` distinction separately from `stopped`.
+
+```ts
+clip.on("paused",  () => playIcon.classList.add("paused"));
+clip.on("resumed", () => playIcon.classList.remove("paused"));
+```
+
+**`timeupdate` — scrubber and clock display**
+
+Fires at most every 250 ms (configurable via `clip.timeUpdateInterval`) with the current `AudioContext.currentTime`. Use it to move a scrubber thumb or update a running-time label without subscribing to every audio quantum.
+
+```ts
+clip.on("timeupdate", (currentTime) => {
+  const pct = (clip.playhead / clip.buffer!.length) * 100;
+  scrubber.style.left = `${pct}%`;
+  timeLabel.textContent = currentTime.toFixed(2);
+});
+```
+
+**`seeking` and `seeked` — show a seek indicator**
+
+`seeking` fires the moment you write to `clip.playhead`; `seeked` fires once the worklet confirms the new position. Show a spinner or freeze the scrubber between the two.
+
+```ts
+clip.on("seeking", () => scrubber.classList.add("seeking"));
+clip.on("seeked",  () => scrubber.classList.remove("seeking"));
+```
+
+**`durationchange` — update metadata when the buffer changes**
+
+Fires when a new `AudioBuffer` is assigned to a live node. Use it to recalculate UI elements that depend on total duration.
+
+```ts
+clip.on("durationchange", (durationInSamples) => {
+  const seconds = durationInSamples / ctx.sampleRate;
+  durationLabel.textContent = `${seconds.toFixed(2)} s`;
+});
+```
+
+**`ratechange` — reflect playback speed in the UI**
+
+Fires whenever `clip.playbackRate.value` changes. Useful to keep a rate display in sync when rate is changed programmatically from somewhere else in your code.
+
+```ts
+clip.on("ratechange", (rate) => {
+  rateDisplay.textContent = `${rate.toFixed(2)}×`;
+});
+```
+
+**`frame` — per-quantum telemetry (VU meter, CPU)**
+
+Fires once per 128-sample audio block (≈2.67 ms at 48 kHz) with a `[currentTime, currentFrame, playhead, timeTaken]` tuple. Only enable this when you actually need it — it adds a cross-thread message every quantum.
+
+```ts
+clip.on("frame", ([currentTime, currentFrame, playhead, timeTaken]) => {
+  vuMeter.level = playhead / clip.buffer!.length;
+  cpuLabel.textContent = `${(clip.cpu * 100).toFixed(1)} %`;
+});
+```
+
+**`disposed` — clean up external resources**
+
+Fires when `clip.dispose()` is called. Use it to release object URLs, remove DOM elements, or unregister the node from a pool.
+
+```ts
+clip.on("disposed", () => {
+  URL.revokeObjectURL(objectUrl);
+  container.remove();
+});
+```
+
+---
+
+### StreamingClipNode Event Listener Examples
+
+`StreamingClipNode` emits all `ClipNode` events plus the streaming-specific ones below.
+
+**`loadstart` — show a loading indicator**
+
+Fires as soon as `clip.url` is set and the fetch begins. Show a spinner or skeleton so the user knows something is happening.
+
+```ts
+clip.on("loadstart", () => {
+  spinner.hidden = false;
+  errorBanner.hidden = true;
+});
+```
+
+**`progress` — loading bar**
+
+Fires each time a chunk arrives, with the cumulative bytes received. Use it to fill a download progress bar. If the server returns a `Content-Length` header you can compute a percentage; otherwise show an indeterminate bar and display raw bytes.
+
+```ts
+clip.on("progress", (bytesReceived) => {
+  // If total size is known:
+  if (totalBytes > 0) {
+    progressBar.value = bytesReceived / totalBytes;
+  }
+  bytesLabel.textContent = `${(bytesReceived / 1024).toFixed(0)} KB`;
+});
+```
+
+**`canplay` — enable the play button**
+
+Fires once the first chunk has been decoded and enough samples are buffered that playback can start immediately. Enable playback controls here — `clip.start()` is safe to call from this point onwards.
+
+```ts
+clip.on("canplay", () => {
+  spinner.hidden = true;
+  playButton.disabled = false;
+});
+```
+
+**`canplaythrough` — signal stutter-free playback**
+
+Fires when the decoder estimates that the remaining data will arrive fast enough to play through without rebuffering. Use it to hide the "Still loading…" notice or start auto-play if the user hasn't interacted yet.
+
+```ts
+clip.on("canplaythrough", () => {
+  bufferingNotice.hidden = true;
+});
+```
+
+**`waiting` — rebuffering stall**
+
+Fires when the playhead catches up with the decoded buffer and playback stalls waiting for more data. Show a rebuffering indicator so the user knows the pause is not intentional.
+
+```ts
+clip.on("waiting", () => {
+  rebufferingBadge.hidden = false;
+});
+
+clip.on("canplay", () => {
+  rebufferingBadge.hidden = true; // reuse canplay to hide it again
+});
+```
+
+**`done` — fetch and decode complete**
+
+Fires once the entire stream has been received and decoded successfully. Use it to hide download progress UI, enable "download" buttons, or transition a stream-only player into a seek-anywhere mode.
+
+```ts
+clip.on("done", () => {
+  progressBar.hidden = true;
+  downloadButton.disabled = false;
+  seekBar.classList.add("fully-buffered");
+});
+```
+
+**`error` — handle stream failures gracefully**
+
+Fires if the fetch or decoder encounters a fatal error. Show an error message and offer a retry action.
+
+```ts
+clip.on("error", (err) => {
+  console.error("Stream failed:", err);
+  errorMessage.textContent = `Playback error: ${err}`;
+  retryButton.hidden = false;
+});
+```
+
+**`retry` — surface transient network retries**
+
+Fires before each automatic retry attempt with the attempt number, back-off delay (ms), and the triggering error string. Use it to show a non-blocking "Reconnecting…" toast.
+
+```ts
+clip.on("retry", (attempt, delay, error) => {
+  toast.show(`Network issue, retrying in ${(delay / 1000).toFixed(1)} s… (${error})`);
+});
+```
+
+**`metadata` — display stream info**
+
+Fires as soon as the container headers are parsed, before any audio has been decoded. Use it to show codec, sample rate, and channel count metadata while the rest of the file is still downloading.
+
+```ts
+clip.on("metadata", (meta) => {
+  infoPanel.textContent =
+    `${meta.codec} · ${meta.sampleRate} Hz · ${meta.channelCount} ch`;
+});
+```
+
+**`bufferchange` — draw buffer ranges**
+
+Fires whenever the set of decoded ranges changes. Use it to render a buffering bar similar to a `<video>` element's `.buffered` ranges — grey for downloaded, coloured for the current position.
+
+```ts
+clip.on("bufferchange", (ranges) => {
+  renderBufferRanges(seekBar, ranges, clip.duration);
+});
+
+function renderBufferRanges(
+  bar: HTMLElement,
+  ranges: { start: number; end: number }[],
+  total: number,
+) {
+  bar.querySelectorAll(".range").forEach((el) => el.remove());
+  for (const { start, end } of ranges) {
+    const div = document.createElement("div");
+    div.className = "range";
+    div.style.left  = `${(start / total) * 100}%`;
+    div.style.width = `${((end - start) / total) * 100}%`;
+    bar.appendChild(div);
+  }
+}
+```
+
+**`readystatechange` — coarse loading state**
+
+Fires with one of `"have-nothing"`, `"have-metadata"`, `"have-current-data"`, `"have-future-data"`, or `"have-enough-data"` — mirroring the HTML media element ready-state model. Useful when you want a single place to drive a multi-phase loading UI.
+
+```ts
+clip.on("readystatechange", (state) => {
+  loadingLabel.textContent = {
+    "have-nothing":       "Waiting…",
+    "have-metadata":      "Loading metadata",
+    "have-current-data":  "First chunk ready",
+    "have-future-data":   "Buffering…",
+    "have-enough-data":   "Ready",
+  }[state] ?? state;
+});
+```
 
 ## Processor Loading Options
 
