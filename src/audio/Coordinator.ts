@@ -243,13 +243,13 @@ export class Coordinator {
 		return this.moduleLoaded;
 	}
 
-	ClipNode(options?: ClipWorkletOptions): ClipNode {
+	createClipNode(options?: ClipWorkletOptions): ClipNode {
 		const node = new ClipNode(this.context, options ?? {});
 		this.nodes.add(node);
 		return node;
 	}
 
-	StreamingClipNode(
+	createStreamingClipNode(
 		options?: ClipWorkletOptions,
 		streamingOptions?: CoordinatorStreamingOptions,
 	): StreamingClipNode {

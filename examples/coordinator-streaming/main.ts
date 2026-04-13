@@ -7,7 +7,7 @@ async function main() {
   const context: AudioContext = new AudioContext({ sampleRate: 48000 });
   const coordinator: Coordinator = Coordinator.fromContext(context);
   await coordinator.addModule();
-  const clip = coordinator.StreamingClipNode();
+  const clip = coordinator.createStreamingClipNode();
   clip.connect(context.destination);
 
   clip.onprogress = (bytes) => {

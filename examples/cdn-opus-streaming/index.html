@@ -53,7 +53,7 @@
 
     async function main() {
       const coordinator = Coordinator.fromCdn();
-      const clip = coordinator.StreamingClipNode();
+      const clip = coordinator.createStreamingClipNode();
       clip.connect(coordinator.context.destination);
 
       clip.onprogress = (bytes) => {

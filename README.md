@@ -70,7 +70,7 @@ const ctx = new AudioContext({ sampleRate: 48_000 });
 const coordinator = Coordinator.fromContext(ctx);
 await coordinator.addModule(); // loads the worklet once
 
-const clip = coordinator.StreamingClipNode();
+const clip = coordinator.createStreamingClipNode();
 clip.connect(ctx.destination);
 
 clip.onprogress = (bytes) => console.log("received", bytes, "bytes");

@@ -73,7 +73,7 @@ describe("Coordinator.addModule", () => {
 	});
 });
 
-describe("Coordinator.ClipNode", () => {
+describe("Coordinator.createClipNode", () => {
 	test("returns a regular ClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
@@ -81,13 +81,13 @@ describe("Coordinator.ClipNode", () => {
 			workerFactory: fakeWorkerFactory,
 			processorUrl: "./dist/audio/processor.js",
 		});
-		const node = coordinator.ClipNode();
+		const node = coordinator.createClipNode();
 		expect(node).toBeInstanceOf(ClipNode);
 		expect(node).not.toBeInstanceOf(StreamingClipNode);
 	});
 });
 
-describe("Coordinator.StreamingClipNode", () => {
+describe("Coordinator.createStreamingClipNode", () => {
 	test("returns a StreamingClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
@@ -95,7 +95,7 @@ describe("Coordinator.StreamingClipNode", () => {
 			workerFactory: fakeWorkerFactory,
 			processorUrl: "./dist/audio/processor.js",
 		});
-		const node = coordinator.StreamingClipNode();
+		const node = coordinator.createStreamingClipNode();
 		expect(node).toBeInstanceOf(StreamingClipNode);
 	});
 
@@ -115,7 +115,7 @@ describe("Coordinator.StreamingClipNode", () => {
 			workerFactory: trackingFactory,
 			processorUrl: "./dist/audio/processor.js",
 		});
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.unknown";
@@ -134,8 +134,8 @@ describe("Coordinator.dispose", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const regular = coordinator.ClipNode();
-		const streaming = coordinator.StreamingClipNode(undefined, {
+		const regular = coordinator.createClipNode();
+		const streaming = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		streaming.url = "https://example.com/audio.opus";
@@ -159,7 +159,7 @@ describe("StreamingClipNode.url setter", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		const url = "https://example.com/audio.opus";
@@ -181,7 +181,7 @@ describe("StreamingClipNode.url setter", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio1.opus";
@@ -202,7 +202,7 @@ describe("StreamingClipNode.url setter", () => {
 			workerFactory: fakeWorkerFactory,
 			processorUrl: "./dist/audio/processor.js",
 		});
-		const node = coordinator.StreamingClipNode();
+		const node = coordinator.createStreamingClipNode();
 		node.url = "https://example.com/audio.opus";
 		expect(node.url).toBe("https://example.com/audio.opus");
 	});
@@ -217,7 +217,7 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -250,7 +250,7 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -279,7 +279,7 @@ describe("StreamingClipNode.stop", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -299,7 +299,7 @@ describe("StreamingClipNode.stop", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -322,7 +322,7 @@ describe("StreamingClipNode callbacks", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -345,7 +345,7 @@ describe("StreamingClipNode callbacks", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -368,7 +368,7 @@ describe("StreamingClipNode callbacks", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -393,7 +393,7 @@ describe("StreamingClipNode.downloaded", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -412,7 +412,7 @@ describe("StreamingClipNode.downloaded", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -431,7 +431,7 @@ describe("StreamingClipNode.downloaded", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio1.opus";
@@ -459,7 +459,7 @@ describe("StreamingClipNode.downloaded", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		// No URL set — promise should stay pending
@@ -488,7 +488,7 @@ describe("StreamingClipNode format auto-detection", () => {
 			workerFactory: trackingFactory,
 			processorUrl: "./dist/audio/processor.js",
 		});
-		const node = coordinator.StreamingClipNode();
+		const node = coordinator.createStreamingClipNode();
 		node.url = "https://example.com/audio.opus";
 		await Promise.resolve();
 
@@ -505,7 +505,7 @@ describe("StreamingClipNode auto-dispose worker", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -525,7 +525,7 @@ describe("StreamingClipNode auto-dispose worker", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
@@ -548,7 +548,7 @@ describe("StreamingClipNode auto-dispose worker", () => {
 			processorUrl: "./dist/audio/processor.js",
 		});
 
-		const node = coordinator.StreamingClipNode(undefined, {
+		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 		node.url = "https://example.com/audio.opus";
