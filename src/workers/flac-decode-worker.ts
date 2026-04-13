@@ -400,5 +400,6 @@ async function startStreaming(
 		} catch {
 			// Decoder may already be closed
 		}
+		self.close();
 	}
 }

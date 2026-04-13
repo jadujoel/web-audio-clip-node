@@ -47,6 +47,8 @@ export class StreamingClipNode extends ClipNode {
 	private _readyToPlay = false;
 	private _streamDone = false;
 	private _streamOptions: StreamingClipNodeOptions;
+	private _downloaded: PromiseWithResolvers<void> =
+		Promise.withResolvers<void>();
 
 	onerror?: (message: string) => void;
 	onprogress?: (bytesReceived: number) => void;
@@ -59,6 +61,15 @@ export class StreamingClipNode extends ClipNode {
 	) {
 		super(context, options);
 		this._streamOptions = streamOptions;
+	}
+
+	/**
+	 * A promise that resolves when the current stream download completes.
+	 * Rejects if the stream encounters an error.
+	 * Will not resolve until a URL is set and the stream finishes.
+	 */
+	get downloaded(): Promise<void> {
+		return this._downloaded.promise;
 	}
 
 	get url(): string | undefined {
@@ -80,6 +91,7 @@ export class StreamingClipNode extends ClipNode {
 
 		this._readyToPlay = false;
 		this._streamDone = false;
+		this._downloaded = Promise.withResolvers<void>();
 
 		const format = this._streamOptions.defaultFormat ?? detectStreamFormat(url);
 
@@ -110,9 +122,16 @@ export class StreamingClipNode extends ClipNode {
 				this._streamDone = true;
 				// If the entire stream is shorter than the threshold, start now
 				this._tryStart(msg.samplesDecoded ?? 0, 0);
+				this._downloaded.resolve();
+				this._worker?.terminate();
+				this._worker = null;
 				this.ondone?.();
 			} else if (msg.type === "error") {
-				this.onerror?.(msg.message ?? "Unknown streaming error");
+				const errorMsg = msg.message ?? "Unknown streaming error";
+				this._downloaded.reject(new Error(errorMsg));
+				this._worker?.terminate();
+				this._worker = null;
+				this.onerror?.(errorMsg);
 			}
 		};
 

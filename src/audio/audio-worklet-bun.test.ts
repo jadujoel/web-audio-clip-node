@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 
 import { createContext, renderContext } from "../../TestPreload";
+import { assertSamplesMatch, computeRms } from "../test-utils/audio-assertions";
 import { ClipNode } from "./ClipNode";
 
 beforeAll(async () => {
@@ -195,5 +196,69 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here confirms scrub + streaming writes remain stable.
 		expect(true).toBe(true);
+	});
+
+	test("streaming buffer samples survive processor roundtrip at identity settings", async () => {
+		const length = 12_000;
+		const context = createContext({
+			sampleRate: 48_000,
+			channels: 2,
+			length,
+			preferOffline: true,
+		});
+
+		await context.audioWorklet.addModule("./dist/audio/processor.js");
+
+		// Create known sine wave signals
+		const inputL = new Float32Array(length);
+		const inputR = new Float32Array(length);
+		for (let i = 0; i < length; i++) {
+			inputL[i] = Math.sin((2 * Math.PI * 440 * i) / 48_000) * 0.5;
+			inputR[i] = Math.sin((2 * Math.PI * 880 * i) / 48_000) * 0.5;
+		}
+
+		const clip = new ClipNode(context);
+		clip.connect(context.destination);
+		clip.initializeBuffer(length, 2, { streaming: true });
+		clip.start();
+
+		// Feed in chunks (simulate streaming)
+		const chunkSize = 1_200;
+		for (let i = 0; i < length; i += chunkSize) {
+			const end = Math.min(i + chunkSize, length);
+			clip.replaceBufferRange(
+				i,
+				[inputL.subarray(i, end), inputR.subarray(i, end)],
+				{
+					totalLength: length,
+					streamEnded: end >= length,
+				},
+			);
+		}
+
+		const rendered = (context as OfflineAudioContext).startRendering
+			? await (context as OfflineAudioContext).startRendering()
+			: null;
+		expect(rendered).not.toBeNull();
+		if (!rendered) return;
+
+		// Verify rendered output has non-trivial audio (not silence)
+		const outputL = rendered.getChannelData(0);
+		const outputR = rendered.getChannelData(1);
+		expect(computeRms(outputL)).toBeGreaterThan(0.01);
+		expect(computeRms(outputR)).toBeGreaterThan(0.01);
+
+		// Compare — allow small error from processor filters; skip initial settling
+		const skip = 256;
+		assertSamplesMatch(outputL.subarray(skip), inputL.subarray(skip), {
+			epsilon: 1e-3,
+			maxMismatchRatio: 0.01,
+			label: "left channel",
+		});
+		assertSamplesMatch(outputR.subarray(skip), inputR.subarray(skip), {
+			epsilon: 1e-3,
+			maxMismatchRatio: 0.01,
+			label: "right channel",
+		});
 	});
 });

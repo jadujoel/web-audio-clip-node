@@ -123,5 +123,6 @@ async function startStreaming(
 	} finally {
 		streamDecoder.close();
 		processorPort.close();
+		self.close();
 	}
 }

@@ -384,6 +384,93 @@ describe("StreamingClipNode callbacks", () => {
 	});
 });
 
+describe("StreamingClipNode.downloaded", () => {
+	test("resolves when stream completes", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const promise = node.downloaded;
+		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		await expect(promise).resolves.toBeUndefined();
+	});
+
+	test("rejects when stream errors", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const promise = node.downloaded;
+		lastWorker.receive({ type: "error", message: "network failure" });
+		await expect(promise).rejects.toThrow("network failure");
+	});
+
+	test("resets when a new URL is set", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio1.opus";
+		await Promise.resolve();
+
+		const firstPromise = node.downloaded;
+		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		await firstPromise;
+
+		// Setting a new URL should create a fresh promise
+		node.url = "https://example.com/audio2.opus";
+		await Promise.resolve();
+
+		const secondPromise = node.downloaded;
+		expect(secondPromise).not.toBe(firstPromise);
+		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		await expect(secondPromise).resolves.toBeUndefined();
+	});
+
+	test("stays pending when no stream started", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		// No URL set — promise should stay pending
+		const result = await Promise.race([
+			node.downloaded.then(() => "resolved"),
+			Promise.resolve("pending"),
+		]);
+		expect(result).toBe("pending");
+	});
+});
+
 describe("StreamingClipNode format auto-detection", () => {
 	test("auto-detects OggOpus format from .opus URL when no format set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -406,5 +493,76 @@ describe("StreamingClipNode format auto-detection", () => {
 		await Promise.resolve();
 
 		expect(capturedFormats[0]).toBe("OggOpus");
+	});
+});
+
+describe("StreamingClipNode auto-dispose worker", () => {
+	test("worker is terminated and nulled after done", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		worker.receive({ type: "done", samplesDecoded: 960 });
+
+		expect(worker.terminated).toBe(true);
+	});
+
+	test("worker is terminated and nulled after error", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		// suppress unhandled rejection from downloaded promise
+		node.downloaded.catch(() => {});
+
+		const worker = lastWorker;
+		worker.receive({ type: "error", message: "fail" });
+
+		expect(worker.terminated).toBe(true);
+	});
+
+	test("stop() after done does not send abort (worker already disposed)", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.StreamingClipNode(undefined, {
+			format: "OggOpus",
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		worker.receive({ type: "done", samplesDecoded: 960 });
+
+		// Worker already terminated by "done" handler
+		expect(worker.terminated).toBe(true);
+
+		// stop() should not throw and should not send "abort" since _worker is null
+		node.stop();
+		const abortMessages = worker.messages.filter((m) => m.type === "abort");
+		expect(abortMessages).toHaveLength(0);
 	});
 });

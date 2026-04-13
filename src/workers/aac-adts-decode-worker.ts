@@ -306,5 +306,6 @@ async function startStreaming(
 			// already closed
 		}
 		processorPort.close();
+		self.close();
 	}
 }
