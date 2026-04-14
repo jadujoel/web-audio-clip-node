@@ -25,6 +25,7 @@ export type {
 	ClipProcessorToggleMessageType,
 	ClipWorkletOptions,
 	FrameData,
+	GapPlaybackStrategy,
 	LoopMode,
 	StreamBufferSpan,
 	StreamBufferState,

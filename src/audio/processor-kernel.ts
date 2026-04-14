@@ -41,6 +41,8 @@ function createStreamBufferState(
 		underrunActive: false,
 		underrunRecoverySamples: 256,
 		underrunRecoveryPosition: 256, // Start at max = no recovery needed
+		gapPlaybackStrategy: "hold",
+		targetTotalSamples: null,
 	};
 }
 
@@ -921,6 +923,13 @@ export function handleProcessorMessage(
 			properties.state = State.Started;
 			properties.startWhen = (data as number | undefined) ?? currentTime;
 			return [{ type: "resume" }];
+		case "getBuffer": {
+			const buf = properties.buffer;
+			const committed = properties.streamBuffer.committedLength;
+			const len = committed > 0 ? committed : (buf[0]?.length ?? 0);
+			const channelData = buf.map((ch) => ch.slice(0, len));
+			return [{ type: "bufferData", data: channelData }];
+		}
 		case "dispose":
 			properties.state = State.Disposed;
 			properties.buffer = [];
@@ -1021,6 +1030,16 @@ export function handleProcessorMessage(
 			return [];
 		case "mute":
 			properties.muted = data as boolean;
+			return [];
+		case "streamGapStrategy":
+			properties.streamBuffer.gapPlaybackStrategy = data as "hold" | "silence";
+			return [];
+		case "streamTargetLength":
+			properties.streamBuffer.targetTotalSamples =
+				(data as number | null) ?? null;
+			return [];
+		case "streamGapRecoveryFadeSamples":
+			properties.streamBuffer.underrunRecoverySamples = data as number;
 			return [];
 	}
 	return [];
@@ -1127,16 +1146,35 @@ export function processBlock(
 		props.streamBuffer.streaming &&
 		props.streamBuffer.committedLength < sourceLength;
 	const loop = props.loop;
+	const isSilenceStrategy =
+		props.streamBuffer.gapPlaybackStrategy === "silence";
 
-	// When looping during an incomplete stream, clamp effective length to committed data
-	// to avoid reading silence/unwritten regions.
+	// Resolve effective target length for silence strategy:
+	// 1. User-declared targetTotalSamples
+	// 2. Metadata/worker totalLength
+	// 3. committedLength fallback
+	const effectiveTargetLength = isSilenceStrategy
+		? (props.streamBuffer.targetTotalSamples ??
+			props.streamBuffer.totalLength ??
+			Math.max(props.streamBuffer.committedLength, sourceLength))
+		: sourceLength;
+
+	// In "silence" strategy: use target length so playhead advances through gaps.
+	// In "hold" strategy: clamp to committed data to avoid reading unwritten regions.
 	const effectiveSourceLength = hasIncompleteStream
-		? Math.max(props.streamBuffer.committedLength, 0)
+		? isSilenceStrategy
+			? effectiveTargetLength
+			: Math.max(props.streamBuffer.committedLength, 0)
 		: sourceLength;
 
 	// Guard against degenerate tiny loops that would produce audible artifacts
 	const MIN_LOOP_SAMPLES = SAMPLE_BLOCK_SIZE * 2;
-	if (hasIncompleteStream && loop && effectiveSourceLength < MIN_LOOP_SAMPLES) {
+	if (
+		hasIncompleteStream &&
+		!isSilenceStrategy &&
+		loop &&
+		effectiveSourceLength < MIN_LOOP_SAMPLES
+	) {
 		fillWithSilence(output0);
 		for (let i = 1; i < outputs.length; i++) {
 			copy(output0, outputs[i]);
@@ -1229,7 +1267,10 @@ export function processBlock(
 	} = useRateIndexing
 		? findIndexesWithPlaybackRates(blockParams)
 		: findIndexesNormal(blockParams);
+	// In hold strategy, wait for committedLength to catch up to totalLength before ending.
+	// In silence strategy, endRequested alone means "all data sent" — gaps are acceptable.
 	const waitingForFinalCommit =
+		!isSilenceStrategy &&
 		props.streamBuffer.streaming &&
 		props.streamBuffer.endRequested &&
 		!props.streamBuffer.streamEnded;
@@ -1240,7 +1281,9 @@ export function processBlock(
 		(index) =>
 			index >= props.streamBuffer.committedLength && index < sourceLength,
 	);
+	// In silence strategy, gap traversal is expected — only report underrun in hold strategy
 	if (
+		!isSilenceStrategy &&
 		underrunSample !== undefined &&
 		!props.streamBuffer.streamEnded &&
 		props.streamBuffer.lastUnderrunSample !== underrunSample
@@ -1259,27 +1302,52 @@ export function processBlock(
 	}
 
 	// Track underrun active state for recovery crossfade.
+	// In silence strategy, track gap state for recovery fade purposes.
 	// Underrun can be detected two ways:
 	// 1. indexes land in uncommitted range (underrunSample !== undefined)
 	// 2. In streaming mode, indexes are truncated because effectiveSourceLength
 	//    was clamped to committedLength (partial block while stream not ended)
 	const isStreamingUnderrun =
+		!isSilenceStrategy &&
 		hasUnfinishedStreamTail &&
 		!props.streamBuffer.streamEnded &&
 		indexes.length < SAMPLE_BLOCK_SIZE;
+
+	// In silence strategy, "in gap" means some indexes are in uncommitted territory
+	const isInGap =
+		isSilenceStrategy &&
+		underrunSample !== undefined &&
+		!props.streamBuffer.streamEnded;
+
 	const isUnderrunning =
-		(underrunSample !== undefined && !props.streamBuffer.streamEnded) ||
-		isStreamingUnderrun;
+		((!isSilenceStrategy &&
+			underrunSample !== undefined &&
+			!props.streamBuffer.streamEnded) ||
+			isStreamingUnderrun ||
+			isInGap) &&
+		!props.streamBuffer.streamEnded;
 
 	if (isUnderrunning) {
 		props.streamBuffer.underrunActive = true;
 	} else if (props.streamBuffer.underrunActive && !isUnderrunning) {
-		// Recovering from underrun — start fade-in
+		// Recovering from underrun/gap — start fade-in
 		props.streamBuffer.underrunActive = false;
 		props.streamBuffer.underrunRecoveryPosition = 0;
 	}
 
 	fill(output0, buffer, indexes);
+
+	// In silence strategy, zero out samples that fall in uncommitted gap regions
+	if (isSilenceStrategy && hasIncompleteStream) {
+		const committed = props.streamBuffer.committedLength;
+		for (let i = 0; i < indexes.length; i++) {
+			if (indexes[i] >= committed) {
+				for (let ch = 0; ch < nc; ch++) {
+					output0[ch][i] = 0;
+				}
+			}
+		}
+	}
 
 	// --- Underrun recovery fade-in ---
 	if (
@@ -1431,13 +1499,19 @@ export function processBlock(
 		props.timesLooped++;
 		messages.push({ type: "looped", data: props.timesLooped });
 	}
+	// In silence strategy, endRequested alone is sufficient (gaps are ok)
 	const canEndStreamPlayback =
-		!props.streamBuffer.streaming || props.streamBuffer.streamEnded;
+		!props.streamBuffer.streaming ||
+		props.streamBuffer.streamEnded ||
+		(isSilenceStrategy && props.streamBuffer.endRequested);
+	// In silence strategy, allow ending when stream is finalized even if gaps remain
+	const preventEndForIncompleteStream =
+		!isSilenceStrategy && hasUnfinishedStreamTail;
 	if (
 		ended &&
 		canEndStreamPlayback &&
 		!waitingForFinalCommit &&
-		!hasUnfinishedStreamTail
+		!preventEndForIncompleteStream
 	) {
 		props.state = State.Ended;
 		messages.push({ type: "ended" });

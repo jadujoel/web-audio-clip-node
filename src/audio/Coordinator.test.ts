@@ -2575,3 +2575,612 @@ describe("StreamingClipNode seeking", () => {
 		node.dispose();
 	});
 });
+
+describe("ClipNode dispose guards", () => {
+	test("dispose is idempotent — calling twice does not throw", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		node.dispose(); // should not throw
+		expect(node.state).toBe("disposed");
+	});
+
+	test("start throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => node.start()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("stop throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => node.stop()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("pause throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => node.pause()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("resume throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => node.resume()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("setting buffer throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		const ab = ctx.createBuffer(2, 48_000, 48_000);
+		expect(() => {
+			node.buffer = ab;
+		}).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("setting playhead throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => {
+			node.playhead = 100;
+		}).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("dispose clears buffer and stream state", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		const ab = ctx.createBuffer(2, 48_000, 48_000);
+		node.buffer = ab;
+		expect(node.buffer).toBeDefined();
+		node.dispose();
+		expect(node.buffer).toBeUndefined();
+	});
+
+	test("disposed event fires exactly once on first dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		let count = 0;
+		node.on("disposed", () => count++);
+		node.dispose();
+		node.dispose();
+		expect(count).toBe(1);
+	});
+});
+
+describe("StreamingClipNode dispose guards", () => {
+	test("dispose is idempotent for StreamingClipNode", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => new FakeWorker() as unknown as Worker,
+			},
+		);
+		node.dispose();
+		node.dispose(); // should not throw
+		expect(node.state).toBe("disposed");
+	});
+
+	test("start throws after StreamingClipNode dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => new FakeWorker() as unknown as Worker,
+			},
+		);
+		node.dispose();
+		expect(() => node.start()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("stop throws after StreamingClipNode dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => new FakeWorker() as unknown as Worker,
+			},
+		);
+		node.dispose();
+		expect(() => node.stop()).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("setting url throws after dispose", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => new FakeWorker() as unknown as Worker,
+			},
+		);
+		node.dispose();
+		expect(() => {
+			node.url = "https://example.com/test.mp3";
+		}).toThrow("Cannot use a disposed ClipNode");
+	});
+
+	test("dispose clears pending start and metadata", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => worker as unknown as Worker,
+			},
+		);
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+		worker.receive({
+			type: "metadata",
+			metadata: { title: "Test", sampleRate: 48_000 },
+		});
+		expect(node.metadata).not.toBeNull();
+
+		node.dispose();
+		expect(node.metadata).toBeNull();
+		expect(node.url).toBeUndefined();
+		expect(node.error).toBeNull();
+	});
+
+	test("dispose terminates worker", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => worker as unknown as Worker,
+			},
+		);
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+
+		expect(worker.terminated).toBe(false);
+		node.dispose();
+		expect(worker.terminated).toBe(true);
+	});
+
+	test("dispose clears all streaming callbacks", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48_000,
+				createWorker: () => new FakeWorker() as unknown as Worker,
+			},
+		);
+		node.onerror = () => {};
+		node.onprogress = () => {};
+		node.ondone = () => {};
+		node.onwaiting = () => {};
+		node.oncanplay = () => {};
+		node.oncanplaythrough = () => {};
+		node.onloadstart = () => {};
+		node.onreadystatechange = () => {};
+		node.onbufferchange = () => {};
+		node.onretry = () => {};
+		node.onmetadata = () => {};
+		node.onended = () => {};
+		node.onstarted = () => {};
+
+		node.dispose();
+
+		expect(node.onerror).toBeUndefined();
+		expect(node.onprogress).toBeUndefined();
+		expect(node.ondone).toBeUndefined();
+		expect(node.onwaiting).toBeUndefined();
+		expect(node.oncanplay).toBeUndefined();
+		expect(node.oncanplaythrough).toBeUndefined();
+		expect(node.onloadstart).toBeUndefined();
+		expect(node.onreadystatechange).toBeUndefined();
+		expect(node.onbufferchange).toBeUndefined();
+		expect(node.onretry).toBeUndefined();
+		expect(node.onmetadata).toBeUndefined();
+		expect(node.onended).toBeUndefined();
+		expect(node.onstarted).toBeUndefined();
+	});
+});
+
+describe("ClipNode.getDecodedBuffer", () => {
+	test("throws when called on a disposed node", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+		node.dispose();
+		expect(() => node.getDecodedBuffer()).toThrow(
+			"Cannot use a disposed ClipNode",
+		);
+	});
+
+	test("resolves with AudioBuffer when processor responds", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+
+		const promise = node.getDecodedBuffer();
+
+		// Simulate processor response
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferData",
+				data: [new Float32Array([1, 2, 3]), new Float32Array([4, 5, 6])],
+			},
+		} as MessageEvent);
+
+		const buffer = await promise;
+		expect(buffer.numberOfChannels).toBe(2);
+		expect(buffer.length).toBe(3);
+		expect(Array.from(buffer.getChannelData(0))).toEqual([1, 2, 3]);
+		expect(Array.from(buffer.getChannelData(1))).toEqual([4, 5, 6]);
+	});
+
+	test("rejects when processor returns empty buffer", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+
+		const promise = node.getDecodedBuffer();
+
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: { type: "bufferData", data: [] },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow("No decoded buffer available");
+	});
+
+	test("rejects when node is disposed while waiting", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+
+		const promise = node.getDecodedBuffer();
+		node.dispose();
+
+		await expect(promise).rejects.toThrow("Node was disposed");
+	});
+
+	test("returns same promise when called multiple times before response", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new ClipNode(ctx);
+
+		const p1 = node.getDecodedBuffer();
+		const p2 = node.getDecodedBuffer();
+		expect(p1).toBe(p2);
+
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({
+			data: {
+				type: "bufferData",
+				data: [new Float32Array([1])],
+			},
+		} as MessageEvent);
+
+		const buffer = await p1;
+		expect(buffer.numberOfChannels).toBe(1);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Streaming Gap Playback Strategy (Coordinator integration)
+// ---------------------------------------------------------------------------
+
+describe("StreamingClipNode gap playback strategy", () => {
+	const callHandleMessage = (
+		node: StreamingClipNode,
+		msg: { type: string; data: unknown },
+	) => {
+		(
+			node as never as { handleMessage: (msg: MessageEvent) => void }
+		).handleMessage({ data: msg } as MessageEvent);
+	};
+
+	test("targetNumSamples can be set before url", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				targetNumSamples: 96000,
+			},
+		);
+
+		expect(node.targetNumSamples).toBe(96000);
+		expect(node.gapPlaybackStrategy).toBe("silence");
+	});
+
+	test("targetDuration can be set before url", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				targetDuration: 2.0,
+			},
+		);
+
+		expect(node.targetDuration).toBe(2.0);
+		// With a known target, default strategy is silence
+		expect(node.gapPlaybackStrategy).toBe("silence");
+	});
+
+	test("default strategy is 'hold' when no target is set", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+			},
+		);
+
+		expect(node.gapPlaybackStrategy).toBe("hold");
+	});
+
+	test("gapPlaybackStrategy can be set explicitly", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				gapPlaybackStrategy: "silence",
+			},
+		);
+
+		expect(node.gapPlaybackStrategy).toBe("silence");
+	});
+
+	test("gapRecoveryFadeSamples can be configured", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				gapRecoveryFadeSamples: 256,
+			},
+		);
+
+		expect(node.gapRecoveryFadeSamples).toBe(256);
+	});
+
+	test("runtime targetNumSamples setter updates strategy accordingly", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+			},
+		);
+
+		// Initially hold (no target)
+		expect(node.gapPlaybackStrategy).toBe("hold");
+
+		// Set target → default strategy changes to silence
+		node.targetNumSamples = 96000;
+		expect(node.gapPlaybackStrategy).toBe("silence");
+
+		// Clear target → back to hold
+		node.targetNumSamples = undefined;
+		expect(node.gapPlaybackStrategy).toBe("hold");
+	});
+
+	test("silence strategy: no waiting event on gap traversal", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				preBufferSamples: 100,
+				gapPlaybackStrategy: "silence",
+				targetNumSamples: 96000,
+			},
+		);
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+
+		// Get to canplay state
+		worker.receive({ type: "decoded", samplesDecoded: 200 });
+		expect(node.readyState).toBe("canplay");
+
+		let waitingFired = false;
+		node.onwaiting = () => {
+			waitingFired = true;
+		};
+
+		// In silence strategy, processor does NOT send bufferUnderrun,
+		// so waiting should never fire — simulate regular buffer progress
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 200,
+				totalLength: null,
+				streamEnded: false,
+				writtenSpans: [{ startSample: 0, endSample: 200 }],
+			},
+		});
+
+		expect(waitingFired).toBe(false);
+		// In silence strategy with known target, readyState advances to canplaythrough
+		expect(node.readyState).toBe("canplaythrough");
+	});
+
+	test("silence strategy: canplaythrough is immediate with known target", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				preBufferSamples: 100,
+				gapPlaybackStrategy: "silence",
+				targetNumSamples: 96000,
+			},
+		);
+
+		const states: StreamReadyState[] = [];
+		node.onreadystatechange = (s) => states.push(s);
+
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+
+		// Reach canplay
+		worker.receive({ type: "decoded", samplesDecoded: 200 });
+		expect(node.readyState).toBe("canplay");
+
+		// Buffer state update should trigger immediate canplaythrough
+		// because silence strategy guarantees uninterrupted playback
+		callHandleMessage(node, {
+			type: "bufferState",
+			data: {
+				committedLength: 200,
+				totalLength: null,
+				streamEnded: false,
+				writtenSpans: [{ startSample: 0, endSample: 200 }],
+			},
+		});
+
+		expect(node.readyState).toBe("canplaythrough");
+		expect(states).toContain("canplaythrough");
+	});
+
+	test("hold strategy: waiting event fires on buffer underrun", async () => {
+		const worker = new FakeWorker();
+		const ctx = createContext();
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const node = new StreamingClipNode(
+			ctx,
+			{},
+			{
+				defaultFormat: "mp3" as StreamFormat,
+				targetSampleRate: 48000,
+				createWorker: () => worker as unknown as Worker,
+				preBufferSamples: 100,
+			},
+		);
+		node.url = "https://example.com/test.mp3";
+		await Promise.resolve();
+
+		worker.receive({ type: "decoded", samplesDecoded: 200 });
+		expect(node.readyState).toBe("canplay");
+
+		let waitingFired = false;
+		node.onwaiting = () => {
+			waitingFired = true;
+		};
+
+		// In hold strategy, processor sends bufferUnderrun → triggers waiting
+		callHandleMessage(node, {
+			type: "bufferUnderrun",
+			data: { playhead: 100, committedLength: 200, requestedSample: 201 },
+		});
+
+		expect(waitingFired).toBe(true);
+		expect(node.readyState).toBe("loading");
+	});
+
+	test("coordinator passes gap options through to StreamingClipNode", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			gapPlaybackStrategy: "silence",
+			targetNumSamples: 48000,
+			targetDuration: 1.0,
+			gapRecoveryFadeSamples: 64,
+		});
+
+		expect(node.gapPlaybackStrategy).toBe("silence");
+		expect(node.targetNumSamples).toBe(48000);
+		expect(node.targetDuration).toBe(1.0);
+		expect(node.gapRecoveryFadeSamples).toBe(64);
+	});
+});

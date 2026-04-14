@@ -10,6 +10,7 @@ import type {
 	BufferedRange,
 	ClipNodeEventMap,
 	ClipWorkletOptions,
+	GapPlaybackStrategy,
 	StreamBufferSpan,
 	StreamError,
 	StreamErrorCode,
@@ -88,6 +89,18 @@ export interface StreamingClipNodeOptions {
 				maxRetryDelayMs?: number;
 		  }
 		| false;
+	/**
+	 * Policy for handling gaps in decoded audio during streaming.
+	 * - "hold": Clamp playhead at committed edge.
+	 * - "silence": Advance playhead through gaps, outputting silence.
+	 */
+	gapPlaybackStrategy?: GapPlaybackStrategy;
+	/** Upfront target length in samples. */
+	targetNumSamples?: number;
+	/** Upfront target length in seconds. */
+	targetDuration?: number;
+	/** Number of samples to fade-in when transitioning from silence gap to real audio. */
+	gapRecoveryFadeSamples?: number;
 }
 
 export class StreamingClipNode extends ClipNode {
@@ -128,6 +141,93 @@ export class StreamingClipNode extends ClipNode {
 	) {
 		super(context, options);
 		this._streamOptions = streamOptions;
+		// Push initial gap strategy and target length to processor if configured
+		const strategy = this._resolveGapStrategy();
+		this.port.postMessage({ type: "streamGapStrategy", data: strategy });
+		const targetSamples = this._resolveTargetSamples();
+		if (targetSamples !== null) {
+			this.port.postMessage({
+				type: "streamTargetLength",
+				data: targetSamples,
+			});
+		}
+		if (streamOptions.gapRecoveryFadeSamples !== undefined) {
+			this.port.postMessage({
+				type: "streamGapRecoveryFadeSamples",
+				data: streamOptions.gapRecoveryFadeSamples,
+			});
+		}
+	}
+
+	private _resolveGapStrategy(): GapPlaybackStrategy {
+		if (this._streamOptions.gapPlaybackStrategy) {
+			return this._streamOptions.gapPlaybackStrategy;
+		}
+		// Default: "silence" when target length is known, otherwise "hold"
+		return this._resolveTargetSamples() !== null ? "silence" : "hold";
+	}
+
+	private _resolveTargetSamples(): number | null {
+		if (this._streamOptions.targetNumSamples !== undefined) {
+			return this._streamOptions.targetNumSamples;
+		}
+		if (this._streamOptions.targetDuration !== undefined) {
+			return Math.round(
+				this._streamOptions.targetDuration * this.context.sampleRate,
+			);
+		}
+		return null;
+	}
+
+	get gapPlaybackStrategy(): GapPlaybackStrategy {
+		return this._resolveGapStrategy();
+	}
+
+	set gapPlaybackStrategy(value: GapPlaybackStrategy) {
+		this.throwIfDisposed();
+		this._streamOptions.gapPlaybackStrategy = value;
+		this.port.postMessage({ type: "streamGapStrategy", data: value });
+	}
+
+	get targetNumSamples(): number | undefined {
+		return this._streamOptions.targetNumSamples;
+	}
+
+	set targetNumSamples(value: number | undefined) {
+		this.throwIfDisposed();
+		this._streamOptions.targetNumSamples = value;
+		const resolved = this._resolveTargetSamples();
+		this.port.postMessage({
+			type: "streamTargetLength",
+			data: resolved,
+		});
+	}
+
+	get targetDuration(): number | undefined {
+		return this._streamOptions.targetDuration;
+	}
+
+	set targetDuration(value: number | undefined) {
+		this.throwIfDisposed();
+		this._streamOptions.targetDuration = value;
+		const resolved = this._resolveTargetSamples();
+		this.port.postMessage({
+			type: "streamTargetLength",
+			data: resolved,
+		});
+	}
+
+	get gapRecoveryFadeSamples(): number {
+		return this._streamOptions.gapRecoveryFadeSamples ?? 128;
+	}
+
+	set gapRecoveryFadeSamples(value: number) {
+		this.throwIfDisposed();
+		this._streamOptions.gapRecoveryFadeSamples = value;
+		this.port.postMessage({
+			type: "streamGapRecoveryFadeSamples",
+			data: value,
+		});
 	}
 
 	get preload(): StreamPreload {
@@ -201,32 +301,42 @@ export class StreamingClipNode extends ClipNode {
 			this.emit("canplay");
 		}
 
-		// Estimate canplaythrough: if remaining download time < remaining playback time
-		if (
-			this._readyState === "canplay" &&
-			this._streamTotalLength !== null &&
-			this._totalBytesReceived > 0
-		) {
-			const elapsed = (performance.now() - this._streamStartTime) / 1000;
-			if (elapsed > 0) {
-				const bytesPerSecond = this._totalBytesReceived / elapsed;
-				const sr = this.context.sampleRate;
-				// Estimate total byte size relative to samples (bytes per sample ratio)
-				const remainingSamples =
-					this._streamTotalLength - this._committedLength;
-				const committedBytes =
-					this._committedLength > 0
-						? this._totalBytesReceived *
-							(this._streamTotalLength / this._committedLength)
-						: 0;
-				const remainingBytes = committedBytes - this._totalBytesReceived;
-				const remainingDownloadSeconds =
-					remainingBytes > 0 ? remainingBytes / bytesPerSecond : 0;
-				const remainingPlaybackSeconds = remainingSamples / sr;
-				if (remainingDownloadSeconds < remainingPlaybackSeconds) {
-					this._setReadyState("canplaythrough");
-					this.oncanplaythrough?.();
-					this.emit("canplaythrough");
+		// Estimate canplaythrough
+		if (this._readyState === "canplay") {
+			// In silence strategy, playback never stalls (gaps become silence),
+			// so canplaythrough is immediate once target length is known.
+			if (
+				this._resolveGapStrategy() === "silence" &&
+				this._resolveTargetSamples() !== null
+			) {
+				this._setReadyState("canplaythrough");
+				this.oncanplaythrough?.();
+				this.emit("canplaythrough");
+			} else if (
+				this._streamTotalLength !== null &&
+				this._totalBytesReceived > 0
+			) {
+				// Hold strategy: estimate from remaining download time < remaining playback time
+				const elapsed = (performance.now() - this._streamStartTime) / 1000;
+				if (elapsed > 0) {
+					const bytesPerSecond = this._totalBytesReceived / elapsed;
+					const sr = this.context.sampleRate;
+					const remainingSamples =
+						this._streamTotalLength - this._committedLength;
+					const committedBytes =
+						this._committedLength > 0
+							? this._totalBytesReceived *
+								(this._streamTotalLength / this._committedLength)
+							: 0;
+					const remainingBytes = committedBytes - this._totalBytesReceived;
+					const remainingDownloadSeconds =
+						remainingBytes > 0 ? remainingBytes / bytesPerSecond : 0;
+					const remainingPlaybackSeconds = remainingSamples / sr;
+					if (remainingDownloadSeconds < remainingPlaybackSeconds) {
+						this._setReadyState("canplaythrough");
+						this.oncanplaythrough?.();
+						this.emit("canplaythrough");
+					}
 				}
 			}
 		}
@@ -315,6 +425,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set url(value: string) {
+		this.throwIfDisposed();
 		this._url = value;
 		const preload = this._streamOptions.preload ?? "auto";
 		if (preload === "none") {
@@ -536,6 +647,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	start(when?: number, offset?: number, duration?: number): void {
+		this.throwIfDisposed();
 		// If preload deferred fetching, start the stream now
 		if (
 			this._url &&
@@ -555,12 +667,21 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	stop(when?: number): void {
+		this.throwIfDisposed();
 		this._terminateWorker();
 		super.stop(when);
 	}
 
 	dispose(): void {
+		if (this.state === "disposed") return;
 		this._terminateWorker();
+		this._pendingStart = null;
+		this._readyToPlay = false;
+		this._streamDone = true;
+		this._metadata = null;
+		this._detectedFormat = null;
+		this._lastError = null;
+		this._url = undefined;
 		this.onwaiting = undefined;
 		this.oncanplay = undefined;
 		this.oncanplaythrough = undefined;

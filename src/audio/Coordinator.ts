@@ -2,7 +2,11 @@ import type { StreamFormat } from "../streaming";
 import { createCdnWorkerFactory } from "../streaming";
 import { ClipNode } from "./ClipNode";
 import { StreamingClipNode } from "./StreamingClipNode";
-import type { ClipWorkletOptions, StreamPreload } from "./types";
+import type {
+	ClipWorkletOptions,
+	GapPlaybackStrategy,
+	StreamPreload,
+} from "./types";
 import { getProcessorBlobUrl } from "./workletUrl";
 
 export type {
@@ -43,6 +47,19 @@ export interface CoordinatorStreamingOptions {
 				maxRetryDelayMs?: number;
 		  }
 		| false;
+	/**
+	 * Policy for handling gaps in decoded audio during streaming.
+	 * - "hold": Clamp playhead at committed edge (default when target length unknown).
+	 * - "silence": Advance playhead through gaps, outputting silence.
+	 */
+	gapPlaybackStrategy?: GapPlaybackStrategy;
+	/** Upfront target length in samples. Takes priority over targetDuration and decoder metadata. */
+	targetNumSamples?: number;
+	/** Upfront target length in seconds. Converted to samples at context sample rate. */
+	targetDuration?: number;
+	/** Number of samples to fade-in when transitioning from silence gap to real audio.
+	 * Defaults to 128. */
+	gapRecoveryFadeSamples?: number;
 }
 
 export class Coordinator {
@@ -122,6 +139,10 @@ export class Coordinator {
 			pauseFetchAheadSamples: streamingOptions?.pauseFetchAheadSamples,
 			resumeFetchAheadSamples: streamingOptions?.resumeFetchAheadSamples,
 			retry: streamingOptions?.retry,
+			gapPlaybackStrategy: streamingOptions?.gapPlaybackStrategy,
+			targetNumSamples: streamingOptions?.targetNumSamples,
+			targetDuration: streamingOptions?.targetDuration,
+			gapRecoveryFadeSamples: streamingOptions?.gapRecoveryFadeSamples,
 		});
 		this.nodes.add(node);
 		return node;

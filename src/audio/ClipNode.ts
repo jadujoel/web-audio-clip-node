@@ -51,6 +51,7 @@ export class ClipNode extends AudioWorkletNode {
 	protected _committedLength = 0;
 	protected _streamTotalLength: number | null = null;
 	protected _streamEnded = false;
+	private _pendingGetBuffer: PromiseWithResolvers<AudioBuffer> | null = null;
 
 	timesLooped = 0;
 	state: ClipNodeState = "initial";
@@ -215,6 +216,31 @@ export class ClipNode extends AudioWorkletNode {
 			case "bufferLowWater":
 				this.onBufferLowWater();
 				break;
+			case "bufferData": {
+				const channelData = data as Float32Array[];
+				if (this._pendingGetBuffer) {
+					const pending = this._pendingGetBuffer;
+					this._pendingGetBuffer = null;
+					if (
+						!channelData ||
+						channelData.length === 0 ||
+						channelData[0].length === 0
+					) {
+						pending.reject(new Error("No decoded buffer available"));
+					} else {
+						const ab = this.context.createBuffer(
+							channelData.length,
+							channelData[0].length,
+							this.context.sampleRate,
+						);
+						for (let ch = 0; ch < channelData.length; ch++) {
+							ab.getChannelData(ch).set(channelData[ch]);
+						}
+						pending.resolve(ab);
+					}
+				}
+				break;
+			}
 			case "disposed":
 				this.setState("disposed");
 				break;
@@ -299,6 +325,7 @@ export class ClipNode extends AudioWorkletNode {
 		return this._buffer;
 	}
 	set buffer(ab: AudioBuffer) {
+		this.throwIfDisposed();
 		this._buffer = ab;
 		this._bufferWriteCursor = ab.length;
 		if (this._loopStart >= ab.duration) {
@@ -389,6 +416,7 @@ export class ClipNode extends AudioWorkletNode {
 	}
 
 	start(when?: number, offset?: number, duration?: number) {
+		this.throwIfDisposed();
 		if (!this._buffer && !this._hasStreamingPort) {
 			console.error("Buffer not set.");
 			return;
@@ -397,6 +425,7 @@ export class ClipNode extends AudioWorkletNode {
 	}
 
 	stop(when: number = this.context.currentTime, initialDelay = 0) {
+		this.throwIfDisposed();
 		this.port.postMessage({
 			type: "stop",
 			data: when + initialDelay + this._fadeOut + 0.2,
@@ -404,10 +433,12 @@ export class ClipNode extends AudioWorkletNode {
 	}
 
 	pause(when: number = this.context.currentTime) {
+		this.throwIfDisposed();
 		this.port.postMessage({ type: "pause", data: when });
 	}
 
 	resume(when: number = this.context.currentTime) {
+		this.throwIfDisposed();
 		this.port.postMessage({ type: "resume", data: when });
 	}
 
@@ -479,6 +510,7 @@ export class ClipNode extends AudioWorkletNode {
 		return this._playhead;
 	}
 	set playhead(value: number) {
+		this.throwIfDisposed();
 		this._seeking = true;
 		this.onseeking?.();
 		this.emit("seeking");
@@ -569,12 +601,42 @@ export class ClipNode extends AudioWorkletNode {
 		});
 	}
 
+	protected throwIfDisposed(): void {
+		if (this.state === "disposed") {
+			throw new Error("Cannot use a disposed ClipNode");
+		}
+	}
+
+	/**
+	 * Request a copy of the decoded audio buffer from the processor.
+	 * The buffer is only copied when this method is called, not cached.
+	 * Returns a Promise that resolves with an AudioBuffer containing the decoded data.
+	 */
+	getDecodedBuffer(): Promise<AudioBuffer> {
+		this.throwIfDisposed();
+		if (this._pendingGetBuffer) {
+			return this._pendingGetBuffer.promise;
+		}
+		this._pendingGetBuffer = Promise.withResolvers<AudioBuffer>();
+		this.port.postMessage({ type: "getBuffer" });
+		return this._pendingGetBuffer.promise;
+	}
+
 	dispose() {
+		if (this.state === "disposed") return;
+		if (this._pendingGetBuffer) {
+			this._pendingGetBuffer.reject(new Error("Node was disposed"));
+			this._pendingGetBuffer = null;
+		}
 		this.port.postMessage({ type: "dispose" });
 		this.port.close();
 		this.ondisposed?.();
 		this.emit("disposed");
 		this._buffer = undefined;
+		this._writtenSpans = [];
+		this._committedLength = 0;
+		this._streamTotalLength = null;
+		this._streamEnded = false;
 		this.onended = undefined;
 		this._onframe = undefined;
 		this.onlooped = undefined;

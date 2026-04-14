@@ -109,6 +109,13 @@ export type StreamReadyState =
 
 export type StreamPreload = "none" | "metadata" | "auto";
 
+/**
+ * Policy for how the processor handles gaps in decoded audio during streaming.
+ * - "hold": Clamp playhead at committed edge (current behavior). Timeline stalls.
+ * - "silence": Advance playhead through gaps, outputting silence for unavailable samples.
+ */
+export type GapPlaybackStrategy = "hold" | "silence";
+
 // ---------------------------------------------------------------------------
 // Event maps for on()/off() support
 // ---------------------------------------------------------------------------
@@ -217,7 +224,10 @@ export type ClipProcessorMessageRx =
 	| ClipProcessorToggleMessageRx
 	| ClipProcessorLogStateMessageRx
 	| ClipProcessorEnableFrameReportingMessageRx
-	| ClipProcessorMuteMessageRx;
+	| ClipProcessorMuteMessageRx
+	| ClipProcessorGapStrategyMessageRx
+	| ClipProcessorTargetLengthMessageRx
+	| ClipProcessorGapRecoveryFadeMessageRx;
 
 export type ClipProcessorMessageType =
 	| "buffer"
@@ -306,6 +316,10 @@ export interface StreamBufferState {
 	underrunRecoverySamples: number;
 	/** Current sample position within the recovery fade-in (0 = start). */
 	underrunRecoveryPosition: number;
+	/** Policy for handling gaps in decoded audio. */
+	gapPlaybackStrategy: GapPlaybackStrategy;
+	/** User-declared target total length in samples (overrides decoder metadata). */
+	targetTotalSamples: number | null;
 }
 
 export interface ClipProcessorBufferInitMessageRx {
@@ -406,6 +420,21 @@ export interface ClipProcessorLoopCrossfadeMessageRx {
 
 export interface ClipProcessorLoopCrossfadeOffsetMessageRx {
 	readonly type: "loopCrossfadeOffset";
+	readonly data: number;
+}
+
+export interface ClipProcessorGapStrategyMessageRx {
+	readonly type: "streamGapStrategy";
+	readonly data: GapPlaybackStrategy;
+}
+
+export interface ClipProcessorTargetLengthMessageRx {
+	readonly type: "streamTargetLength";
+	readonly data: number | null;
+}
+
+export interface ClipProcessorGapRecoveryFadeMessageRx {
+	readonly type: "streamGapRecoveryFadeSamples";
 	readonly data: number;
 }
 

@@ -6630,3 +6630,489 @@ describe("Loop crossfade: comprehensive", () => {
 		}
 	});
 });
+
+describe("getBuffer message", () => {
+	const SR = 48000;
+	const CT = 0;
+
+	it("returns buffer data for a loaded buffer", () => {
+		const buf = [
+			new Float32Array([1, 2, 3, 4]),
+			new Float32Array([5, 6, 7, 8]),
+		];
+		const props = getProperties({}, SR);
+		handleProcessorMessage(props, { type: "buffer", data: buf }, CT, SR);
+		const msgs = handleProcessorMessage(props, { type: "getBuffer" }, CT, SR);
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0].type).toBe("bufferData");
+		const channelData = msgs[0].data as Float32Array[];
+		expect(channelData).toHaveLength(2);
+		expect(Array.from(channelData[0])).toEqual([1, 2, 3, 4]);
+		expect(Array.from(channelData[1])).toEqual([5, 6, 7, 8]);
+	});
+
+	it("returns only committed range for streaming buffer", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 1, totalLength: 100, streaming: true },
+			},
+			CT,
+			SR,
+		);
+		const chunk = new Float32Array([10, 20, 30]);
+		applyBufferRangeWrite(props, {
+			startSample: 0,
+			channelData: [chunk],
+		});
+		const msgs = handleProcessorMessage(props, { type: "getBuffer" }, CT, SR);
+		const channelData = msgs[0].data as Float32Array[];
+		expect(channelData).toHaveLength(1);
+		expect(channelData[0].length).toBe(3);
+		expect(Array.from(channelData[0])).toEqual([10, 20, 30]);
+	});
+
+	it("returns empty array when no buffer is set", () => {
+		const props = getProperties({}, SR);
+		const msgs = handleProcessorMessage(props, { type: "getBuffer" }, CT, SR);
+		const channelData = msgs[0].data as Float32Array[];
+		expect(channelData).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Streaming Gap Playback Strategy
+// ---------------------------------------------------------------------------
+
+describe("Streaming Gap Playback Strategy", () => {
+	const SR = 48000;
+
+	function makeStreamingProps(
+		overrides: Partial<ClipProcessorOptions> = {},
+	): Required<ClipProcessorOptions> {
+		return getProperties(
+			{
+				state: State.Started,
+				startWhen: 0,
+				stopWhen: Number.MAX_SAFE_INTEGER,
+				duration: Number.MAX_SAFE_INTEGER,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+				...overrides,
+			},
+			SR,
+		);
+	}
+
+	function initStreaming(
+		props: Required<ClipProcessorOptions>,
+		totalLength: number,
+		channels = 2,
+	): void {
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels, totalLength, streaming: true },
+			},
+			0,
+			SR,
+		);
+	}
+
+	function writeChunk(
+		props: Required<ClipProcessorOptions>,
+		startSample: number,
+		length: number,
+		channels = 2,
+		value = 0.5,
+	): void {
+		const channelData = Array.from({ length: channels }, () =>
+			new Float32Array(length).fill(value),
+		);
+		applyBufferRangeWrite(props, { startSample, channelData });
+	}
+
+	function runBlock(
+		props: Required<ClipProcessorOptions>,
+		blockIndex = 0,
+	): {
+		output: Float32Array[];
+		messages: OutboundMessage[];
+		keepAlive: boolean;
+	} {
+		const output = makeOutput(2);
+		const outputs = [output];
+		const result = processBlock(
+			props,
+			outputs,
+			{
+				playbackRate: new Float32Array([1]),
+				detune: new Float32Array([0]),
+				lowpass: new Float32Array([20000]),
+				highpass: new Float32Array([20]),
+				gain: new Float32Array([1]),
+				pan: new Float32Array([0]),
+			},
+			{
+				currentTime: 0.001 + blockIndex * (128 / SR),
+				currentFrame: blockIndex * 128,
+				sampleRate: SR,
+			},
+			{ lowpass: createFilterState(), highpass: createFilterState() },
+		);
+		return { output, messages: result.messages, keepAlive: result.keepAlive };
+	}
+
+	function runBlocks(
+		props: Required<ClipProcessorOptions>,
+		numBlocks: number,
+	): {
+		allOutputs: Float32Array[][];
+		messages: OutboundMessage[];
+		playheadHistory: number[];
+	} {
+		const allOutputs: Float32Array[][] = [];
+		const messages: OutboundMessage[] = [];
+		const playheadHistory: number[] = [props.playhead];
+		for (let b = 0; b < numBlocks; b++) {
+			const { output, messages: msgs, keepAlive } = runBlock(props, b);
+			allOutputs.push(output);
+			messages.push(...msgs);
+			playheadHistory.push(props.playhead);
+			if (!keepAlive) break;
+		}
+		return { allOutputs, messages, playheadHistory };
+	}
+
+	describe("silence strategy: playhead advancement", () => {
+		it("advances playhead through uncommitted gap", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 512);
+			// Write only first 128 samples
+			writeChunk(props, 0, 128);
+			// Set silence strategy with target length
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 512 },
+				0,
+				SR,
+			);
+
+			// Block 0: render committed data (samples 0-127)
+			runBlock(props, 0);
+			expect(props.playhead).toBe(128);
+
+			// Block 1: samples 128-255 are in gap — playhead should still advance
+			runBlock(props, 1);
+			expect(props.playhead).toBe(256);
+
+			// Block 2: samples 256-383 are also in gap
+			runBlock(props, 2);
+			expect(props.playhead).toBe(384);
+		});
+
+		it("hold strategy clamps at committed edge (existing behavior)", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 512);
+			writeChunk(props, 0, 128);
+			// Default strategy is "hold" (no target set)
+
+			// Block 0: render committed data
+			runBlock(props, 0);
+			expect(props.playhead).toBe(128);
+
+			// Block 1: hold strategy — playhead should NOT advance past committed
+			runBlock(props, 1);
+			// Playhead stays at 128 or holds — doesn't advance to 256
+			expect(props.playhead).toBeLessThanOrEqual(128);
+		});
+	});
+
+	describe("silence strategy: zero output for gaps", () => {
+		it("outputs zeros for uncommitted gap regions", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 512);
+			writeChunk(props, 0, 128, 2, 0.75);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 512 },
+				0,
+				SR,
+			);
+
+			// Block 0: committed data renders normally
+			const b0 = runBlock(props, 0);
+			expect(b0.output[0][0]).toBeCloseTo(0.75);
+			expect(b0.output[1][0]).toBeCloseTo(0.75);
+
+			// Block 1: gap → zeros
+			const b1 = runBlock(props, 1);
+			for (let i = 0; i < 128; i++) {
+				expect(b1.output[0][i]).toBe(0);
+				expect(b1.output[1][i]).toBe(0);
+			}
+		});
+
+		it("renders audio after gap when data arrives later", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 384);
+			// Write samples 0-127
+			writeChunk(props, 0, 128, 2, 0.5);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 384 },
+				0,
+				SR,
+			);
+			// Disable recovery fade so we can cleanly check rendered values
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapRecoveryFadeSamples", data: 0 },
+				0,
+				SR,
+			);
+
+			// Block 0: plays committed (0-127)
+			runBlock(props, 0);
+			// Block 1: gap (128-255), zeros
+			const b1 = runBlock(props, 1);
+			for (let i = 0; i < 128; i++) {
+				expect(b1.output[0][i]).toBe(0);
+			}
+
+			// Now data arrives for 128-255
+			writeChunk(props, 128, 128, 2, 0.6);
+			// Reset playhead to newly-committed region
+			props.playhead = 128;
+			const b2 = runBlock(props, 2);
+			expect(b2.output[0][0]).toBeCloseTo(0.6);
+		});
+	});
+
+	describe("silence strategy: underrun messages", () => {
+		it("does not emit bufferUnderrun in silence strategy", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 512);
+			writeChunk(props, 0, 128);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 512 },
+				0,
+				SR,
+			);
+
+			// Render into gap
+			runBlock(props, 0); // committed
+			const result = runBlock(props, 1); // gap
+			const underrunMsgs = result.messages.filter(
+				(m) => m.type === "bufferUnderrun",
+			);
+			expect(underrunMsgs).toHaveLength(0);
+		});
+
+		it("tracks underrun state in hold strategy when stalled at committed edge", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 512);
+			writeChunk(props, 0, 128);
+			// Hold is default when no target set
+
+			// Block 0: render committed data
+			runBlock(props, 0);
+			expect(props.playhead).toBe(128);
+
+			// Block 1: hold strategy stalls at committed edge → underrunActive
+			runBlock(props, 1);
+			expect(props.streamBuffer.underrunActive).toBe(true);
+		});
+	});
+
+	describe("silence strategy: recovery fade", () => {
+		it("applies recovery fade at gap-to-audio boundary", () => {
+			const fadeSamples = 64;
+			const props = makeStreamingProps();
+			initStreaming(props, 384);
+			// Write first 128 samples
+			writeChunk(props, 0, 128, 2, 0.8);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 384 },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapRecoveryFadeSamples", data: fadeSamples },
+				0,
+				SR,
+			);
+
+			// Block 0: render committed (0-127)
+			runBlock(props, 0);
+			// Block 1: gap (128-255) → enters underrun/gap state
+			runBlock(props, 1);
+
+			// Now commit data for 128-383
+			writeChunk(props, 128, 256, 2, 1.0);
+			// End the stream
+			handleProcessorMessage(
+				props,
+				{ type: "bufferEnd", data: { totalSamples: 384 } },
+				0,
+				SR,
+			);
+
+			// Block 2: recovering from gap → fade should be applied
+			const b2 = runBlock(props, 2);
+			// First sample of recovery should be attenuated (fade from 0)
+			expect(b2.output[0][0]).toBeLessThan(1.0);
+			// Later in the block, after fade completes (sample 63+), should be close to 1.0
+			expect(b2.output[0][fadeSamples]).toBeCloseTo(1.0);
+		});
+	});
+
+	describe("silence strategy: ended behavior", () => {
+		it("ends when stream finalized and playhead reaches target length", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 256);
+			writeChunk(props, 0, 128, 2, 0.5);
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 256 },
+				0,
+				SR,
+			);
+			// End the stream (committed only 128 of 256 — gap exists)
+			handleProcessorMessage(
+				props,
+				{ type: "bufferEnd", data: { totalSamples: 256 } },
+				0,
+				SR,
+			);
+
+			const { messages } = runBlocks(props, 4);
+			const endedMsgs = messages.filter((m) => m.type === "ended");
+			expect(endedMsgs).toHaveLength(1);
+		});
+
+		it("does not end in hold strategy until fully committed", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 256);
+			writeChunk(props, 0, 128, 2, 0.5);
+			// Mark end requested but only 128 committed
+			handleProcessorMessage(
+				props,
+				{ type: "bufferEnd", data: { totalSamples: 256 } },
+				0,
+				SR,
+			);
+
+			// Hold strategy — should not end (only 128 of 256 committed)
+			const { messages } = runBlocks(props, 10);
+			const endedMsgs = messages.filter((m) => m.type === "ended");
+			expect(endedMsgs).toHaveLength(0);
+			expect(props.state).toBe(State.Started);
+		});
+	});
+
+	describe("message handling", () => {
+		it("streamGapStrategy message sets gapPlaybackStrategy", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 256);
+			expect(props.streamBuffer.gapPlaybackStrategy).toBe("hold");
+
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "silence" },
+				0,
+				SR,
+			);
+			expect(props.streamBuffer.gapPlaybackStrategy).toBe("silence");
+
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapStrategy", data: "hold" },
+				0,
+				SR,
+			);
+			expect(props.streamBuffer.gapPlaybackStrategy).toBe("hold");
+		});
+
+		it("streamTargetLength message sets targetTotalSamples", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 256);
+			expect(props.streamBuffer.targetTotalSamples).toBeNull();
+
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: 48000 },
+				0,
+				SR,
+			);
+			expect(props.streamBuffer.targetTotalSamples).toBe(48000);
+
+			// Can be cleared
+			handleProcessorMessage(
+				props,
+				{ type: "streamTargetLength", data: null },
+				0,
+				SR,
+			);
+			expect(props.streamBuffer.targetTotalSamples).toBeNull();
+		});
+
+		it("streamGapRecoveryFadeSamples message sets underrunRecoverySamples", () => {
+			const props = makeStreamingProps();
+			initStreaming(props, 256);
+
+			handleProcessorMessage(
+				props,
+				{ type: "streamGapRecoveryFadeSamples", data: 256 },
+				0,
+				SR,
+			);
+			expect(props.streamBuffer.underrunRecoverySamples).toBe(256);
+		});
+	});
+});
