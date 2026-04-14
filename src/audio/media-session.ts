@@ -1,5 +1,5 @@
 import type { ClipNode } from "./ClipNode";
-import type { StreamingClipNode } from "./Coordinator";
+import type { StreamingClipNode } from "./StreamingClipNode";
 import type { AudioMetadata } from "./types";
 
 export interface MediaSessionOptions {

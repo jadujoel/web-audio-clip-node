@@ -2,7 +2,8 @@ import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { createContext } from "../../TestPreload";
 import type { StreamFormat } from "../streaming";
 import { ClipNode } from "./ClipNode";
-import { Coordinator, StreamingClipNode } from "./Coordinator";
+import { Coordinator } from "./Coordinator";
+import { StreamingClipNode } from "./StreamingClipNode";
 import type { StreamError, StreamReadyState } from "./types";
 
 interface FakeWorkerMessage {

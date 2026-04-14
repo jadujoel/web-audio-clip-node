@@ -1,6 +1,6 @@
 // Core audio
 export { ClipNode } from "./audio/ClipNode";
-export { Coordinator, StreamingClipNode } from "./audio/Coordinator";
+export { Coordinator } from "./audio/Coordinator";
 export type { MediaSessionOptions } from "./audio/media-session";
 export { bindMediaSession } from "./audio/media-session";
 export { processorCode } from "./audio/processor-code";
@@ -12,6 +12,7 @@ export {
 	processBlock,
 	SAMPLE_BLOCK_SIZE,
 } from "./audio/processor-kernel";
+export { StreamingClipNode } from "./audio/StreamingClipNode";
 // Types
 export type {
 	AudioMetadata,
