@@ -327,6 +327,38 @@ describe("ControlSection", () => {
 		expect(labels[1].textContent).toBe("Pan");
 	});
 
+	test("applies disabledKeys to matching controls", () => {
+		const { container } = render(
+			<ControlSection
+				legend="Params"
+				defs={testDefs}
+				disabledKeys={new Set<ControlKey>(["gain"])}
+				values={makeValues()}
+				snaps={makeSnaps()}
+				enabled={makeEnabled()}
+				mins={makeMins()}
+				maxs={makeMaxs()}
+				maxLocked={makeMaxLocked()}
+				tempo={120}
+				onValueChange={() => {}}
+				onToggle={() => {}}
+				onSnapChange={() => {}}
+				onMinChange={() => {}}
+				onMaxChange={() => {}}
+				onMaxLockedChange={() => {}}
+			/>,
+		);
+
+		const controls = container.querySelectorAll(".audio-control");
+		expect(controls.length).toBe(2);
+		expect(controls[0]?.classList.contains("audio-control--disabled")).toBe(
+			true,
+		);
+		expect(controls[1]?.classList.contains("audio-control--disabled")).toBe(
+			false,
+		);
+	});
+
 	test("onValueChange is called with correct key", () => {
 		const onValueChange = mock(() => {});
 		const { container } = render(

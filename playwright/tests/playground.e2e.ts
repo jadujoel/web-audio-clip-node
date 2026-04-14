@@ -182,4 +182,57 @@ test.describe("Playground example", () => {
 		await loopMode.selectOption("boomerang");
 		await expect(loopMode).toHaveValue("boomerang");
 	});
+
+	test("crossfade controls are disabled in boomerang mode", async ({
+		page,
+	}) => {
+		await page.locator("#loop").check();
+		const loopMode = page.locator("#loopMode");
+
+		const crossfadeControl = page.locator(".audio-control").filter({
+			has: page.locator(".control-label", { hasText: /^Crossfade$/ }),
+		});
+		const crossfadeSlider = crossfadeControl.locator("[role='slider']");
+		const crossfadeToggle = crossfadeControl.locator(".control-toggle");
+
+		await expect(crossfadeSlider).not.toHaveAttribute("aria-disabled", "true");
+		await expect(crossfadeToggle).toBeEnabled();
+
+		await loopMode.selectOption("boomerang");
+		await expect(loopMode).toHaveValue("boomerang");
+
+		await expect(crossfadeControl).toHaveClass(/audio-control--disabled/);
+		await expect(crossfadeSlider).toHaveAttribute("aria-disabled", "true");
+		await expect(crossfadeToggle).toBeDisabled();
+	});
+
+	test("crossfade value is preserved when leaving boomerang mode", async ({
+		page,
+	}) => {
+		await page.locator("#loop").check();
+		const loopMode = page.locator("#loopMode");
+
+		const crossfadeControl = page.locator(".audio-control").filter({
+			has: page.locator(".control-label", { hasText: /^Crossfade$/ }),
+		});
+		const crossfadeSlider = crossfadeControl.locator("[role='slider']");
+
+		await crossfadeSlider.focus();
+		await page.keyboard.press("ArrowRight");
+
+		const valueBeforeBoomerang =
+			await crossfadeSlider.getAttribute("aria-valuenow");
+		expect(valueBeforeBoomerang).toBeTruthy();
+
+		await loopMode.selectOption("boomerang");
+		await expect(crossfadeSlider).toHaveAttribute("aria-disabled", "true");
+
+		await loopMode.selectOption("forward");
+		await expect(loopMode).toHaveValue("forward");
+		await expect(crossfadeSlider).not.toHaveAttribute("aria-disabled", "true");
+
+		const valueAfterForward =
+			await crossfadeSlider.getAttribute("aria-valuenow");
+		expect(valueAfterForward).toBe(valueBeforeBoomerang);
+	});
 });

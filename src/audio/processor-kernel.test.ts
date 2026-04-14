@@ -6019,6 +6019,174 @@ describe("Loop crossfade: comprehensive", () => {
 		}
 	});
 
+	it("XF20b: boomerang skips crossfade even when enabled", () => {
+		const buffer = makeBuffer(SR);
+		const boomerangWithCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopMode: "boomerang",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+		const boomerangNoCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: false,
+			loopMode: "boomerang",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+
+		const outWithCrossfade = [makeOutput(2)];
+		const outNoCrossfade = [makeOutput(2)];
+
+		processBlock(
+			boomerangWithCrossfade,
+			outWithCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+		processBlock(
+			boomerangNoCrossfade,
+			outNoCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+
+		for (let i = 0; i < 128; i++) {
+			expect(outWithCrossfade[0][0][i]).toBeCloseTo(outNoCrossfade[0][0][i], 8);
+		}
+	});
+
+	it("XF20c: forward loop still applies crossfade when enabled", () => {
+		const buffer = makeBuffer(SR);
+		const forwardWithCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopMode: "forward",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+		const forwardNoCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: false,
+			loopMode: "forward",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+
+		const outWithCrossfade = [makeOutput(2)];
+		const outNoCrossfade = [makeOutput(2)];
+
+		processBlock(
+			forwardWithCrossfade,
+			outWithCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+		processBlock(forwardNoCrossfade, outNoCrossfade, makeParams(), ctx(), fs());
+
+		let differs = false;
+		for (let i = 0; i < 128; i++) {
+			if (
+				Math.abs(outWithCrossfade[0][0][i] - outNoCrossfade[0][0][i]) > 0.000001
+			) {
+				differs = true;
+				break;
+			}
+		}
+		expect(differs).toBe(true);
+	});
+
+	it("XF20d: switching boomerang -> forward resumes crossfade", () => {
+		const buffer = makeBuffer(SR);
+		const withCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: true,
+			loopMode: "boomerang",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+		const noCrossfade = makeLoopProps({
+			buffer,
+			loop: true,
+			loopStart: 0.1,
+			loopEnd: 0.9,
+			loopCrossfade: 0.05,
+			enableLoopCrossfade: false,
+			loopMode: "boomerang",
+			playhead: Math.floor(0.1 * SR) + 10,
+		});
+
+		const boomerangOutWithCrossfade = [makeOutput(2)];
+		const boomerangOutNoCrossfade = [makeOutput(2)];
+		processBlock(
+			withCrossfade,
+			boomerangOutWithCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+		processBlock(
+			noCrossfade,
+			boomerangOutNoCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+
+		for (let i = 0; i < 128; i++) {
+			expect(boomerangOutWithCrossfade[0][0][i]).toBeCloseTo(
+				boomerangOutNoCrossfade[0][0][i],
+				8,
+			);
+		}
+
+		withCrossfade.loopMode = "forward";
+		noCrossfade.loopMode = "forward";
+
+		const forwardOutWithCrossfade = [makeOutput(2)];
+		const forwardOutNoCrossfade = [makeOutput(2)];
+		processBlock(
+			withCrossfade,
+			forwardOutWithCrossfade,
+			makeParams(),
+			ctx(),
+			fs(),
+		);
+		processBlock(noCrossfade, forwardOutNoCrossfade, makeParams(), ctx(), fs());
+
+		let differs = false;
+		for (let i = 0; i < 128; i++) {
+			if (
+				Math.abs(
+					forwardOutWithCrossfade[0][0][i] - forwardOutNoCrossfade[0][0][i],
+				) > 0.000001
+			) {
+				differs = true;
+				break;
+			}
+		}
+		expect(differs).toBe(true);
+	});
+
 	// --- Crossfade + playback rates ---
 
 	it("XF21: crossfade + rate=0.5 (half speed) — no NaN, stays bounded", () => {

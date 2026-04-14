@@ -9,6 +9,7 @@ import { AudioControl } from "./AudioControl";
 interface ControlSectionProps {
 	legend: string;
 	defs: ControlDef[];
+	disabledKeys?: Set<ControlKey>;
 	values: Record<ControlKey, number>;
 	snaps: Record<ControlKey, string>;
 	enabled: Record<ControlKey, boolean>;
@@ -51,6 +52,7 @@ function renderAudioControl(
 	>,
 ) {
 	const {
+		disabledKeys,
 		mins,
 		maxs,
 		maxLocked,
@@ -89,6 +91,7 @@ function renderAudioControl(
 			hasMaxLock={def.hasMaxLock}
 			audioDuration={audioDuration}
 			maxLocked={maxLocked[def.key] ?? true}
+			forceDisabled={disabledKeys?.has(def.key) === true}
 			onChange={(v) => onValueChange(def.key, v)}
 			onToggle={(on) => onToggle(def.key, on)}
 			onSnapChange={(s) => onSnapChange(def.key, s)}
@@ -198,6 +201,7 @@ function areControlSectionPropsEqual(
 		prev.mins === next.mins &&
 		prev.maxs === next.maxs &&
 		prev.maxLocked === next.maxLocked &&
+		prev.disabledKeys === next.disabledKeys &&
 		prev.linked === next.linked &&
 		prev.linkedPairs === next.linkedPairs &&
 		prev.tempo === next.tempo &&

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LoopMode } from "./audio/types";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
@@ -234,6 +234,13 @@ export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 		(v: number) => handleValueChange("playhead", v),
 		[handleValueChange],
 	);
+	const loopDisabledKeys = useMemo(
+		() =>
+			controls.loopMode === "boomerang"
+				? new Set<ControlKey>(["loopCrossfade", "loopCrossfadeOffset"])
+				: undefined,
+		[controls.loopMode],
+	);
 	const handlePlaybackRateChange = useCallback(
 		(v: number) => handleValueChange("playbackRate", v),
 		[handleValueChange],
@@ -390,6 +397,7 @@ export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
 						<ControlSection
 							legend="Controls"
 							defs={loopControlDefs}
+							disabledKeys={loopDisabledKeys}
 							values={controls.values}
 							snaps={controls.snaps}
 							enabled={controls.enabled}

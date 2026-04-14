@@ -1377,7 +1377,8 @@ export function processBlock(
 	const needsCrossfade =
 		enableLoopCrossfade &&
 		loopCrossfadeSamples > 0 &&
-		effectiveSourceLength > SAMPLE_BLOCK_SIZE;
+		effectiveSourceLength > SAMPLE_BLOCK_SIZE &&
+		props.loopMode !== "boomerang";
 
 	if (isWithinLoopRange && needsCrossfade) {
 		const offsetShift = Math.floor((loopCrossfadeOffset * xfadeNumSamples) / 2);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	type ControlKey,
 	type LoopMode,
@@ -234,6 +234,13 @@ export function App() {
 		(v: number) => handleValueChange("playhead", v),
 		[handleValueChange],
 	);
+	const loopDisabledKeys = useMemo(
+		() =>
+			controls.loopMode === "boomerang"
+				? new Set<ControlKey>(["loopCrossfade", "loopCrossfadeOffset"])
+				: undefined,
+		[controls.loopMode],
+	);
 	const handlePlaybackRateChange = useCallback(
 		(v: number) => handleValueChange("playbackRate", v),
 		[handleValueChange],
@@ -390,6 +397,7 @@ export function App() {
 						<ControlSection
 							legend="Controls"
 							defs={loopControlDefs}
+							disabledKeys={loopDisabledKeys}
 							values={controls.values}
 							snaps={controls.snaps}
 							enabled={controls.enabled}

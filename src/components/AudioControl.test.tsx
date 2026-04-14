@@ -275,4 +275,29 @@ describe("AudioControl", () => {
 		const slider = q(container, '[role="slider"]');
 		expect(slider.getAttribute("aria-disabled")).toBe("true");
 	});
+
+	test("forceDisabled disables toggle and slider even when enabled", () => {
+		const onToggle = mock(() => {});
+		const { container } = render(
+			<AudioControl
+				label="Crossfade"
+				min={0}
+				max={1}
+				value={0.25}
+				hasToggle={true}
+				enabled={true}
+				forceDisabled={true}
+				onToggle={onToggle}
+			/>,
+		);
+
+		expect(container.querySelector(".audio-control--disabled")).toBeTruthy();
+		const slider = q(container, '[role="slider"]');
+		expect(slider.getAttribute("aria-disabled")).toBe("true");
+
+		const toggle = q(container, ".control-toggle") as HTMLInputElement;
+		expect(toggle.disabled).toBe(true);
+		fireEvent.click(toggle);
+		expect(onToggle).not.toHaveBeenCalled();
+	});
 });

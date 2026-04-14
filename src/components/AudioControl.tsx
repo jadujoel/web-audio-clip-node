@@ -29,6 +29,7 @@ export interface AudioControlProps {
 	onMinChange?: (val: number) => void;
 	onMaxChange?: (val: number) => void;
 	onMaxLockedChange?: (locked: boolean) => void;
+	forceDisabled?: boolean;
 }
 
 function AudioControlInner({
@@ -55,6 +56,7 @@ function AudioControlInner({
 	onMinChange,
 	onMaxChange,
 	onMaxLockedChange,
+	forceDisabled = false,
 }: AudioControlProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState("");
@@ -74,14 +76,15 @@ function AudioControlInner({
 	const resolvedSkew = presetConfig?.skew ?? 1;
 	const resolvedStep = step ?? presetConfig?.step;
 	const resolvedLogarithmic = presetConfig?.logarithmic ?? false;
+	const isDisabled = forceDisabled || (hasToggle && !enabled);
 
 	const handleSliderChange = useCallback(
 		(rawValue: number) => {
-			if (!enabled) return;
+			if (isDisabled) return;
 			const snapped = getSnappedValue(rawValue, snap, tempo);
 			onChange?.(snapped);
 		},
-		[snap, tempo, onChange, enabled],
+		[snap, tempo, onChange, isDisabled],
 	);
 
 	const displayValue = formatValueText(value, controlKey, snap, tempo);
@@ -92,12 +95,13 @@ function AudioControlInner({
 	}, [preset, controlKey, snap, tempo]);
 
 	const startEditing = useCallback(() => {
+		if (isDisabled) return;
 		setEditText(String(value));
 		setIsEditing(true);
 		queueMicrotask(() => {
 			inputRef.current?.select();
 		});
-	}, [value]);
+	}, [value, isDisabled]);
 
 	const commitEdit = useCallback(() => {
 		setIsEditing(false);
@@ -127,17 +131,17 @@ function AudioControlInner({
 
 	const handleContextMenu = useCallback(
 		(e: React.MouseEvent) => {
-			if (!hasSnap) return;
+			if (!hasSnap || isDisabled) return;
 			e.preventDefault();
 			setCtxMenu({ x: e.clientX, y: e.clientY });
 		},
-		[hasSnap],
+		[hasSnap, isDisabled],
 	);
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: context menu on right-click is standard UX
 		<div
-			className={`audio-control${hasToggle && !enabled ? " audio-control--disabled" : ""}`}
+			className={`audio-control${isDisabled ? " audio-control--disabled" : ""}`}
 			title={title}
 			onContextMenu={handleContextMenu}
 		>
@@ -146,6 +150,7 @@ function AudioControlInner({
 					type="checkbox"
 					className="control-toggle"
 					checked={enabled}
+					disabled={forceDisabled}
 					onChange={(e) => onToggle?.(e.target.checked)}
 				/>
 			)}
@@ -164,7 +169,7 @@ function AudioControlInner({
 				snaps={resolvedSnaps}
 				ticks={resolvedTicks}
 				logarithmic={resolvedLogarithmic}
-				disabled={hasToggle && !enabled}
+				disabled={isDisabled}
 				labelId={labelId}
 				valueText={displayValue}
 				formatTick={tickFormatter}
@@ -181,7 +186,12 @@ function AudioControlInner({
 					onKeyDown={handleEditKeyDown}
 				/>
 			) : (
-				<button type="button" className="control-output" onClick={startEditing}>
+				<button
+					type="button"
+					className="control-output"
+					onClick={startEditing}
+					disabled={isDisabled}
+				>
 					{displayValue}
 				</button>
 			)}
@@ -236,7 +246,8 @@ function areAudioControlPropsEqual(
 		prev.onSnapChange === next.onSnapChange &&
 		prev.onMinChange === next.onMinChange &&
 		prev.onMaxChange === next.onMaxChange &&
-		prev.onMaxLockedChange === next.onMaxLockedChange
+		prev.onMaxLockedChange === next.onMaxLockedChange &&
+		prev.forceDisabled === next.forceDisabled
 	);
 }
 

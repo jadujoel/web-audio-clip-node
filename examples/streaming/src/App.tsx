@@ -2,6 +2,7 @@ import {
 	memo,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "./react-runtime";
@@ -395,6 +396,13 @@ export function App() {
 		(v: number) => node.seekPlayhead(v),
 		[node],
 	);
+	const loopDisabledKeys = useMemo(
+		() =>
+			controls.loopMode === "boomerang"
+				? new Set<ControlKey>(["loopCrossfade", "loopCrossfadeOffset"])
+				: undefined,
+		[controls.loopMode],
+	);
 	const handlePlaybackRateChange = useCallback(
 		(v: number) => handleValueChange("playbackRate", v),
 		[handleValueChange],
@@ -703,6 +711,7 @@ export function App() {
 						<ControlSection
 							legend="Controls"
 							defs={loopControlDefs}
+							disabledKeys={loopDisabledKeys}
 							values={controls.values}
 							snaps={controls.snaps}
 							enabled={controls.enabled}
