@@ -104,12 +104,16 @@ const StreamingDisplayPanel = memo(StreamingDisplayPanelInner);
 function StreamingPlayheadInner({
 	frameRef,
 	audioDuration,
+	seekableSamples,
+	streamProgress,
 	disabled,
 	onChange,
 	playbackGeneration,
 }: {
 	frameRef: RefObject<FrameData | null>;
 	audioDuration: number | null;
+	seekableSamples: number | null;
+	streamProgress: number;
 	disabled: boolean;
 	onChange: (v: number) => void;
 	playbackGeneration: number;
@@ -143,6 +147,8 @@ function StreamingPlayheadInner({
 		<PlayheadSlider
 			value={value}
 			audioDuration={audioDuration}
+			seekableSamples={seekableSamples}
+			streamProgress={streamProgress}
 			disabled={disabled}
 			onChange={onChange}
 		/>
@@ -637,6 +643,8 @@ export function App() {
 			<StreamingPlayhead
 				frameRef={node.frameRef}
 				audioDuration={node.audioDuration}
+				seekableSamples={node.seekableSamples}
+				streamProgress={node.progress}
 				disabled={
 					node.nodeState === "initial" || node.nodeState === "disposed"
 				}

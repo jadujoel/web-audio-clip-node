@@ -84,4 +84,67 @@ describe("PlayheadSlider", () => {
 		render(<PlayheadSlider value={0} audioDuration={null} onChange={noop} />);
 		expect(screen.getByText("0:00.00 / 0:00.00")).toBeTruthy();
 	});
+
+	test("renders buffered and pending overlays for streaming progress", () => {
+		render(
+			<PlayheadSlider
+				value={0}
+				audioDuration={10}
+				seekableSamples={2 * SAMPLE_RATE}
+				onChange={noop}
+			/>,
+		);
+
+		const fill = screen.getByTestId("playhead-buffer-fill") as HTMLElement;
+		const pending = screen.getByTestId(
+			"playhead-buffer-pending",
+		) as HTMLElement;
+
+		expect(fill.style.width).toBe("20%");
+		expect(pending).toBeTruthy();
+	});
+
+	test("clamps buffered overlay when seekable exceeds total duration", () => {
+		render(
+			<PlayheadSlider
+				value={0}
+				audioDuration={3}
+				seekableSamples={999_999}
+				onChange={noop}
+			/>,
+		);
+
+		const fill = screen.getByTestId("playhead-buffer-fill") as HTMLElement;
+		expect(fill.style.width).toBe("100%");
+	});
+
+	test("handles null seekable samples without crashing", () => {
+		render(
+			<PlayheadSlider
+				value={0}
+				audioDuration={8}
+				seekableSamples={null}
+				onChange={noop}
+			/>,
+		);
+
+		const fill = screen.getByTestId("playhead-buffer-fill") as HTMLElement;
+		expect(fill.style.width).toBe("0%");
+		expect(screen.getByText("0:00.00 / 0:08.00")).toBeTruthy();
+	});
+
+	test("uses stream progress fallback when duration is unknown", () => {
+		render(
+			<PlayheadSlider
+				value={0}
+				audioDuration={null}
+				seekableSamples={12_000}
+				streamProgress={0.4}
+				onChange={noop}
+			/>,
+		);
+
+		const fill = screen.getByTestId("playhead-buffer-fill") as HTMLElement;
+		expect(fill.style.width).toBe("40%");
+	});
 });

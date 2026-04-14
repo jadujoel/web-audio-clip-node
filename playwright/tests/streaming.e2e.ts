@@ -255,6 +255,31 @@ test.describe("Streaming example", () => {
 		}).toPass({ timeout: 15000 });
 	});
 
+	test("shows buffered vs pending playhead regions while streaming", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming progress timing is unstable in headless Firefox",
+		);
+
+		await page.locator("button:has-text('Stream & Play')").click();
+
+		const fill = page.locator("[data-testid='playhead-buffer-fill']");
+		const pending = page.locator("[data-testid='playhead-buffer-pending']");
+		await expect(pending).toBeVisible();
+		await expect(fill).toBeVisible();
+
+		await expect(async () => {
+			const width = await fill.evaluate((node) => {
+				const value = (node as HTMLElement).style.width;
+				return Number.parseFloat(value || "0");
+			});
+			expect(width).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+	});
+
 	test("selecting RawOpusFramed format populates default URL", async ({
 		page,
 	}) => {

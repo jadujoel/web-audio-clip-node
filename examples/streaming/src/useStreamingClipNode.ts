@@ -476,6 +476,7 @@ export function useStreamingClipNode({
 		progress,
 		audioDuration,
 		seekableDuration,
+		seekableSamples,
 		frameRef: frameRef as RefObject<FrameData | null>,
 		timesLoopedRef: timesLoopedRef as RefObject<string>,
 		infoLatency,
