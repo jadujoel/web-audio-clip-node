@@ -67,7 +67,7 @@
     async function main() {
       const context = new AudioContext({ sampleRate: 48000 });
       await context.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
-      statusEl.textContent = "AudioWorklet loaded";
+      statusEl.textContent = "Ready";
 
       const clip = new ClipNode(context, {
         processorOptions: { buffer: generateTone(context.sampleRate) },

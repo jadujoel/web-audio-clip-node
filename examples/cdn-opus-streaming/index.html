@@ -78,7 +78,9 @@
       };
     }
 
-    main();
+    main().catch(err => {
+      document.getElementById("status").textContent = `Error: ${err.message}`;
+    });
   </script>
 </body>
 </html>
