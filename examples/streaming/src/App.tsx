@@ -19,6 +19,7 @@ import {
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
 import type { LoopMode } from "./clip-node-lib";
+import type { GapPlaybackStrategy } from "./clip-node-lib";
 import {
 	controlDefs,
 	loopControlDefs,
@@ -178,6 +179,7 @@ export function App() {
 	const [format, setFormat] = useState<StreamFormat>("OggOpus");
 	const [url, setUrl] = useState(getDefaultUrlForFormat("OggOpus"));
 	const [throttle, setThrottle] = useState(0);
+	const [gapStrategy, setGapStrategy] = useState<GapPlaybackStrategy>("hold");
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
 	const progressRef = useRef<HTMLDivElement>(null);
@@ -374,6 +376,14 @@ export function App() {
 		[controls.setLoopMode, node.setLoopModeOnNode],
 	);
 
+	const handleGapStrategyChange = useCallback(
+		(strategy: GapPlaybackStrategy) => {
+			setGapStrategy(strategy);
+			node.setGapPlaybackStrategyOnNode(strategy);
+		},
+		[node.setGapPlaybackStrategyOnNode],
+	);
+
 	const handleMaxLockedChange = useCallback(
 		(key: ControlKey, locked: boolean) => {
 			const linkedKeys = getActiveLinkedControls(key, controls.linkedPairs);
@@ -554,8 +564,34 @@ export function App() {
 				<option value={51200}>Turtle (~50 KB/s)</option>
 			</select>
 
+			<label
+				htmlFor="gap-strategy-select"
+				style={{ display: "block", marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}
+			>
+				Gap Playback Strategy
+			</label>
+			<select
+				id="gap-strategy-select"
+				value={gapStrategy}
+				onChange={(e) => handleGapStrategyChange(e.target.value as GapPlaybackStrategy)}
+				style={{
+					width: "100%",
+					boxSizing: "border-box",
+					padding: "0.5rem",
+					marginTop: "0.25rem",
+					border: "1px solid var(--color-border-subtle, #334155)",
+					borderRadius: "6px",
+					background: "var(--color-surface, #1e293b)",
+					color: "var(--color-text, #e2e8f0)",
+					fontSize: "0.9rem",
+				}}
+			>
+				<option value="hold">Hold — stall at committed edge</option>
+				<option value="silence">Silence — advance through gaps</option>
+			</select>
+
 			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-				<button type="button" onClick={() => node.stream(url, throttle, format)}>
+				<button type="button" onClick={() => node.stream(url, throttle, format, gapStrategy)}>
 					▶ Stream &amp; Play
 				</button>
 				<button type="button" onClick={node.pause} disabled={!isStreaming}>

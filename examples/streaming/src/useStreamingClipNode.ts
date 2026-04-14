@@ -13,7 +13,7 @@ import {
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
-import type { LoopMode, StreamFormat } from "./clip-node-lib";
+import type { GapPlaybackStrategy, LoopMode, StreamFormat } from "./clip-node-lib";
 import { clampSeekTargetSamples, secondsFromSamples } from "./clip-node-lib";
 
 function getWorkerUrl(format: StreamFormat): string {
@@ -183,6 +183,7 @@ export function useStreamingClipNode({
 	const workerRef = useRef<Worker | null>(null);
 	const frameRef = useRef<FrameData | null>(null);
 	const timesLoopedRef = useRef("0");
+	const gapStrategyRef = useRef<GapPlaybackStrategy>("hold");
 	const [playbackGeneration, setPlaybackGeneration] = useState(0);
 
 	const ensureContext = useCallback(async () => {
@@ -200,7 +201,7 @@ export function useStreamingClipNode({
 	}, []);
 
 	const stream = useCallback(
-		async (url: string, throttle: number, format?: StreamFormat) => {
+		async (url: string, throttle: number, format?: StreamFormat, gapStrategy?: GapPlaybackStrategy) => {
 			if (!url.trim()) {
 				setStatus("Enter a URL first.");
 				return;
@@ -235,6 +236,12 @@ export function useStreamingClipNode({
 				// Create ClipNode (no buffer — streaming mode)
 				const clip = new ClipNode(ctx);
 				configureClip(ctx, clip);
+
+				// Apply gap playback strategy
+				if (gapStrategy) {
+					gapStrategyRef.current = gapStrategy;
+					clip.port.postMessage({ type: "streamGapStrategy", data: gapStrategy });
+				}
 
 				// Create MessageChannel: port1 → Worker, port2 → Processor
 				const channel = new MessageChannel();
@@ -417,17 +424,26 @@ export function useStreamingClipNode({
 
 	const seekPlayhead = useCallback(
 		(targetSample: number) => {
-			const { value: clampedValue, clamped } = clampSeekTargetSamples(
-				targetSample,
-				seekableSamples,
-			);
-			setValue("playhead", clampedValue);
+			let seekValue: number;
+			if (gapStrategyRef.current === "silence") {
+				// Silence strategy: allow seeking anywhere, don't clamp to decoded region
+				seekValue = Number.isFinite(targetSample)
+					? Math.max(0, Math.floor(targetSample))
+					: 0;
+			} else {
+				const { value: clampedValue, clamped } = clampSeekTargetSamples(
+					targetSample,
+					seekableSamples,
+				);
+				seekValue = clampedValue;
+				if (clamped) {
+					setStatus("Seek limited to decoded region while streaming.");
+				}
+			}
+			setValue("playhead", seekValue);
 			const node = clipRef.current;
 			if (node) {
-				applyValueToClip(node, "playhead", clampedValue);
-			}
-			if (clamped) {
-				setStatus("Seek limited to decoded region while streaming.");
+				applyValueToClip(node, "playhead", seekValue);
 			}
 		},
 		[seekableSamples, setStatus, setValue],
@@ -470,6 +486,17 @@ export function useStreamingClipNode({
 		if (clip) clip.loopMode = mode;
 	}, []);
 
+	const setGapPlaybackStrategyOnNode = useCallback(
+		(strategy: GapPlaybackStrategy) => {
+			gapStrategyRef.current = strategy;
+			const clip = clipRef.current;
+			if (clip) {
+				clip.port.postMessage({ type: "streamGapStrategy", data: strategy });
+			}
+		},
+		[],
+	);
+
 	return {
 		nodeState,
 		statusMessage,
@@ -490,5 +517,6 @@ export function useStreamingClipNode({
 		applyToggle,
 		setLoopOnNode,
 		setLoopModeOnNode,
+		setGapPlaybackStrategyOnNode,
 	};
 }

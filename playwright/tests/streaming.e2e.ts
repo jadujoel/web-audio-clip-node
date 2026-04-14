@@ -203,6 +203,23 @@ test.describe("Streaming example", () => {
 		await expect(throttle).toBeVisible();
 	});
 
+	test("gap strategy selector renders with hold and silence options", async ({
+		page,
+	}) => {
+		const select = page.locator("select#gap-strategy-select");
+		await expect(select).toBeVisible();
+		await expect(select).toHaveValue("hold");
+
+		const options = select.locator("option");
+		await expect(options).toHaveCount(2);
+
+		await expect(options.nth(0)).toHaveAttribute("value", "hold");
+		await expect(options.nth(1)).toHaveAttribute("value", "silence");
+
+		await select.selectOption("silence");
+		await expect(select).toHaveValue("silence");
+	});
+
 	test("playhead starts at zero and does not regress without playback", async ({
 		page,
 	}) => {
@@ -275,7 +292,7 @@ test.describe("Streaming example", () => {
 		}).toPass({ timeout: 15000 });
 	});
 
-	test("seeking beyond decoded region is blocked while streaming", async ({
+	test("seeking beyond decoded region is blocked while streaming with hold strategy", async ({
 		page,
 		browserName,
 	}) => {
@@ -285,6 +302,7 @@ test.describe("Streaming example", () => {
 		);
 
 		await page.locator("select#throttle-select").selectOption("204800");
+		await page.locator("select#gap-strategy-select").selectOption("hold");
 		await page.locator("button:has-text('Stream & Play')").click();
 
 		const slider = page.locator(".playhead-slider [role='slider']");
@@ -298,6 +316,42 @@ test.describe("Streaming example", () => {
 				const valueNow = Number(await slider.getAttribute("aria-valuenow"));
 				const valueMax = Number(await slider.getAttribute("aria-valuemax"));
 				return valueNow < valueMax;
+			})
+			.toBe(true);
+	});
+
+	test("seeking beyond decoded region is allowed with silence strategy", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"streaming playhead/seek gating is not supported in headless Firefox/WebKit",
+		);
+
+		await page.locator("select#throttle-select").selectOption("204800");
+		await page.locator("select#gap-strategy-select").selectOption("silence");
+		await page.locator("button:has-text('Stream & Play')").click();
+
+		const slider = page.locator(".playhead-slider [role='slider']");
+		await expect(slider).toBeVisible();
+
+		// Wait for some decoding to happen so the slider max is set
+		await expect(async () => {
+			const valueMax = Number(await slider.getAttribute("aria-valuemax"));
+			expect(valueMax).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+
+		// Press End to seek to the maximum
+		await slider.focus();
+		await page.keyboard.press("End");
+
+		// With silence strategy, seeking to the end should be allowed
+		await expect
+			.poll(async () => {
+				const valueNow = Number(await slider.getAttribute("aria-valuenow"));
+				const valueMax = Number(await slider.getAttribute("aria-valuemax"));
+				return valueNow === valueMax;
 			})
 			.toBe(true);
 	});
