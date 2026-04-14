@@ -235,4 +235,72 @@ test.describe("Playground example", () => {
 			await crossfadeSlider.getAttribute("aria-valuenow");
 		expect(valueAfterForward).toBe(valueBeforeBoomerang);
 	});
+
+	test("pause then delayed stop never resumes before ending", async ({
+		page,
+	}) => {
+		test.setTimeout(45_000);
+
+		const fileChooserPromise = page.waitForEvent("filechooser");
+		await page.locator("section#buttons button:has-text('Load Sound')").click();
+		const fileChooser = await fileChooserPromise;
+		await fileChooser.setFiles(
+			"/Users/admin/workspace/web-audio-clip-node/src/sounds/example.mp3",
+		);
+
+		const soundOutput = page.locator("code:has-text('Sound:') + output");
+		await expect(soundOutput).toContainText("example.mp3");
+
+		const stopDelaySlider = page
+			.locator(".audio-control")
+			.filter({
+				has: page.locator(".control-label", { hasText: /^StopDelay$/ }),
+			})
+			.locator("[role='slider']");
+		await stopDelaySlider.focus();
+		await page.keyboard.press("PageUp");
+		await expect
+			.poll(async () =>
+				Number(await stopDelaySlider.getAttribute("aria-valuenow")),
+			)
+			.toBeGreaterThan(0);
+
+		const stateOutput = page.locator("code:has-text('State:') + output");
+		const startButton = page.locator(
+			"section#buttons button:has-text('Start')",
+		);
+		const pauseButton = page.locator(
+			"section#buttons button:has-text('Pause')",
+		);
+		const stopButton = page.locator("section#buttons button:has-text('Stop')");
+
+		await startButton.click();
+		await expect
+			.poll(async () => (await stateOutput.textContent())?.trim() ?? "")
+			.toBe("started");
+
+		await expect(pauseButton).toBeEnabled();
+		await pauseButton.click();
+		await expect(stateOutput).toHaveText("paused");
+
+		await stopButton.click();
+		await expect(stateOutput).toHaveText("stopped");
+
+		const sampledStates: string[] = [];
+		for (let i = 0; i < 10; i++) {
+			sampledStates.push(
+				((await stateOutput.textContent()) ?? "").trim().toLowerCase(),
+			);
+			await page.waitForTimeout(100);
+		}
+
+		expect(sampledStates).not.toContain("started");
+		expect(sampledStates).not.toContain("resumed");
+
+		await expect
+			.poll(async () => (await stateOutput.textContent())?.trim() ?? "", {
+				timeout: 10_000,
+			})
+			.toBe("ended");
+	});
 });

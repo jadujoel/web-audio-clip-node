@@ -65,6 +65,7 @@ export interface ClipProcessorOptions {
 	stopWhen?: number;
 	pauseWhen?: number;
 	resumeWhen?: number;
+	stopWhilePaused?: boolean;
 	playedSamples?: number;
 	timesLooped?: number;
 	fadeInDuration?: number;

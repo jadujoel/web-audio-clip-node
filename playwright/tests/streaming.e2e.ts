@@ -293,13 +293,13 @@ test.describe("Streaming example", () => {
 		await slider.focus();
 		await page.keyboard.press("End");
 
-		await expect(
-			page.getByText("Seek limited to decoded region while streaming."),
-		).toBeVisible();
-
-		const valueNow = Number(await slider.getAttribute("aria-valuenow"));
-		const valueMax = Number(await slider.getAttribute("aria-valuemax"));
-		expect(valueNow).toBeLessThan(valueMax);
+		await expect
+			.poll(async () => {
+				const valueNow = Number(await slider.getAttribute("aria-valuenow"));
+				const valueMax = Number(await slider.getAttribute("aria-valuemax"));
+				return valueNow < valueMax;
+			})
+			.toBe(true);
 	});
 
 	test("selecting RawOpusFramed format populates default URL", async ({

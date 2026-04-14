@@ -295,6 +295,7 @@ export function getProperties(
 		stopWhen = 0,
 		pauseWhen = 0,
 		resumeWhen = 0,
+		stopWhilePaused = false,
 		playedSamples = 0,
 		state = State.Initial,
 		timesLooped = 0,
@@ -332,6 +333,7 @@ export function getProperties(
 		stopWhen,
 		pauseWhen,
 		resumeWhen,
+		stopWhilePaused,
 		playedSamples,
 		state,
 		timesLooped,
@@ -878,6 +880,7 @@ export function handleProcessorMessage(
 		case "bufferReset":
 			properties.buffer = [];
 			properties.streamBuffer = createStreamBufferState();
+			properties.stopWhilePaused = false;
 			normalizeLoopBounds(properties, sampleRate);
 			return [];
 		case "start":
@@ -902,6 +905,7 @@ export function handleProcessorMessage(
 				properties.playbackDirection = 1;
 				properties.startWhen = d?.when ?? currentTime;
 				properties.stopWhen = properties.startWhen + properties.duration;
+				properties.stopWhilePaused = false;
 				properties.playedSamples = 0;
 				properties.state = State.Scheduled;
 			}
@@ -913,15 +917,22 @@ export function handleProcessorMessage(
 			)
 				return [];
 			properties.stopWhen = (data as number | undefined) ?? properties.stopWhen;
-			properties.state = State.Stopped;
+			if (properties.state === State.Paused) {
+				properties.stopWhilePaused = true;
+			} else {
+				properties.stopWhilePaused = false;
+				properties.state = State.Stopped;
+			}
 			return [{ type: "stopped" }];
 		case "pause":
 			properties.state = State.Paused;
 			properties.pauseWhen = (data as number | undefined) ?? currentTime;
+			properties.stopWhilePaused = false;
 			return [{ type: "paused" }];
 		case "resume":
 			properties.state = State.Started;
 			properties.startWhen = (data as number | undefined) ?? currentTime;
+			properties.stopWhilePaused = false;
 			return [{ type: "resume" }];
 		case "getBuffer": {
 			const buf = properties.buffer;
@@ -934,6 +945,7 @@ export function handleProcessorMessage(
 			properties.state = State.Disposed;
 			properties.buffer = [];
 			properties.streamBuffer = createStreamBufferState();
+			properties.stopWhilePaused = false;
 			return [{ type: "disposed" }];
 		case "loop": {
 			const loop = data as boolean;
@@ -1089,16 +1101,33 @@ export function processBlock(
 			fillWithSilence(outputs[0]);
 			return { keepAlive: true, messages };
 		}
-	} else if (state === State.Paused) {
+	} else if (state === State.Paused && !props.stopWhilePaused) {
 		if (ctx.currentTime > props.pauseWhen) {
 			fillWithSilence(outputs[0]);
 			return { keepAlive: true, messages };
 		}
 	}
 
+	if (state === State.Paused && props.stopWhilePaused) {
+		if (ctx.currentTime > props.stopWhen) {
+			fillWithSilence(outputs[0]);
+			props.state = State.Ended;
+			props.stopWhilePaused = false;
+			messages.push({ type: "ended" });
+			props.playedSamples = 0;
+			return { keepAlive: true, messages };
+		}
+		fillWithSilence(outputs[0]);
+		for (let i = 1; i < outputs.length; i++) {
+			copy(outputs[0], outputs[i]);
+		}
+		return { keepAlive: true, messages };
+	}
+
 	if (ctx.currentTime > props.stopWhen) {
 		fillWithSilence(outputs[0]);
 		props.state = State.Ended;
+		props.stopWhilePaused = false;
 		messages.push({ type: "ended" });
 		props.playedSamples = 0;
 		return { keepAlive: true, messages };
@@ -1515,6 +1544,7 @@ export function processBlock(
 		!preventEndForIncompleteStream
 	) {
 		props.state = State.Ended;
+		props.stopWhilePaused = false;
 		messages.push({ type: "ended" });
 	}
 

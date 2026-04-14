@@ -595,9 +595,11 @@ describe("StreamingClipNode.downloaded", () => {
 		});
 		node.url = "https://example.com/audio.opus";
 		await Promise.resolve();
+		const worker = lastWorker;
+		if (!worker) throw new Error("worker was not created");
 
 		const promise = node.downloaded;
-		lastWorker.receive({ type: "done", samplesDecoded: 0 });
+		worker.receive({ type: "done", samplesDecoded: 0 });
 		callHandleMessage(node, {
 			type: "bufferState",
 			data: {

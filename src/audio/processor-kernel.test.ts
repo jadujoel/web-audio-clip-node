@@ -801,6 +801,21 @@ describe("handleProcessorMessage", () => {
 		const props = getProperties({ state: State.Started }, SR);
 		const msgs = handleProcessorMessage(props, { type: "stop" }, CT, SR);
 		expect(props.state).toBe(State.Stopped);
+		expect(props.stopWhilePaused).toBe(false);
+		expect(msgs).toEqual([{ type: "stopped" }]);
+	});
+
+	it("stop while paused keeps paused state and sets stopWhilePaused", () => {
+		const props = getProperties({ state: State.Paused }, SR);
+		const msgs = handleProcessorMessage(
+			props,
+			{ type: "stop", data: CT + 1 },
+			CT,
+			SR,
+		);
+		expect(props.state).toBe(State.Paused);
+		expect(props.stopWhilePaused).toBe(true);
+		expect(props.stopWhen).toBe(CT + 1);
 		expect(msgs).toEqual([{ type: "stopped" }]);
 	});
 
@@ -819,10 +834,27 @@ describe("handleProcessorMessage", () => {
 	});
 
 	it("resume → Started, returns resume", () => {
-		const props = getProperties({ state: State.Paused }, SR);
+		const props = getProperties(
+			{ state: State.Paused, stopWhilePaused: true },
+			SR,
+		);
 		const msgs = handleProcessorMessage(props, { type: "resume" }, CT, SR);
 		expect(props.state).toBe(State.Started);
+		expect(props.stopWhilePaused).toBe(false);
 		expect(msgs).toEqual([{ type: "resume" }]);
+	});
+
+	it("start clears stopWhilePaused", () => {
+		const props = getProperties(
+			{
+				state: State.Paused,
+				stopWhilePaused: true,
+				buffer: makeBuffer(48_000),
+			},
+			SR,
+		);
+		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		expect(props.stopWhilePaused).toBe(false);
 	});
 
 	it("dispose → Disposed, buffer cleared, returns disposed", () => {
@@ -1271,6 +1303,115 @@ describe("processBlock", () => {
 		);
 		expect(props.state).toBe(State.Ended);
 		expect(result.messages).toContainEqual({ type: "ended" });
+	});
+
+	it("paused then delayed stop stays silent until stopWhen then ends", () => {
+		const buffer = makeBuffer(48000);
+		for (const channel of buffer) channel.fill(1);
+		const props = getProperties(
+			{
+				state: State.Paused,
+				pauseWhen: 1,
+				stopWhen: 2,
+				stopWhilePaused: true,
+				duration: 10,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+
+		const outputsBeforeStop = [makeOutput(2)];
+		const beforeStop = processBlock(
+			props,
+			outputsBeforeStop,
+			makeProcessParams(),
+			{ currentTime: 1.5, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(outputsBeforeStop[0][0].every((sample) => sample === 0)).toBe(true);
+		expect(props.state).toBe(State.Paused);
+		expect(beforeStop.messages).toEqual([]);
+
+		const outputsAfterStop = [makeOutput(2)];
+		const afterStop = processBlock(
+			props,
+			outputsAfterStop,
+			makeProcessParams(),
+			{ currentTime: 2.1, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(outputsAfterStop[0][0].every((sample) => sample === 0)).toBe(true);
+		expect(props.state).toBe(State.Ended);
+		expect(props.stopWhilePaused).toBe(false);
+		expect(afterStop.messages).toContainEqual({ type: "ended" });
+	});
+
+	it("paused delayed stop remains silent when fadeOut is enabled", () => {
+		const buffer = makeBuffer(48000);
+		for (const channel of buffer) channel.fill(1);
+		const props = getProperties(
+			{
+				state: State.Paused,
+				pauseWhen: 1,
+				stopWhen: 5,
+				stopWhilePaused: true,
+				fadeOutDuration: 1,
+				enableFadeOut: true,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 1.5, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(outputs[0][0].every((sample) => sample === 0)).toBe(true);
+		expect(outputs[0][1].every((sample) => sample === 0)).toBe(true);
+	});
+
+	it("started delayed stop still renders before stopWhen", () => {
+		const buffer = makeBuffer(48000);
+		for (const channel of buffer) channel.fill(1);
+		const props = getProperties(
+			{
+				state: State.Stopped,
+				startWhen: 0,
+				stopWhen: 5,
+				duration: 10,
+				buffer,
+				enableLowpass: false,
+				enableHighpass: false,
+				enableGain: false,
+				enablePan: false,
+				enablePlaybackRate: false,
+			},
+			SR,
+		);
+		const outputs = [makeOutput(2)];
+		processBlock(
+			props,
+			outputs,
+			makeProcessParams(),
+			{ currentTime: 1.5, currentFrame: 0, sampleRate: SR },
+			makeFilterState(),
+		);
+		expect(outputs[0][0].some((sample) => sample !== 0)).toBe(true);
+		expect(props.state).toBe(State.Stopped);
 	});
 
 	it("mono buffer → auto-stereo conversion", () => {
