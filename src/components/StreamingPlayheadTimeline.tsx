@@ -51,37 +51,29 @@ function StreamingPlayheadTimelineInner({
 	);
 
 	return (
-		<div className="playhead-slider streaming-playhead-timeline">
+		<div
+			className="playhead-slider streaming-playhead-timeline"
+			data-testid="streaming-playhead-track"
+			data-decoded-percent={decodedPercent}
+			style={
+				{
+					"--streaming-decoded": `${decodedRatio * 100}%`,
+				} as React.CSSProperties
+			}
+		>
 			<span className="playhead-label" id={labelId}>
 				Playhead
 			</span>
 			<div className="playhead-slider-track-wrapper">
-				<div
-					className="streaming-playhead-track"
-					aria-hidden="true"
-					data-testid="streaming-playhead-track"
-				>
-					<div
-						className="streaming-playhead-pending"
-						data-testid="streaming-playhead-pending"
-					/>
-					<div
-						className="streaming-playhead-decoded"
-						data-testid="streaming-playhead-decoded"
-						style={{ width: `${decodedRatio * 100}%` }}
-					/>
-				</div>
-				<div className="streaming-playhead-handle">
-					<SnappableSlider
-						min={0}
-						max={maxSamples}
-						value={value}
-						disabled={disabled || maxSamples === 0}
-						labelId={labelId}
-						valueText={`${formatTime(currentSeconds)} (decoded ${decodedPercent}%)`}
-						onChange={handleChange}
-					/>
-				</div>
+				<SnappableSlider
+					min={0}
+					max={maxSamples}
+					value={value}
+					disabled={disabled || maxSamples === 0}
+					labelId={labelId}
+					valueText={`${formatTime(currentSeconds)} (decoded ${decodedPercent}%)`}
+					onChange={handleChange}
+				/>
 			</div>
 			<span className="playhead-time">
 				{formatTime(currentSeconds)} / {formatTime(durationSeconds)}

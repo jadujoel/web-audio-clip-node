@@ -723,49 +723,48 @@ input[type="number"]::-webkit-outer-spin-button {
 	z-index: 1;
 }
 
-.streaming-playhead-track {
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 50%;
-	height: 8px;
-	transform: translateY(-50%);
-	border-radius: 999px;
-	overflow: hidden;
-	pointer-events: none;
-	z-index: 0;
+.streaming-playhead-timeline {
+	--streaming-decoded: 0%;
 }
 
-.streaming-playhead-pending {
-	position: absolute;
-	inset: 0;
-	background-image: repeating-linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.08) 0,
-		rgba(255, 255, 255, 0.08) 6px,
-		rgba(255, 255, 255, 0.03) 6px,
-		rgba(255, 255, 255, 0.03) 12px
-	);
-	opacity: 0.45;
-	z-index: 0;
+.streaming-playhead-timeline .slider-track {
+	background-image:
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.08) 0,
+			rgba(255, 255, 255, 0.08) 6px,
+			rgba(255, 255, 255, 0.03) 6px,
+			rgba(255, 255, 255, 0.03) 12px
+		),
+		linear-gradient(
+			to right,
+			rgba(91, 155, 213, 0.88) 0,
+			rgba(91, 155, 213, 0.88) var(--streaming-decoded),
+			rgba(15, 18, 24, 0.95) var(--streaming-decoded),
+			rgba(15, 18, 24, 0.95) 100%
+		);
+	border-color: rgba(104, 164, 221, 0.55);
 }
 
-.streaming-playhead-decoded {
+.streaming-playhead-timeline .snappable-slider::before {
+	content: "";
 	position: absolute;
-	left: 0;
 	top: 0;
-	bottom: 0;
-	background: rgba(91, 155, 213, 0.65);
-	transition: width 0.15s ease;
+	left: var(--streaming-decoded);
+	height: 65%;
+	width: 2px;
+	transform: translateX(-1px);
+	background: rgba(219, 238, 255, 0.75);
+	pointer-events: none;
 	z-index: 1;
 }
 
-.streaming-playhead-handle .snappable-slider {
-	position: relative;
-	z-index: 1;
+.streaming-playhead-timeline .slider-fill {
+	background-color: rgba(255, 255, 255, 0.15);
+	opacity: 1;
 }
 
-.streaming-playhead-handle .slider-thumb {
+.streaming-playhead-timeline .slider-thumb {
 	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 

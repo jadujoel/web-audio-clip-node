@@ -9,7 +9,7 @@ describe("StreamingPlayheadTimeline", () => {
 	const noop = () => {};
 
 	test("renders decoded ratio from seekable samples when duration is known", () => {
-		render(
+		const { container } = render(
 			<StreamingPlayheadTimeline
 				value={0}
 				audioDuration={10}
@@ -19,10 +19,10 @@ describe("StreamingPlayheadTimeline", () => {
 			/>,
 		);
 
-		const decoded = screen.getByTestId(
-			"streaming-playhead-decoded",
-		) as HTMLElement;
-		expect(decoded.style.width).toBe("20%");
+		const track = screen.getByTestId("streaming-playhead-track") as HTMLElement;
+		expect(track.getAttribute("data-decoded-percent")).toBe("20");
+		expect(track.style.getPropertyValue("--streaming-decoded")).toBe("20%");
+		expect(container.querySelector(".slider-track")).toBeTruthy();
 	});
 
 	test("falls back to stream progress when duration is unknown", () => {
@@ -36,10 +36,9 @@ describe("StreamingPlayheadTimeline", () => {
 			/>,
 		);
 
-		const decoded = screen.getByTestId(
-			"streaming-playhead-decoded",
-		) as HTMLElement;
-		expect(decoded.style.width).toBe("40%");
+		const track = screen.getByTestId("streaming-playhead-track") as HTMLElement;
+		expect(track.getAttribute("data-decoded-percent")).toBe("40");
+		expect(track.style.getPropertyValue("--streaming-decoded")).toBe("40%");
 	});
 
 	test("clamps decoded width at 0 and 100 percent", () => {
@@ -53,10 +52,9 @@ describe("StreamingPlayheadTimeline", () => {
 			/>,
 		);
 
-		let decoded = screen.getByTestId(
-			"streaming-playhead-decoded",
-		) as HTMLElement;
-		expect(decoded.style.width).toBe("0%");
+		let track = screen.getByTestId("streaming-playhead-track") as HTMLElement;
+		expect(track.getAttribute("data-decoded-percent")).toBe("0");
+		expect(track.style.getPropertyValue("--streaming-decoded")).toBe("0%");
 
 		rerender(
 			<StreamingPlayheadTimeline
@@ -68,8 +66,9 @@ describe("StreamingPlayheadTimeline", () => {
 			/>,
 		);
 
-		decoded = screen.getByTestId("streaming-playhead-decoded") as HTMLElement;
-		expect(decoded.style.width).toBe("100%");
+		track = screen.getByTestId("streaming-playhead-track") as HTMLElement;
+		expect(track.getAttribute("data-decoded-percent")).toBe("100");
+		expect(track.style.getPropertyValue("--streaming-decoded")).toBe("100%");
 	});
 
 	test("disables slider when disabled prop is true", () => {

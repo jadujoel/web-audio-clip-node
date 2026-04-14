@@ -266,17 +266,12 @@ test.describe("Streaming example", () => {
 
 		await page.locator("button:has-text('Stream & Play')").click();
 
-		const fill = page.locator("[data-testid='streaming-playhead-decoded']");
-		const pending = page.locator("[data-testid='streaming-playhead-pending']");
-		await expect(pending).toBeVisible();
-		await expect(fill).toBeVisible();
+		const track = page.locator("[data-testid='streaming-playhead-track']");
+		await expect(track).toBeVisible();
 
 		await expect(async () => {
-			const width = await fill.evaluate((node) => {
-				const value = (node as HTMLElement).style.width;
-				return Number.parseFloat(value || "0");
-			});
-			expect(width).toBeGreaterThan(0);
+			const percent = await track.getAttribute("data-decoded-percent");
+			expect(Number(percent ?? "0")).toBeGreaterThan(0);
 		}).toPass({ timeout: 15000 });
 	});
 
