@@ -26,6 +26,7 @@ export {
 	PanControl,
 	PlaybackRateControl,
 	PlayheadSlider,
+	StreamingPlayheadTimeline,
 	useClipControls,
 } from "../../../src/lib-react";
 export type { ControlKey, ClipNodeState, FrameData, LoopMode } from "../../../src/lib";

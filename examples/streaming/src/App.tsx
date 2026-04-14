@@ -13,7 +13,7 @@ import {
 	GainControl,
 	PanControl,
 	PlaybackRateControl,
-	PlayheadSlider,
+	StreamingPlayheadTimeline,
 	useClipControls,
 } from "./clip-node-lib";
 import type { ControlKey } from "./clip-node-lib";
@@ -145,7 +145,7 @@ function StreamingPlayheadInner({
 	}, [frameRef, playbackGeneration]);
 
 	return (
-		<PlayheadSlider
+		<StreamingPlayheadTimeline
 			value={value}
 			audioDuration={audioDuration}
 			seekableSamples={seekableSamples}

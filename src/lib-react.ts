@@ -12,6 +12,7 @@ export { PanControl } from "./components/PanControl";
 export { PlaybackRateControl } from "./components/PlaybackRateControl";
 export { PlayheadSlider } from "./components/PlayheadSlider";
 export { SnappableSlider } from "./components/SnappableSlider";
+export { StreamingPlayheadTimeline } from "./components/StreamingPlayheadTimeline";
 export { TransportButtons } from "./components/TransportButtons";
 // Hooks
 export { useClipNode } from "./hooks/useClipNode";

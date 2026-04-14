@@ -266,8 +266,8 @@ test.describe("Streaming example", () => {
 
 		await page.locator("button:has-text('Stream & Play')").click();
 
-		const fill = page.locator("[data-testid='playhead-buffer-fill']");
-		const pending = page.locator("[data-testid='playhead-buffer-pending']");
+		const fill = page.locator("[data-testid='streaming-playhead-decoded']");
+		const pending = page.locator("[data-testid='streaming-playhead-pending']");
 		await expect(pending).toBeVisible();
 		await expect(fill).toBeVisible();
 
@@ -278,6 +278,40 @@ test.describe("Streaming example", () => {
 			});
 			expect(width).toBeGreaterThan(0);
 		}).toPass({ timeout: 15000 });
+	});
+
+	test("seeking beyond decoded region is blocked while streaming", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming playhead not supported in headless Firefox",
+		);
+
+		await page.locator("select#throttle-select").selectOption("51200");
+		await page.locator("button:has-text('Stream & Play')").click();
+
+		const slider = page.locator(".playhead-slider [role='slider']");
+		await expect(slider).toBeVisible();
+
+		await expect(async () => {
+			const decodedInfo = page.getByText(/Decoded seekable:/i);
+			await expect(decodedInfo).toBeVisible();
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 20000 });
+
+		await slider.focus();
+		await page.keyboard.press("End");
+
+		await expect(
+			page.getByText("Seek limited to decoded region while streaming."),
+		).toBeVisible();
+
+		const valueNow = Number(await slider.getAttribute("aria-valuenow"));
+		const valueMax = Number(await slider.getAttribute("aria-valuemax"));
+		expect(valueNow).toBeLessThan(valueMax);
 	});
 
 	test("selecting RawOpusFramed format populates default URL", async ({

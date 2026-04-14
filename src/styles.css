@@ -723,7 +723,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	z-index: 1;
 }
 
-.playhead-buffer-track {
+.streaming-playhead-track {
 	position: absolute;
 	left: 0;
 	right: 0;
@@ -736,7 +736,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	z-index: 0;
 }
 
-.playhead-buffer-pending {
+.streaming-playhead-pending {
 	position: absolute;
 	inset: 0;
 	background-image: repeating-linear-gradient(
@@ -750,7 +750,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	z-index: 0;
 }
 
-.playhead-buffer-fill {
+.streaming-playhead-decoded {
 	position: absolute;
 	left: 0;
 	top: 0;
@@ -758,6 +758,15 @@ input[type="number"]::-webkit-outer-spin-button {
 	background: rgba(91, 155, 213, 0.65);
 	transition: width 0.15s ease;
 	z-index: 1;
+}
+
+.streaming-playhead-handle .snappable-slider {
+	position: relative;
+	z-index: 1;
+}
+
+.streaming-playhead-handle .slider-thumb {
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .playhead-time {
