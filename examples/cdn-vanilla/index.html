@@ -47,31 +47,22 @@
 
   <script type="module">
     // Ogg Opus at 48 kHz recommended — avoids resampling overhead
-    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
+    import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node";
 
     const playBtn = document.getElementById("play");
     const pauseBtn = document.getElementById("pause");
     const resumeBtn = document.getElementById("resume");
     const statusEl = document.getElementById("status");
 
-    function generateTone(sampleRate, seconds = 2, freq = 440) {
-      const length = sampleRate * seconds;
-      const buf = new Float32Array(length);
-      for (let i = 0; i < length; i++) {
-        buf[i] = 0.3 * Math.sin(2 * Math.PI * freq * i / sampleRate)
-               * (1 - i / length); // fade out
-      }
-      return [buf, buf.slice()]; // stereo
-    }
-
+    main();
     async function main() {
       const context = new AudioContext({ sampleRate: 48000 });
-      await context.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
+      await context.audioWorklet.addModule();
       statusEl.textContent = "Ready";
 
-      const clip = new ClipNode(context, {
-        processorOptions: { buffer: generateTone(context.sampleRate) },
-      });
+      const clip = new ClipNode(context)
+
+      clip.buffer = generateTone(context.sampleRate)
       clip.connect(context.destination);
       clip.onstatechange = (s) => { statusEl.textContent = s; };
 
@@ -98,7 +89,17 @@
         resumeBtn.disabled = true;
       };
     }
-    main()
+
+    function generateTone(sampleRate, seconds = 2, freq = 440) {
+      const length = sampleRate * seconds;
+      const buf = new Float32Array(length);
+      for (let i = 0; i < length; i++) {
+        buf[i] = 0.3 * Math.sin(2 * Math.PI * freq * i / sampleRate)
+               * (1 - i / length); // fade out
+      }
+      return [buf, buf.slice()]; // stereo
+    }
+
   </script>
 </body>
 </html>

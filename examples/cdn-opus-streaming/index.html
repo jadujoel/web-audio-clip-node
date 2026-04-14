@@ -42,7 +42,7 @@
   </main>
 
   <script type="module">
-    import { Coordinator } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/lib.bundle.js";
+    import { Coordinator } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node";
 
     const btn = document.getElementById("start");
     const status = document.getElementById("status");
@@ -53,6 +53,7 @@
 
     async function main() {
       const coordinator = Coordinator.fromCdn();
+      await coordinator.addModule();
       const clip = coordinator.createStreamingClipNode();
       clip.connect(coordinator.context.destination);
 
