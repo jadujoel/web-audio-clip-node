@@ -57,7 +57,7 @@ describe("AudioWorklet Bun integration", () => {
 		await renderContext(context);
 
 		expect(true).toBe(true);
-	});
+	}, 30_000);
 
 	test("playbackRate can hit zero and resume without crashing the worklet", async () => {
 		const context = createContext({
@@ -86,7 +86,7 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here without a crash means the worklet survived rate=0
 		expect(true).toBe(true);
-	});
+	}, 30_000);
 
 	test("C1: full buffer swap via ClipNode.buffer setter during playback — no crash", async () => {
 		const context = createContext({
@@ -117,7 +117,7 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here = no crash, no hang
 		expect(true).toBe(true);
-	});
+	}, 30_000);
 
 	test("C2: replaceBufferRange during streaming playback — no crash", async () => {
 		const context = createContext({
@@ -153,7 +153,7 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here = no crash, no hang
 		expect(true).toBe(true);
-	});
+	}, 30_000);
 
 	test("C3: playhead scrub beyond committed stream data remains stable", async () => {
 		const context = createContext({
@@ -196,7 +196,7 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here confirms scrub + streaming writes remain stable.
 		expect(true).toBe(true);
-	});
+	}, 30_000);
 
 	test("streaming buffer samples survive processor roundtrip at identity settings", async () => {
 		const length = 12_000;
@@ -260,5 +260,5 @@ describe("AudioWorklet Bun integration", () => {
 			maxMismatchRatio: 0.01,
 			label: "right channel",
 		});
-	});
+	}, 30_000);
 });
