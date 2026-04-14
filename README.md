@@ -4,6 +4,12 @@ AudioWorklet clip playback for the Web Audio API with pause/resume, reusable sta
 
 Live demo: https://jadujoel.github.io/web-audio-clip-node/
 
+## At a Glance
+
+- Use `ClipNode` when your audio is already in an `AudioBuffer`.
+- Use `Coordinator` + `StreamingClipNode` to start playback before full download.
+- Use `@jadujoel/web-audio-clip-node/react` for hooks and ready-made transport/UI controls.
+
 ## Why this library
 
 `AudioBufferSourceNode` is good at one-shot playback, but it does not give you some things more advanced apps usually need:
@@ -20,6 +26,18 @@ Live demo: https://jadujoel.github.io/web-audio-clip-node/
 `ClipNode` is aimed at those missing pieces while staying small enough to drop into a plain browser app.
 
 ## Install
+
+```sh
+npm install @jadujoel/web-audio-clip-node
+```
+
+```sh
+pnpm add @jadujoel/web-audio-clip-node
+```
+
+```sh
+yarn add @jadujoel/web-audio-clip-node
+```
 
 ```sh
 bun install @jadujoel/web-audio-clip-node
@@ -63,6 +81,8 @@ clip.start();
 
 Use `Coordinator` to share a single worklet module load and create `StreamingClipNode` instances that start playback before the full file has been fetched.
 
+Streaming decode uses WebCodecs (`AudioDecoder`) in a worker, so browser support for WebCodecs + AudioWorklet is required.
+
 ```ts
 import { Coordinator } from "@jadujoel/web-audio-clip-node";
 
@@ -75,7 +95,7 @@ clip.connect(ctx.destination);
 
 clip.onprogress = (bytes) => console.log("received", bytes, "bytes");
 clip.ondone = () => console.log("stream complete");
-clip.onerror = (msg) => console.error("stream error:", msg);
+clip.onerror = (err) => console.error("stream error:", err.message);
 
 // Setting the URL immediately begins fetching and decoding.
 // Playback starts automatically once the first chunk is decoded.
@@ -136,10 +156,10 @@ Use the bundled entry point when you want a single browser import and load the p
 
 ```html
 <script type="module">
-  import { ClipNode } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node";
+  import { ClipNode, getProcessorCdnUrl } from "https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/bundle";
 
   const ctx = new AudioContext();
-  await ctx.audioWorklet.addModule("https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node/dist/processor.js");
+  await ctx.audioWorklet.addModule(getProcessorCdnUrl());
 
   const clip = new ClipNode(ctx);
   clip.connect(ctx.destination);
