@@ -156,6 +156,35 @@ interface OpusHead {
 	description: Uint8Array;
 }
 
+export function getOpusSamplesPerFrame(config: number): number {
+	if (config >= 16) {
+		// CELT-only mode: 2.5/5/10/20ms
+		return [120, 240, 480, 960][config & 0x03] ?? 960;
+	}
+	if (config >= 12) {
+		// Hybrid mode: 10/20ms
+		return [480, 960][config & 0x01] ?? 960;
+	}
+	// SILK-only mode: 10/20/40/60ms
+	return [480, 960, 1920, 2880][config & 0x03] ?? 960;
+}
+
+export function getOpusPacketDurationSamples(packet: Uint8Array): number {
+	if (packet.length === 0) return 0;
+	const toc = packet[0] ?? 0;
+	const config = toc >> 3;
+	const frameCountCode = toc & 0x03;
+	let frameCount = 1;
+	if (frameCountCode === 1 || frameCountCode === 2) {
+		frameCount = 2;
+	} else if (frameCountCode === 3) {
+		frameCount = (packet[1] ?? 0) & 0x3f;
+		if (frameCount <= 0) frameCount = 1;
+	}
+	const samplesPerFrame = getOpusSamplesPerFrame(config);
+	return frameCount * samplesPerFrame;
+}
+
 function parseOpusHead(packet: Uint8Array): OpusHead | null {
 	if (packet.length < 19) return null;
 	const magic = new TextDecoder().decode(packet.slice(0, 8));
@@ -253,6 +282,7 @@ async function startStreaming(
 	const batcher = new FrameBatcher();
 	let packetIndex = isSeeking ? 2 : 0; // Skip header packets when seeking
 	let activeSerial: number | null = null;
+	let activeSerialEnded = false;
 	let streamChannels = 2;
 	let preSkipSourceSamples = 0;
 	let preSkipTargetSamples = 0;
@@ -299,7 +329,6 @@ async function startStreaming(
 				);
 				samplesSkipped += toSkip;
 				if (toSkip === resampledFrames) {
-					timestampUs += Math.round((numFrames / OPUS_SAMPLE_RATE) * 1_000_000);
 					return;
 				}
 				for (let ch = 0; ch < channelData.length; ch++) {
@@ -372,8 +401,6 @@ async function startStreaming(
 					}
 				}
 			}
-
-			timestampUs += Math.round((numFrames / OPUS_SAMPLE_RATE) * 1_000_000);
 		},
 		error(e: DOMException) {
 			self.postMessage({ type: "error", code: "DECODE", message: e.message });
@@ -458,6 +485,10 @@ async function startStreaming(
 					data: packet,
 				}),
 			);
+			const packetDurationUs = Math.round(
+				(getOpusPacketDurationSamples(packet) / OPUS_SAMPLE_RATE) * 1_000_000,
+			);
+			timestampUs += packetDurationUs;
 			decodedAnyPacket = true;
 			packetIndex += 1;
 		};
@@ -477,9 +508,23 @@ async function startStreaming(
 			for (const page of parsed.pages) {
 				if (activeSerial == null) {
 					activeSerial = page.serialNumber;
+					activeSerialEnded = false;
 				}
 				if (page.serialNumber !== activeSerial) {
-					continue;
+					// Support chained Ogg Opus links: when the current serial has ended,
+					// adopt the next BOS serial and continue decoding instead of truncating.
+					const isBos = (page.headerType & 0x02) !== 0;
+					if (activeSerialEnded && isBos) {
+						activeSerial = page.serialNumber;
+						activeSerialEnded = false;
+						packetIndex = 0;
+						pendingPacket = new Uint8Array(0);
+						samplesSkipped = 0;
+						shouldApplyPreSkip = true;
+						preSkipProbeDone = false;
+					} else {
+						continue;
+					}
 				}
 				if (page.continued) {
 					if (page.packets.length === 0) {
@@ -522,6 +567,10 @@ async function startStreaming(
 					} else {
 						handlePacket(page.packets[i]);
 					}
+				}
+
+				if ((page.headerType & 0x04) !== 0) {
+					activeSerialEnded = true;
 				}
 			}
 		}

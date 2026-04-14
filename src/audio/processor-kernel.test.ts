@@ -769,6 +769,21 @@ describe("handleProcessorMessage", () => {
 		expect(props.duration).toBe(Number.MAX_SAFE_INTEGER);
 	});
 
+	it("start with incomplete streaming source keeps duration unbounded", () => {
+		const props = getProperties({}, SR);
+		handleProcessorMessage(
+			props,
+			{
+				type: "bufferInit",
+				data: { channels: 2, totalLength: 4_425_337, streaming: true },
+			},
+			CT,
+			SR,
+		);
+		handleProcessorMessage(props, { type: "start" }, CT, SR);
+		expect(props.duration).toBe(Number.MAX_SAFE_INTEGER);
+	});
+
 	it("start keeps a valid loop range when the buffer arrives after construction", () => {
 		const props = getProperties({}, SR);
 		const buf = makeBuffer(48000);
@@ -5195,6 +5210,17 @@ describe("Streaming Loop", () => {
 		const { messages } = simulateBlocks(props, 10);
 		expect(messages.some((m) => m.type === "ended")).toBe(true);
 		expect(props.state).toBe(State.Ended);
+	});
+
+	it("H4b: non-loop streaming does not end before bufferEnd is received", () => {
+		const props = makeStreamingProps({ loop: false });
+		initStreamingBuffer(props, 512, 512);
+
+		const { messages } = simulateBlocks(props, 10);
+		expect(messages.some((m) => m.type === "ended")).toBe(false);
+		expect(props.state).toBe(State.Started);
+		// Playhead clamps to committed edge while waiting for explicit stream end.
+		expect(props.playhead).toBe(512);
 	});
 
 	it("H5: loop start/end params are clamped to effectiveSourceLength during streaming", () => {

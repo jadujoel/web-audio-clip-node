@@ -473,6 +473,9 @@ export class StreamingClipNode extends ClipNode {
 				this.emit("metadata", msg.metadata);
 			} else if (msg.type === "done") {
 				const completionSamples = this._resolveCompletionSamples(msg);
+				// Redundantly finalize on the main-thread control port so totalLength is
+				// correct even if the worker-side bufferEnd message arrives late.
+				this.finalizeBuffer(completionSamples);
 				this._streamDone = true;
 				this._streamDoneAcked = true;
 				// If the entire stream is shorter than the threshold, start now

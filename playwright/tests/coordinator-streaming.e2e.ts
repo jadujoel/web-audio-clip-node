@@ -169,4 +169,40 @@ test.describe("Coordinator streaming example", () => {
 		await expect(status).not.toContainText("Stream Ended.");
 		await expect(status).not.toContainText("Error:");
 	});
+
+	test("ended currentTime is near expected opus duration", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"timing-sensitive stream completion checks are flaky in headless Firefox/WebKit",
+		);
+		test.setTimeout(180_000);
+
+		const streamUrl =
+			"https://jadujoel.github.io/web-audio-clip-node/sounds/example.opus";
+		const expectedDuration = await page.evaluate(async (url) => {
+			const audio = new Audio(url);
+			audio.preload = "metadata";
+			await new Promise<void>((resolve, reject) => {
+				audio.onloadedmetadata = () => resolve();
+				audio.onerror = () => reject(new Error("failed to load metadata"));
+			});
+			return Number.isFinite(audio.duration) ? audio.duration : 0;
+		}, streamUrl);
+
+		const startedAt = Date.now();
+		await page.locator("button#start").click();
+		const status = page.locator("#status");
+
+		await expect
+			.poll(async () => (await status.textContent())?.trim() ?? "", {
+				timeout: 140_000,
+			})
+			.toBe("Stream Ended.");
+
+		const elapsedSeconds = (Date.now() - startedAt) / 1000;
+		expect(elapsedSeconds).toBeGreaterThanOrEqual(expectedDuration * 0.95);
+	});
 });

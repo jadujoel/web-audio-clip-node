@@ -886,9 +886,13 @@ export function handleProcessorMessage(
 					| undefined;
 				properties.duration = d?.duration ?? -1;
 				if (properties.duration === -1) {
-					properties.duration = properties.loop
-						? Number.MAX_SAFE_INTEGER
-						: (properties.buffer[0]?.length ?? 0) / sampleRate;
+					const isIncompleteStreamingSource =
+						properties.streamBuffer.streaming &&
+						!properties.streamBuffer.streamEnded;
+					properties.duration =
+						properties.loop || isIncompleteStreamingSource
+							? Number.MAX_SAFE_INTEGER
+							: (properties.buffer[0]?.length ?? 0) / sampleRate;
 				}
 				setOffset(properties, d?.offset, sampleRate);
 				normalizeLoopBounds(properties, sampleRate);
@@ -1427,7 +1431,14 @@ export function processBlock(
 		props.timesLooped++;
 		messages.push({ type: "looped", data: props.timesLooped });
 	}
-	if (ended && !waitingForFinalCommit && !hasUnfinishedStreamTail) {
+	const canEndStreamPlayback =
+		!props.streamBuffer.streaming || props.streamBuffer.streamEnded;
+	if (
+		ended &&
+		canEndStreamPlayback &&
+		!waitingForFinalCommit &&
+		!hasUnfinishedStreamTail
+	) {
 		props.state = State.Ended;
 		messages.push({ type: "ended" });
 	}
