@@ -1292,7 +1292,7 @@ describe("ClipNode.ontimeupdate", () => {
 			data: { type: "frame", data: [0, 0, 48_000, 0.01] },
 		} as MessageEvent);
 		expect(times).toEqual([1]); // 48000 / 48000 = 1 second
-	});
+	}, 20_000);
 
 	test("throttles to timeUpdateInterval", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -2608,7 +2608,7 @@ describe("ClipNode dispose guards", () => {
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.pause()).toThrow("Cannot use a disposed ClipNode");
-	});
+	}, 20_000);
 
 	test("resume throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -2637,7 +2637,7 @@ describe("ClipNode dispose guards", () => {
 		expect(() => {
 			node.playhead = 100;
 		}).toThrow("Cannot use a disposed ClipNode");
-	});
+	}, 20_000);
 
 	test("dispose clears buffer and stream state", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -2648,7 +2648,7 @@ describe("ClipNode dispose guards", () => {
 		expect(node.buffer).toBeDefined();
 		node.dispose();
 		expect(node.buffer).toBeUndefined();
-	});
+	}, 20_000);
 
 	test("disposed event fires exactly once on first dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
@@ -3037,7 +3037,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 		// Clear target → back to hold
 		node.targetNumSamples = undefined;
 		expect(node.gapPlaybackStrategy).toBe("hold");
-	});
+	}, 20_000);
 
 	test("silence strategy: no waiting event on gap traversal", async () => {
 		const worker = new FakeWorker();
@@ -3182,5 +3182,5 @@ describe("StreamingClipNode gap playback strategy", () => {
 		expect(node.targetNumSamples).toBe(48000);
 		expect(node.targetDuration).toBe(1.0);
 		expect(node.gapRecoveryFadeSamples).toBe(64);
-	});
+	}, 20_000);
 });

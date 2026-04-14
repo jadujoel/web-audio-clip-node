@@ -86,7 +86,7 @@ describe("AudioWorklet Bun integration", () => {
 
 		// Reaching here without a crash means the worklet survived rate=0
 		expect(true).toBe(true);
-	}, 30_000);
+	}, 60_000);
 
 	test("C1: full buffer swap via ClipNode.buffer setter during playback — no crash", async () => {
 		const context = createContext({

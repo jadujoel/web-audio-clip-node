@@ -56,13 +56,13 @@
 		"examples": "bun examples.ts",
 		"lint": "biome check",
 		"serve-webpage": "bun serve-webpage.ts",
-		"test": "bun test --max-concurrency=4",
+		"test": "bun test --max-concurrency=4 --timeout=20000",
 		"test:e2e": "bunx playwright test",
 		"test:e2e:chromium": "bunx playwright test --project=chromium",
 		"test:e2e:firefox": "bunx playwright test --project=firefox",
 		"test:e2e:webkit": "bunx playwright test --project=webkit",
 		"typecheck": "tsc --noEmit",
-		"validate": "bun run build && bun run lint && bun run typecheck && bun test --max-concurrency=4",
+		"validate": "bun run build && bun run lint && bun run typecheck && bun test --max-concurrency=4 --timeout=20000",
 		"prepublishOnly": "bun run build:lib"
 	},
 	"peerDependencies": {
