@@ -124,6 +124,8 @@ function StreamingPlayheadInner({
 
 	useEffect(() => {
 		let raf: number;
+		// Reset playhead display when a new stream starts
+		setValue(0);
 		// Track the last emitted value so we can suppress small backwards jumps
 		// caused by stale frame data arriving between processor cycles.
 		let last = 0;
@@ -592,7 +594,10 @@ export function App() {
 
 			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
 				<button type="button" onClick={() => node.stream(url, throttle, format, gapStrategy)}>
-					▶ Stream &amp; Play
+					⏬ Stream
+				</button>
+				<button type="button" onClick={node.play} disabled={node.nodeState !== "initial" || !node.seekableSamples}>
+					▶ Play
 				</button>
 				<button type="button" onClick={node.pause} disabled={!isStreaming}>
 					{node.nodeState === "paused" ? "▶ Resume" : "⏸ Pause"}

@@ -61,6 +61,7 @@
 		"test:e2e:chromium": "bunx playwright test --project=chromium",
 		"test:e2e:firefox": "bunx playwright test --project=firefox",
 		"test:e2e:webkit": "bunx playwright test --project=webkit",
+		"smoke:legacy": "bun smoke-legacy.ts",
 		"typecheck": "tsc --noEmit",
 		"validate": "bun run build && bun run lint && bun run typecheck && bun test --max-concurrency=4 --timeout=20000",
 		"prepublishOnly": "bun run build:lib"
@@ -93,6 +94,7 @@
 		"isomorphic-web-audio-api": "1.0.2",
 		"react": "19.2.5",
 		"react-dom": "19.2.5",
+		"webdriverio": "9.27.0",
 		"zustand": "5.0.12"
 	},
 	"publishConfig": {

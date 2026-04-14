@@ -159,8 +159,13 @@ export function useStreamingClipNode({
 			clip.onlooped = () => {
 				timesLoopedRef.current = clip.timesLooped.toString();
 			};
+			// Capture the generation at clip creation time so stale frames
+			// from a torn-down clip are ignored.
+			const gen = frameGenRef.current;
 			clip.onframe = (data) => {
-				frameRef.current = data;
+				if (frameGenRef.current === gen) {
+					frameRef.current = data;
+				}
 			};
 
 			setInfoLatency(
@@ -182,6 +187,7 @@ export function useStreamingClipNode({
 	const clipRef = useRef<ClipNode | null>(null);
 	const workerRef = useRef<Worker | null>(null);
 	const frameRef = useRef<FrameData | null>(null);
+	const frameGenRef = useRef(0);
 	const timesLoopedRef = useRef("0");
 	const gapStrategyRef = useRef<GapPlaybackStrategy>("hold");
 	const [playbackGeneration, setPlaybackGeneration] = useState(0);
@@ -207,20 +213,24 @@ export function useStreamingClipNode({
 				return;
 			}
 
-			// Increment generation so playhead effect resets its state
+			// Increment generation so playhead effect resets its display value
 			setPlaybackGeneration((g) => g + 1);
 
 			// Tear down previous run
+			frameGenRef.current++;
 			if (workerRef.current) {
 				workerRef.current.postMessage({ type: "abort" });
 				workerRef.current.terminate();
 				workerRef.current = null;
 			}
 			if (clipRef.current) {
+				clipRef.current.onstatechange = undefined;
+				clipRef.current.onframe = undefined;
 				clipRef.current.stop();
 				clipRef.current.disconnect();
 				clipRef.current = null;
 			}
+			frameRef.current = null;
 
 			try {
 				const ctx = await ensureContext();
@@ -311,12 +321,8 @@ export function useStreamingClipNode({
 								setSeekableDuration(nextSeekable);
 							}
 						}
-						if (
-							samplesDecoded >= ctx.sampleRate &&
-							clipRef.current?.state === "initial"
-						) {
-							clipRef.current.start();
-							setStatus("Streaming & playing…");
+						if (samplesDecoded >= ctx.sampleRate) {
+							setStatus("Ready to play.");
 						}
 						break;
 					}
@@ -328,9 +334,6 @@ export function useStreamingClipNode({
 					}
 					case "done": {
 						const samples = ev.data.samplesDecoded as number;
-						setStatus(
-							`Done — ${samples} samples decoded.`,
-						);
 						setProgress(1);
 						if (ctx.sampleRate > 0) {
 							const duration = samples / ctx.sampleRate;
@@ -339,11 +342,11 @@ export function useStreamingClipNode({
 							setSeekableDuration(duration);
 							setSeekableSamples(samples);
 						}
-						// Start playback if stream was too short to meet pre-buffer threshold
-						if (clipRef.current?.state === "initial") {
-							clipRef.current.start();
-							setStatus("Streaming & playing…");
-						}
+						setStatus(
+							clipRef.current?.state === "initial"
+								? `Done — ${samples} samples. Ready to play.`
+								: `Done — ${samples} samples decoded.`,
+						);
 						break;
 					}
 					case "error": {
@@ -391,6 +394,17 @@ export function useStreamingClipNode({
 		},
 		[ensureContext, loop, values, enabled, setStatus],
 	);
+
+	const play = useCallback(() => {
+		const clip = clipRef.current;
+		if (!clip) return;
+		if (clip.state === "initial") {
+			setPlaybackGeneration((g) => g + 1);
+			frameRef.current = null;
+			clip.start();
+			setStatus("Playing…");
+		}
+	}, [setStatus]);
 
 	const pause = useCallback(() => {
 		const clip = clipRef.current;
@@ -509,6 +523,7 @@ export function useStreamingClipNode({
 		infoLatency,
 		playbackGeneration,
 		stream,
+		play,
 		pause,
 		stop,
 		seekPlayhead,
