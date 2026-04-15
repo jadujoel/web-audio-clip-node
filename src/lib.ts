@@ -1,3 +1,5 @@
+import "./polyfills";
+
 // Core audio
 export { ClipNode } from "./audio/ClipNode";
 export { Coordinator } from "./audio/Coordinator";
