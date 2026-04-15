@@ -50,7 +50,11 @@ importScripts(${coreUrl});
 importScripts(${loaderUrl});
 if(typeof LibAVWebCodecs!=="undefined"){
 var __wasmBase=${wasmUrl}.replace(/\\/[^\\/]*$/,"");
-await LibAVWebCodecs.load({polyfill:true,libavOptions:{noworker:true,nothreads:true,base:__wasmBase+"/",wasmurl:${wasmUrl}}});
+var __nowasm=false;
+try{new WebAssembly.Module(new Uint8Array([0,97,115,109,1,0,0,0,12,1,0]))}catch(e){__nowasm=true}
+var __opts={noworker:true,nothreads:true,base:__wasmBase+"/"};
+if(!__nowasm){__opts.wasmurl=${wasmUrl}}else{__opts.nowasm=true}
+await LibAVWebCodecs.load({polyfill:true,libavOptions:__opts});
 }
 if(typeof AudioDecoder==="undefined"){
 self.postMessage({type:"error",code:"AUDIO_DECODER_POLYFILL_LOAD_FAILED",message:"Polyfill did not provide AudioDecoder"});
