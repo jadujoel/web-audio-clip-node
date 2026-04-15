@@ -47,7 +47,10 @@
 		"LICENSE",
 		"examples"
 	],
-	"sideEffects": false,
+	"sideEffects": [
+		"./src/polyfills.ts",
+		"./dist/polyfills.js"
+	],
 	"scripts": {
 		"build": "bun build.ts",
 		"build:lib": "bun build.ts --lib",

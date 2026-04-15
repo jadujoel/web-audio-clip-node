@@ -10,3 +10,12 @@ if (Promise.withResolvers === undefined) {
 		return { promise, resolve: resolve!, reject: reject! };
 	};
 }
+if (Array.prototype.at === undefined) {
+	Array.prototype.at = function (index) {
+		const len = this.length;
+		const relativeIndex = Math.trunc(index) || 0;
+		const k = relativeIndex >= 0 ? relativeIndex : len + relativeIndex;
+		if (k < 0 || k >= len) return undefined;
+		return this[k];
+	};
+}

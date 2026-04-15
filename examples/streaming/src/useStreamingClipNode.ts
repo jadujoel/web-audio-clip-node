@@ -24,7 +24,11 @@ function getWorkerUrl(format: StreamFormat): string {
 
 function getPolyfillOptions(): AudioDecoderPolyfillOptions | undefined {
 	if (probeAudioDecoderSupport()) return undefined;
-	const base = `${location.origin}/polyfill`;
+	// Use pathname-aware base so it works on both localhost and GitHub Pages
+	// e.g. https://jadujoel.github.io/web-audio-clip-node/streaming/ → /web-audio-clip-node/polyfill
+	const pathParts = location.pathname.replace(/\/+$/, "").split("/");
+	pathParts.pop(); // remove current page segment (e.g. "streaming")
+	const base = `${location.origin}${pathParts.join("/")}/polyfill`;
 	return {
 		enabled: true,
 		loaderUrl: `${base}/libavjs-webcodecs-polyfill.js`,

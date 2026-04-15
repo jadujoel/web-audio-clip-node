@@ -151,7 +151,13 @@ async function copyPolyfillAssets(outputRoot: string): Promise<void> {
 	if (existsSync(libavDir)) {
 		const entries = await readdir(libavDir);
 		for (const entry of entries) {
-			if (entry.includes("-webcodecs.") && !entry.includes("-avf.") && !entry.includes("-cli.") && !entry.includes("-thr.") && !entry.includes(".mjs")) {
+			if (
+				entry.includes("-webcodecs.") &&
+				!entry.includes("-avf.") &&
+				!entry.includes("-cli.") &&
+				!entry.includes("-thr.") &&
+				!entry.includes(".mjs")
+			) {
 				await cp(join(libavDir, entry), join(outDir, entry));
 			}
 		}

@@ -1,6 +1,6 @@
-import { remote } from "webdriverio";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { remote } from "webdriverio";
 
 const UDID = process.env.UDID;
 if (!UDID) {
@@ -66,7 +66,9 @@ async function injectCollector(browser: WebdriverIO.Browser) {
 		// Capture uncaught errors
 		window.addEventListener("error", (e) => {
 			(w.__smokeErrors as string[]).push(e.message);
-			(w.__smokeLogs as { level: string; args: string; timestamp: number }[]).push({
+			(
+				w.__smokeLogs as { level: string; args: string; timestamp: number }[]
+			).push({
 				level: "error",
 				args: `[uncaught] ${e.message} (${e.filename}:${e.lineno})`,
 				timestamp: Date.now(),
@@ -75,7 +77,9 @@ async function injectCollector(browser: WebdriverIO.Browser) {
 		window.addEventListener("unhandledrejection", (e) => {
 			const reason = String(e.reason);
 			(w.__smokeErrors as string[]).push(reason);
-			(w.__smokeLogs as { level: string; args: string; timestamp: number }[]).push({
+			(
+				w.__smokeLogs as { level: string; args: string; timestamp: number }[]
+			).push({
 				level: "error",
 				args: `[unhandledrejection] ${reason}`,
 				timestamp: Date.now(),
@@ -86,9 +90,13 @@ async function injectCollector(browser: WebdriverIO.Browser) {
 		for (const level of ["log", "info", "warn", "error"] as const) {
 			const original = console[level].bind(console);
 			console[level] = (...args: unknown[]) => {
-				(w.__smokeLogs as { level: string; args: string; timestamp: number }[]).push({
+				(
+					w.__smokeLogs as { level: string; args: string; timestamp: number }[]
+				).push({
 					level,
-					args: args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "),
+					args: args
+						.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+						.join(" "),
 					timestamp: Date.now(),
 				});
 				original(...args);
@@ -104,7 +112,9 @@ async function collectErrors(browser: WebdriverIO.Browser): Promise<string[]> {
 	});
 }
 
-async function collectLogs(browser: WebdriverIO.Browser): Promise<ConsoleEntry[]> {
+async function collectLogs(
+	browser: WebdriverIO.Browser,
+): Promise<ConsoleEntry[]> {
 	return browser.execute(() => {
 		const w = window as unknown as Record<string, unknown>;
 		return (w.__smokeLogs as ConsoleEntry[]) ?? [];
@@ -121,7 +131,9 @@ async function getPlayheadValue(browser: WebdriverIO.Browser): Promise<number> {
 
 type SmokeCheck = {
 	name: string;
-	run: (browser: WebdriverIO.Browser) => Promise<{ errors: string[]; logs: ConsoleEntry[] }>;
+	run: (
+		browser: WebdriverIO.Browser,
+	) => Promise<{ errors: string[]; logs: ConsoleEntry[] }>;
 };
 
 const smokeChecks: SmokeCheck[] = [
@@ -131,13 +143,16 @@ const smokeChecks: SmokeCheck[] = [
 			const errors: string[] = [];
 			await browser.url(`${BASE_URL}/`);
 			await browser.waitUntil(
-				async () => (await browser.execute(() => document.readyState)) === "complete",
+				async () =>
+					(await browser.execute(() => document.readyState)) === "complete",
 				{ timeout: 30_000, timeoutMsg: "Page did not load" },
 			);
 			await injectCollector(browser);
 			const title = await browser.getTitle();
 			if (!/web-audio-clip-node/i.test(title)) {
-				errors.push(`Expected title matching /web-audio-clip-node/i, got "${title}"`);
+				errors.push(
+					`Expected title matching /web-audio-clip-node/i, got "${title}"`,
+				);
 			}
 			const link = await browser.$("a[href]");
 			if (!(await link.isExisting())) {
@@ -153,7 +168,8 @@ const smokeChecks: SmokeCheck[] = [
 			const errors: string[] = [];
 			await browser.url(`${BASE_URL}/playground/`);
 			await browser.waitUntil(
-				async () => (await browser.execute(() => document.readyState)) === "complete",
+				async () =>
+					(await browser.execute(() => document.readyState)) === "complete",
 				{ timeout: 30_000, timeoutMsg: "Page did not load" },
 			);
 			await injectCollector(browser);
@@ -170,21 +186,27 @@ const smokeChecks: SmokeCheck[] = [
 			const soundName = await getDisplayValue(browser, "Sound:");
 			if (!soundName || soundName === "none") {
 				// Default .opus likely failed on this Safari version — load mp3 via JS
-				console.log("      ⚠ Default sound not loaded (Opus unsupported?), loading MP3...");
+				console.log(
+					"      ⚠ Default sound not loaded (Opus unsupported?), loading MP3...",
+				);
 				await browser.execute((baseUrl: string) => {
 					const url = `${baseUrl}/sounds/example.mp3`;
 					fetch(url)
 						.then((r) => r.arrayBuffer())
 						.then((ab) => {
 							// Dispatch a custom event the app can use, or directly decode
-							const evt = new CustomEvent("smoke-load-sound", { detail: { url, arrayBuffer: ab } });
+							const evt = new CustomEvent("smoke-load-sound", {
+								detail: { url, arrayBuffer: ab },
+							});
 							window.dispatchEvent(evt);
 						});
 				}, BASE_URL);
 				// The above custom event won't work since the app doesn't listen for it.
 				// Instead, use the URL input approach — navigate to a page that auto-loads mp3
 				// Actually, let's just test that the page loads and buttons exist without audio on unsupported browsers
-				console.log("      ℹ Skipping audio playback (Opus not supported on Safari 14)");
+				console.log(
+					"      ℹ Skipping audio playback (Opus not supported on Safari 14)",
+				);
 				console.log("      ✓ Page structure verified");
 				const jsErrors = await collectErrors(browser);
 				for (const e of jsErrors) errors.push(`JS error: ${e}`);
@@ -267,13 +289,20 @@ const smokeChecks: SmokeCheck[] = [
 			const errors: string[] = [];
 			await browser.url(`${BASE_URL}/streaming/`);
 			await browser.waitUntil(
-				async () => (await browser.execute(() => document.readyState)) === "complete",
+				async () =>
+					(await browser.execute(() => document.readyState)) === "complete",
 				{ timeout: 30_000, timeoutMsg: "Page did not load" },
 			);
 			await injectCollector(browser);
 
 			// Verify page structure
-			for (const sel of ["h1", "select#format-select", "input#url", "section#display", ".playhead-slider"]) {
+			for (const sel of [
+				"h1",
+				"select#format-select",
+				"input#url",
+				"section#display",
+				".playhead-slider",
+			]) {
 				const el = await browser.$(sel);
 				if (!(await el.isExisting())) {
 					errors.push(`Missing element: ${sel}`);
@@ -283,11 +312,14 @@ const smokeChecks: SmokeCheck[] = [
 			// Select Flac format — supported by AudioDecoder polyfill (MP3/AAC are MPEG
 			// codecs and not supported by the libavjs-webcodecs-polyfill).
 			await browser.execute(() => {
-				const select = document.querySelector("#format-select") as HTMLSelectElement;
+				const select = document.querySelector(
+					"#format-select",
+				) as HTMLSelectElement;
 				if (!select) return;
 				// Use the native setter to bypass React's controlled component guard
 				const nativeSetter = Object.getOwnPropertyDescriptor(
-					HTMLSelectElement.prototype, "value"
+					HTMLSelectElement.prototype,
+					"value",
 				)?.set;
 				if (nativeSetter) {
 					nativeSetter.call(select, "Flac");
@@ -301,7 +333,9 @@ const smokeChecks: SmokeCheck[] = [
 			await browser.pause(1000);
 
 			const selectedVal = await browser.execute(() => {
-				const select = document.querySelector("#format-select") as HTMLSelectElement;
+				const select = document.querySelector(
+					"#format-select",
+				) as HTMLSelectElement;
 				return select?.value ?? "";
 			});
 			console.log(`      📋 Selected format value: ${selectedVal}`);
@@ -324,7 +358,9 @@ const smokeChecks: SmokeCheck[] = [
 			// Check if streaming started
 			const streamState = await browser.execute(() => {
 				const outputs = document.querySelectorAll("section#display output");
-				return Array.from(outputs).map(o => o.textContent ?? "").join(" | ");
+				return Array.from(outputs)
+					.map((o) => o.textContent ?? "")
+					.join(" | ");
 			});
 			console.log(`      📡 After click — display: ${streamState}`);
 
@@ -349,18 +385,25 @@ const smokeChecks: SmokeCheck[] = [
 			} catch {
 				const statusMsg = await browser.execute(() => {
 					const ps = document.querySelectorAll("p");
-					return Array.from(ps).map(p => p.textContent ?? "").filter(Boolean).join(" | ");
+					return Array.from(ps)
+						.map((p) => p.textContent ?? "")
+						.filter(Boolean)
+						.join(" | ");
 				});
 				console.log(`      ℹ Page status: ${statusMsg}`);
 
 				// Also check streaming state display
 				const stateInfo = await browser.execute(() => {
 					const outputs = document.querySelectorAll("section#display output");
-					return Array.from(outputs).map(o => o.textContent ?? "").join(" | ");
+					return Array.from(outputs)
+						.map((o) => o.textContent ?? "")
+						.join(" | ");
 				});
 				console.log(`      ℹ Display values: ${stateInfo}`);
 
-				errors.push("Play button never became enabled — streaming may have failed");
+				errors.push(
+					"Play button never became enabled — streaming may have failed",
+				);
 				const jsErrors = await collectErrors(browser);
 				for (const e of jsErrors) errors.push(`JS error: ${e}`);
 				return { errors, logs: await collectLogs(browser) };
@@ -404,7 +447,9 @@ const smokeChecks: SmokeCheck[] = [
 				const val = await getPlayheadValue(browser);
 				console.log(`      ✓ Playhead advanced to ${val}`);
 			} catch {
-				errors.push("Playhead did not advance — streaming audio may not be playing");
+				errors.push(
+					"Playhead did not advance — streaming audio may not be playing",
+				);
 			}
 
 			// Click Stop via JS
@@ -469,7 +514,9 @@ async function main() {
 				// Try to collect logs even on fatal errors
 				try {
 					logs = await collectLogs(browser);
-				} catch { /* ignore */ }
+				} catch {
+					/* ignore */
+				}
 			}
 
 			const result: SmokeResult = {
@@ -510,7 +557,9 @@ async function main() {
 		lines.push(`# iPhone Smoke Test — ${new Date().toISOString()}`);
 		lines.push(`UDID: ${UDID}`);
 		lines.push(`Base URL: ${BASE_URL}`);
-		lines.push(`Browser: Safari ${browser.capabilities.browserVersion} / iOS ${(browser.capabilities as Record<string, string>)["safari:platformVersion"]}`);
+		lines.push(
+			`Browser: Safari ${browser.capabilities.browserVersion} / iOS ${(browser.capabilities as Record<string, string>)["safari:platformVersion"]}`,
+		);
 		lines.push("");
 
 		for (const r of results) {
@@ -523,7 +572,9 @@ async function main() {
 				lines.push("### Console Logs");
 				for (const entry of r.logs) {
 					const ts = new Date(entry.timestamp).toISOString().slice(11, 23);
-					lines.push(`[${ts}] [${entry.level.toUpperCase().padEnd(5)}] ${entry.args}`);
+					lines.push(
+						`[${ts}] [${entry.level.toUpperCase().padEnd(5)}] ${entry.args}`,
+					);
 				}
 			} else {
 				lines.push("_(no console logs captured)_");
@@ -544,15 +595,11 @@ async function main() {
 			err instanceof Error ? err.message : err,
 		);
 		console.error("\nTroubleshooting:");
-		console.error(
-			"  1. Is the iPhone connected via USB and unlocked?",
-		);
+		console.error("  1. Is the iPhone connected via USB and unlocked?");
 		console.error(
 			"  2. Is Settings → Safari → Advanced → Remote Automation ON?",
 		);
-		console.error(
-			"  3. Did you run 'safaridriver --enable' on this Mac?",
-		);
+		console.error("  3. Did you run 'safaridriver --enable' on this Mac?");
 		process.exit(1);
 	} finally {
 		if (browser) {
