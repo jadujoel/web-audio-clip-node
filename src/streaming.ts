@@ -1,4 +1,15 @@
-import { createWorkerFromBlob, getWorkerCode } from "./workers/workerUrl";
+import type { AudioDecoderPolyfillOptions } from "./workers/audioDecoderPolyfill";
+import {
+	createWorkerFromBlob,
+	createWorkerWithPolyfill,
+	getWorkerCode,
+} from "./workers/workerUrl";
+
+export type {
+	AudioDecoderMode,
+	AudioDecoderPolyfillOptions,
+} from "./workers/audioDecoderPolyfill";
+export { probeAudioDecoderSupport } from "./workers/audioDecoderPolyfill";
 
 export type StreamFormat =
 	| "Aac"
@@ -26,11 +37,14 @@ export const workerFileMap = {
 } as const;
 workerFileMap satisfies Record<StreamFormat, string>;
 
-export function createCdnWorkerFactory(): (
-	format: StreamFormat,
-) => Promise<Worker> {
+export function createCdnWorkerFactory(
+	polyfillOptions?: AudioDecoderPolyfillOptions,
+): (format: StreamFormat) => Promise<Worker> {
 	return async (format: StreamFormat) => {
 		const code = await getWorkerCode(format);
+		if (polyfillOptions?.enabled) {
+			return createWorkerWithPolyfill(code, polyfillOptions);
+		}
 		return createWorkerFromBlob(code);
 	};
 }
@@ -42,8 +56,12 @@ export function getStreamingWorkerUrl(format: StreamFormat): string {
 
 export async function createStreamingWorker(
 	format: StreamFormat,
+	polyfillOptions?: AudioDecoderPolyfillOptions,
 ): Promise<Worker> {
 	const code = await getWorkerCode(format);
+	if (polyfillOptions?.enabled) {
+		return createWorkerWithPolyfill(code, polyfillOptions);
+	}
 	return createWorkerFromBlob(code);
 }
 

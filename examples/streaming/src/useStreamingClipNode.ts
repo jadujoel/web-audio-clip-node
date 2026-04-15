@@ -6,18 +6,32 @@ import {
 } from "./react-runtime";
 import {
 	ClipNode,
+	createStreamingWorker,
 	detectStreamFormat,
 	getProcessorBlobUrl,
 	getStreamingWorkerUrl,
 	linFromDb,
+	probeAudioDecoderSupport,
 } from "./clip-node-lib";
-import type { ControlKey } from "./clip-node-lib";
+import type { AudioDecoderPolyfillOptions, ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
 import type { GapPlaybackStrategy, LoopMode, StreamFormat } from "./clip-node-lib";
 import { clampSeekTargetSamples, secondsFromSamples } from "./clip-node-lib";
 
 function getWorkerUrl(format: StreamFormat): string {
 	return getStreamingWorkerUrl(format);
+}
+
+function getPolyfillOptions(): AudioDecoderPolyfillOptions | undefined {
+	if (probeAudioDecoderSupport()) return undefined;
+	const base = `${location.origin}/polyfill`;
+	return {
+		enabled: true,
+		loaderUrl: `${base}/libavjs-webcodecs-polyfill.js`,
+		coreUrl: `${base}/libav-6.8.8.0-webcodecs.js`,
+		wasmUrl: `${base}/libav-6.8.8.0-webcodecs.wasm.wasm`,
+		timeoutMs: 30_000,
+	};
 }
 
 function applyValueToClip(node: ClipNode, key: ControlKey, value: number) {
@@ -258,7 +272,10 @@ export function useStreamingClipNode({
 				clip.transferPort(channel.port2);
 
 				// Create and start decode worker
-				const worker = new Worker(getWorkerUrl(selectedFormat));
+				const polyfillOpts = getPolyfillOptions();
+				const worker = polyfillOpts
+					? await createStreamingWorker(selectedFormat, polyfillOpts)
+					: new Worker(getWorkerUrl(selectedFormat));
 				workerRef.current = worker;
 				worker.onerror = (event: ErrorEvent) => {
 					setStatus(

@@ -34,6 +34,7 @@ export {
 	createStreamingWorker,
 	detectStreamFormat,
 	getStreamingWorkerUrl,
+	probeAudioDecoderSupport,
 	usesBufferedContainerDecode,
 } from "../../../src/streaming";
-export type { StreamFormat } from "../../../src/streaming";
+export type { AudioDecoderPolyfillOptions, StreamFormat } from "../../../src/streaming";

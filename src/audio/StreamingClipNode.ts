@@ -1,4 +1,4 @@
-import type { StreamFormat } from "../streaming";
+import type { AudioDecoderPolyfillOptions, StreamFormat } from "../streaming";
 import {
 	createStreamingWorker,
 	detectStreamFormatFromResponse,
@@ -101,6 +101,8 @@ export interface StreamingClipNodeOptions {
 	targetDuration?: number;
 	/** Number of samples to fade-in when transitioning from silence gap to real audio. */
 	gapRecoveryFadeSamples?: number;
+	/** AudioDecoder polyfill options for browsers without native WebCodecs support. */
+	polyfill?: AudioDecoderPolyfillOptions;
 }
 
 export class StreamingClipNode extends ClipNode {
@@ -488,7 +490,9 @@ export class StreamingClipNode extends ClipNode {
 				this._detectedFormat ??
 				(await detectStreamFormatFromResponse(url));
 			const workerFactory =
-				this._streamOptions.createWorker ?? createStreamingWorker;
+				this._streamOptions.createWorker ??
+				((f: StreamFormat) =>
+					createStreamingWorker(f, this._streamOptions.polyfill));
 			worker = await workerFactory(format);
 		} catch {
 			this._streamStarting = false;

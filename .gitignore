@@ -16,3 +16,4 @@ test-results
 playwright-report
 ignored
 .env
+lt.log

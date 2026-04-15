@@ -135,6 +135,29 @@ async function copySounds(outputRoot: string): Promise<void> {
 	}
 }
 
+async function copyPolyfillAssets(outputRoot: string): Promise<void> {
+	const outDir = join(outputRoot, "polyfill");
+	await mkdir(outDir, { recursive: true });
+
+	// Copy libavjs-webcodecs-polyfill loader
+	const polyfillSrc =
+		"node_modules/libavjs-webcodecs-polyfill/dist/libavjs-webcodecs-polyfill.js";
+	if (existsSync(polyfillSrc)) {
+		await cp(polyfillSrc, join(outDir, "libavjs-webcodecs-polyfill.js"));
+	}
+
+	// Copy libav.js webcodecs variant (supports Opus, Vorbis, FLAC)
+	const libavDir = "node_modules/libav.js/dist";
+	if (existsSync(libavDir)) {
+		const entries = await readdir(libavDir);
+		for (const entry of entries) {
+			if (entry.includes("-webcodecs.") && !entry.includes("-avf.") && !entry.includes("-cli.") && !entry.includes("-thr.") && !entry.includes(".mjs")) {
+				await cp(join(libavDir, entry), join(outDir, entry));
+			}
+		}
+	}
+}
+
 export async function buildWebpage(): Promise<void> {
 	await rm(webpageDir, { force: true, recursive: true });
 
@@ -300,6 +323,9 @@ export async function buildWebpage(): Promise<void> {
 
 	// Copy sound assets
 	await copySounds(webpageDir);
+
+	// Copy polyfill assets for AudioDecoder fallback
+	await copyPolyfillAssets(webpageDir);
 
 	// Copy favicon
 	await cp("src/favicon.svg", join(webpageDir, "favicon.svg"));

@@ -1,18 +1,9 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
 	injectAudioMonitor,
 	measureAudioSustain,
 } from "../helpers/audio-monitor";
 import { openExample } from "../helpers/navigation";
-
-/** Click Stream, wait for data to arrive, then click Play. */
-async function streamAndPlay(page: Page) {
-	const streamBtn = page.locator("button:has-text('Stream')").first();
-	const playBtn = page.locator("button:has-text('Play')").first();
-	await streamBtn.click();
-	await expect(playBtn).toBeEnabled({ timeout: 15000 });
-	await playBtn.click();
-}
 
 test.describe("Streaming example", () => {
 	test.beforeEach(async ({ page }) => {
@@ -147,11 +138,10 @@ test.describe("Streaming example", () => {
 		await expect(input).toHaveAttribute("type", "text");
 	});
 
-	test("stream and play buttons render", async ({ page }) => {
+	test("stream & play button renders", async ({ page }) => {
 		await expect(
-			page.locator("button:has-text('Stream')").first(),
+			page.locator("button:has-text('Stream & Play')"),
 		).toBeVisible();
-		await expect(page.locator("button:has-text('Play')").first()).toBeVisible();
 	});
 
 	test("pause and stop buttons render", async ({ page }) => {
@@ -213,23 +203,6 @@ test.describe("Streaming example", () => {
 		await expect(throttle).toBeVisible();
 	});
 
-	test("gap strategy selector renders with hold and silence options", async ({
-		page,
-	}) => {
-		const select = page.locator("select#gap-strategy-select");
-		await expect(select).toBeVisible();
-		await expect(select).toHaveValue("hold");
-
-		const options = select.locator("option");
-		await expect(options).toHaveCount(2);
-
-		await expect(options.nth(0)).toHaveAttribute("value", "hold");
-		await expect(options.nth(1)).toHaveAttribute("value", "silence");
-
-		await select.selectOption("silence");
-		await expect(select).toHaveValue("silence");
-	});
-
 	test("playhead starts at zero and does not regress without playback", async ({
 		page,
 	}) => {
@@ -247,7 +220,7 @@ test.describe("Streaming example", () => {
 		expect(Number(after)).toBe(0);
 	});
 
-	test("playhead updates after streaming and playing a second time", async ({
+	test("playhead updates after pressing Stream & Play a second time", async ({
 		page,
 		browserName,
 	}) => {
@@ -257,11 +230,12 @@ test.describe("Streaming example", () => {
 			"streaming playhead not supported in headless Firefox",
 		);
 
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
 		const stopBtn = page.locator("button:has-text('Stop')");
 		const slider = page.locator(".playhead-slider [role='slider']");
 
 		// First play
-		await streamAndPlay(page);
+		await streamBtn.click();
 		// Wait for playhead to advance
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
@@ -273,46 +247,8 @@ test.describe("Streaming example", () => {
 		await page.waitForTimeout(1000);
 
 		// Second play
-		await streamAndPlay(page);
-		// Wait for playhead to advance again (this was the bug — it would freeze)
-		await expect(async () => {
-			const val = Number(await slider.getAttribute("aria-valuenow"));
-			expect(val).toBeGreaterThan(0);
-		}).toPass({ timeout: 15000 });
-	});
-
-	test("playhead resets when streaming again without stopping", async ({
-		page,
-		browserName,
-	}) => {
-		test.skip(
-			browserName === "firefox",
-			"streaming playhead not supported in headless Firefox",
-		);
-
-		const streamBtn = page.locator("button:has-text('Stream')").first();
-		const playBtn = page.locator("button:has-text('Play')").first();
-		const slider = page.locator(".playhead-slider [role='slider']");
-
-		// First stream + play — wait for playhead to advance well past 2 seconds of samples
-		await streamAndPlay(page);
-		await expect(async () => {
-			const val = Number(await slider.getAttribute("aria-valuenow"));
-			expect(val).toBeGreaterThan(96000);
-		}).toPass({ timeout: 15000 });
-
-		// Click Stream again WITHOUT stopping first — starts a new stream
 		await streamBtn.click();
-
-		// The playhead should reset near 0
-		await expect(async () => {
-			const val = Number(await slider.getAttribute("aria-valuenow"));
-			expect(val).toBeLessThan(48000);
-		}).toPass({ timeout: 10000 });
-
-		// Play the new stream and verify playhead advances again
-		await expect(playBtn).toBeEnabled({ timeout: 15000 });
-		await playBtn.click();
+		// Wait for playhead to advance again (this was the bug — it would freeze)
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
 			expect(val).toBeGreaterThan(0);
@@ -328,7 +264,7 @@ test.describe("Streaming example", () => {
 			"streaming progress timing is unstable in headless Firefox",
 		);
 
-		await page.locator("button:has-text('Stream')").first().click();
+		await page.locator("button:has-text('Stream & Play')").click();
 
 		const track = page.locator("[data-testid='streaming-playhead-track']");
 		await expect(track).toBeVisible();
@@ -339,7 +275,7 @@ test.describe("Streaming example", () => {
 		}).toPass({ timeout: 15000 });
 	});
 
-	test("seeking beyond decoded region is blocked while streaming with hold strategy", async ({
+	test("seeking beyond decoded region is blocked while streaming", async ({
 		page,
 		browserName,
 	}) => {
@@ -349,8 +285,7 @@ test.describe("Streaming example", () => {
 		);
 
 		await page.locator("select#throttle-select").selectOption("204800");
-		await page.locator("select#gap-strategy-select").selectOption("hold");
-		await streamAndPlay(page);
+		await page.locator("button:has-text('Stream & Play')").click();
 
 		const slider = page.locator(".playhead-slider [role='slider']");
 		await expect(slider).toBeVisible();
@@ -363,42 +298,6 @@ test.describe("Streaming example", () => {
 				const valueNow = Number(await slider.getAttribute("aria-valuenow"));
 				const valueMax = Number(await slider.getAttribute("aria-valuemax"));
 				return valueNow < valueMax;
-			})
-			.toBe(true);
-	});
-
-	test("seeking beyond decoded region is allowed with silence strategy", async ({
-		page,
-		browserName,
-	}) => {
-		test.skip(
-			browserName === "firefox" || browserName === "webkit",
-			"streaming playhead/seek gating is not supported in headless Firefox/WebKit",
-		);
-
-		await page.locator("select#throttle-select").selectOption("204800");
-		await page.locator("select#gap-strategy-select").selectOption("silence");
-		await streamAndPlay(page);
-
-		const slider = page.locator(".playhead-slider [role='slider']");
-		await expect(slider).toBeVisible();
-
-		// Wait for some decoding to happen so the slider max is set
-		await expect(async () => {
-			const valueMax = Number(await slider.getAttribute("aria-valuemax"));
-			expect(valueMax).toBeGreaterThan(0);
-		}).toPass({ timeout: 15000 });
-
-		// Press End to seek to the maximum
-		await slider.focus();
-		await page.keyboard.press("End");
-
-		// With silence strategy, seeking to the end should be allowed
-		await expect
-			.poll(async () => {
-				const valueNow = Number(await slider.getAttribute("aria-valuenow"));
-				const valueMax = Number(await slider.getAttribute("aria-valuemax"));
-				return valueNow === valueMax;
 			})
 			.toBe(true);
 	});
@@ -422,11 +321,12 @@ test.describe("Streaming example", () => {
 			"streaming playhead not supported in headless Firefox",
 		);
 
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
 		const pauseBtn = page.locator("button").filter({ hasText: /Pause|Resume/ });
 		const slider = page.locator(".playhead-slider [role='slider']");
 
 		// Start streaming playback
-		await streamAndPlay(page);
+		await streamBtn.click();
 
 		// Wait for playhead to advance past 0
 		await expect(async () => {
@@ -488,9 +388,10 @@ test.describe("Streaming example", () => {
 		await injectAudioMonitor(page);
 		await openExample(page, "streaming");
 
+		const streamBtn = page.locator("button:has-text('Stream & Play')");
 		const slider = page.locator(".playhead-slider [role='slider']");
 
-		await streamAndPlay(page);
+		await streamBtn.click();
 
 		// Wait for playhead to advance (audio has started)
 		await expect(async () => {

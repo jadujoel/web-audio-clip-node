@@ -1,4 +1,4 @@
-import type { StreamFormat } from "../streaming";
+import type { AudioDecoderPolyfillOptions, StreamFormat } from "../streaming";
 import { createCdnWorkerFactory } from "../streaming";
 import { ClipNode } from "./ClipNode";
 import { StreamingClipNode } from "./StreamingClipNode";
@@ -60,6 +60,8 @@ export interface CoordinatorStreamingOptions {
 	/** Number of samples to fade-in when transitioning from silence gap to real audio.
 	 * Defaults to 128. */
 	gapRecoveryFadeSamples?: number;
+	/** AudioDecoder polyfill options for browsers without native WebCodecs support. */
+	polyfill?: AudioDecoderPolyfillOptions;
 }
 
 export class Coordinator {
@@ -72,12 +74,18 @@ export class Coordinator {
 
 	/** One-line setup using embedded workers. All format workers are bundled -
 	 *  no CDN fetch needed for worker scripts. */
-	static fromCdn(options?: { sampleRate?: number }): Coordinator {
+	static fromCdn(options?: {
+		sampleRate?: number;
+		polyfill?: AudioDecoderPolyfillOptions;
+	}): Coordinator {
 		const context = new AudioContext({
 			sampleRate: options?.sampleRate ?? 48000,
 			latencyHint: "playback",
 		});
-		const coordinator = new Coordinator(context, createCdnWorkerFactory());
+		const coordinator = new Coordinator(
+			context,
+			createCdnWorkerFactory(options?.polyfill),
+		);
 		coordinator.addModule();
 		return coordinator;
 	}
@@ -143,6 +151,7 @@ export class Coordinator {
 			targetNumSamples: streamingOptions?.targetNumSamples,
 			targetDuration: streamingOptions?.targetDuration,
 			gapRecoveryFadeSamples: streamingOptions?.gapRecoveryFadeSamples,
+			polyfill: streamingOptions?.polyfill,
 		});
 		this.nodes.add(node);
 		return node;
