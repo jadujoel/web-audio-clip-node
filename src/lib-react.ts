@@ -15,6 +15,8 @@ export { SnappableSlider } from "./components/SnappableSlider";
 export { StreamingPlayheadTimeline } from "./components/StreamingPlayheadTimeline";
 export { TransportButtons } from "./components/TransportButtons";
 // Hooks
+export { applyToggleToClip, applyValueToClip } from "./hooks/clipHelpers";
 export { useClipNode } from "./hooks/useClipNode";
+export { useStreamingClipNode } from "./hooks/useStreamingClipNode";
 export type { ClipControlsState } from "./store/clipStore";
 export { useClipControls } from "./store/clipStore";

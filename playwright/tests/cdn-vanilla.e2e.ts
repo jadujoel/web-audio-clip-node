@@ -40,4 +40,20 @@ test.describe("CDN Vanilla example", () => {
 	test("status shows Ready initially", async ({ page }) => {
 		await expect(page.locator("#status")).toHaveText("Ready");
 	});
+
+	test("clicking Play does not throw getChannelData error", async ({
+		page,
+	}) => {
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(err.message));
+
+		await page.locator("#play").click();
+		// Give time for any async errors to surface
+		await page.waitForTimeout(500);
+
+		const channelDataErrors = errors.filter((e) =>
+			e.includes("getChannelData"),
+		);
+		expect(channelDataErrors).toEqual([]);
+	});
 });

@@ -62,7 +62,9 @@ async function run(browserType: "webkit" | "chromium") {
 
 	// Select FLAC
 	await page.evaluate(() => {
-		const select = document.querySelector("#format-select") as HTMLSelectElement;
+		const select = document.querySelector(
+			"#format-select",
+		) as HTMLSelectElement;
 		if (!select) return;
 		const nativeSetter = Object.getOwnPropertyDescriptor(
 			HTMLSelectElement.prototype,
@@ -116,7 +118,8 @@ async function run(browserType: "webkit" | "chromium") {
 		const errors = await page.evaluate(() => {
 			return (window as unknown as { __errors?: string[] }).__errors ?? [];
 		});
-		if (errors.length) console.log(`  [${browserType}] Errors: ${JSON.stringify(errors)}`);
+		if (errors.length)
+			console.log(`  [${browserType}] Errors: ${JSON.stringify(errors)}`);
 
 		await browser.close();
 		return;
@@ -150,7 +153,9 @@ async function run(browserType: "webkit" | "chromium") {
 			.join(" | ");
 
 		// Check AudioContext state
-		const ctxState = document.querySelector("section#display output:nth-child(4)")?.textContent;
+		const ctxState = document.querySelector(
+			"section#display output:nth-child(4)",
+		)?.textContent;
 		info.nodeState = ctxState;
 
 		return info;
@@ -163,7 +168,9 @@ async function run(browserType: "webkit" | "chromium") {
 
 	const nonZero = result.nonZeroSamples as number;
 	if (nonZero > 0) {
-		console.log(`  [${browserType}] ✅ AUDIO DETECTED (${nonZero} non-zero samples)`);
+		console.log(
+			`  [${browserType}] ✅ AUDIO DETECTED (${nonZero} non-zero samples)`,
+		);
 	} else {
 		console.log(`  [${browserType}] ❌ SILENT — no audio samples detected`);
 	}

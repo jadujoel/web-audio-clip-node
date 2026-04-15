@@ -62,7 +62,7 @@
 
       const clip = new ClipNode(context)
 
-      clip.buffer = generateTone(context.sampleRate)
+      clip.buffer = generateTone(context)
       clip.connect(context.destination);
       clip.onstatechange = (s) => { statusEl.textContent = s; };
 
@@ -90,14 +90,19 @@
       };
     }
 
-    function generateTone(sampleRate, seconds = 2, freq = 440) {
+    function generateTone(context, seconds = 2, freq = 440) {
+      const sampleRate = context.sampleRate;
       const length = sampleRate * seconds;
-      const buf = new Float32Array(length);
+      const ab = new AudioBuffer({ numberOfChannels: 2, length, sampleRate });
+      const left = ab.getChannelData(0);
+      const right = ab.getChannelData(1);
       for (let i = 0; i < length; i++) {
-        buf[i] = 0.3 * Math.sin(2 * Math.PI * freq * i / sampleRate)
+        const sample = 0.3 * Math.sin(2 * Math.PI * freq * i / sampleRate)
                * (1 - i / length); // fade out
+        left[i] = sample;
+        right[i] = sample;
       }
-      return [buf, buf.slice()]; // stereo
+      return ab;
     }
 
   </script>

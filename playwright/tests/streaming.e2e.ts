@@ -138,10 +138,9 @@ test.describe("Streaming example", () => {
 		await expect(input).toHaveAttribute("type", "text");
 	});
 
-	test("stream & play button renders", async ({ page }) => {
-		await expect(
-			page.locator("button:has-text('Stream & Play')"),
-		).toBeVisible();
+	test("stream and play buttons render", async ({ page }) => {
+		await expect(page.locator("button:has-text('Stream')")).toBeVisible();
+		await expect(page.locator("button:has-text('Play')")).toBeVisible();
 	});
 
 	test("pause and stop buttons render", async ({ page }) => {
@@ -220,7 +219,7 @@ test.describe("Streaming example", () => {
 		expect(Number(after)).toBe(0);
 	});
 
-	test("playhead updates after pressing Stream & Play a second time", async ({
+	test("playhead updates after pressing Stream then Play a second time", async ({
 		page,
 		browserName,
 	}) => {
@@ -230,12 +229,15 @@ test.describe("Streaming example", () => {
 			"streaming playhead not supported in headless Firefox",
 		);
 
-		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
 		const stopBtn = page.locator("button:has-text('Stop')");
 		const slider = page.locator(".playhead-slider [role='slider']");
 
-		// First play
+		// First stream + play
 		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
 		// Wait for playhead to advance
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
@@ -246,8 +248,10 @@ test.describe("Streaming example", () => {
 		await stopBtn.click();
 		await page.waitForTimeout(1000);
 
-		// Second play
+		// Second stream + play
 		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
 		// Wait for playhead to advance again (this was the bug — it would freeze)
 		await expect(async () => {
 			const val = Number(await slider.getAttribute("aria-valuenow"));
@@ -264,7 +268,7 @@ test.describe("Streaming example", () => {
 			"streaming progress timing is unstable in headless Firefox",
 		);
 
-		await page.locator("button:has-text('Stream & Play')").click();
+		await page.locator("button:has-text('Stream')").first().click();
 
 		const track = page.locator("[data-testid='streaming-playhead-track']");
 		await expect(track).toBeVisible();
@@ -285,7 +289,11 @@ test.describe("Streaming example", () => {
 		);
 
 		await page.locator("select#throttle-select").selectOption("204800");
-		await page.locator("button:has-text('Stream & Play')").click();
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
+		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
 
 		const slider = page.locator(".playhead-slider [role='slider']");
 		await expect(slider).toBeVisible();
@@ -321,12 +329,15 @@ test.describe("Streaming example", () => {
 			"streaming playhead not supported in headless Firefox",
 		);
 
-		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
 		const pauseBtn = page.locator("button").filter({ hasText: /Pause|Resume/ });
 		const slider = page.locator(".playhead-slider [role='slider']");
 
-		// Start streaming playback
+		// Start streaming + playback
 		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
 
 		// Wait for playhead to advance past 0
 		await expect(async () => {
@@ -388,10 +399,13 @@ test.describe("Streaming example", () => {
 		await injectAudioMonitor(page);
 		await openExample(page, "streaming");
 
-		const streamBtn = page.locator("button:has-text('Stream & Play')");
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
 		const slider = page.locator(".playhead-slider [role='slider']");
 
 		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
 
 		// Wait for playhead to advance (audio has started)
 		await expect(async () => {

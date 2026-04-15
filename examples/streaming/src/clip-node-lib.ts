@@ -28,6 +28,7 @@ export {
 	PlayheadSlider,
 	StreamingPlayheadTimeline,
 	useClipControls,
+	useStreamingClipNode,
 } from "../../../src/lib-react";
 export type { ControlKey, ClipNodeState, FrameData, GapPlaybackStrategy, LoopMode } from "../../../src/lib";
 export {

@@ -351,11 +351,17 @@ const smokeChecks: SmokeCheck[] = [
 			// Without this priming step, the stream handler silently fails.
 			await browser.execute(async () => {
 				const w = window as unknown as Record<string, unknown>;
-				const AC = (w.AudioContext ?? w.webkitAudioContext) as typeof AudioContext | undefined;
+				const AC = (w.AudioContext ?? w.webkitAudioContext) as
+					| typeof AudioContext
+					| undefined;
 				if (!AC) return;
 				const ctx = new AC({ sampleRate: 48000 });
-				try { await ctx.resume(); } catch {}
-				try { ctx.close(); } catch {}
+				try {
+					await ctx.resume();
+				} catch {}
+				try {
+					ctx.close();
+				} catch {}
 			});
 			await browser.pause(500);
 
