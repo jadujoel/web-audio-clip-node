@@ -44,6 +44,7 @@ export function App() {
 		loop: controls.loop,
 		loopMode: controls.loopMode,
 		setValue: controls.setValue,
+		defaultSoundUrl: "../sounds/example.opus",
 	});
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);

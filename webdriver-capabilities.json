@@ -1,0 +1,22 @@
+{
+	"targets": [
+		{
+			"name": "safari_14_mac",
+			"browserName": "Safari",
+			"browserVersion": "14.0",
+			"platformName": "macOS 11.0"
+		},
+		{
+			"name": "safari_15_mac",
+			"browserName": "Safari",
+			"browserVersion": "15.0",
+			"platformName": "macOS 12.0"
+		},
+		{
+			"name": "firefox_100_win10",
+			"browserName": "Firefox",
+			"browserVersion": "100.0",
+			"platformName": "win10"
+		}
+	]
+}

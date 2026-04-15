@@ -116,6 +116,8 @@ interface UseClipNodeParams {
 	loop: boolean;
 	loopMode: LoopMode;
 	setValue: (key: ControlKey, val: number) => void;
+	/** URL to a default sound file to load when no previously uploaded file exists in IndexedDB. */
+	defaultSoundUrl?: string;
 }
 
 export function useClipNode({
@@ -124,6 +126,7 @@ export function useClipNode({
 	loop,
 	loopMode,
 	setValue,
+	defaultSoundUrl,
 }: UseClipNodeParams) {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -317,20 +320,29 @@ export function useClipNode({
 		[decodeAudio, setValue],
 	);
 
-	// Auto-load last uploaded file from IndexedDB on mount
+	// Auto-load last uploaded file from IndexedDB on mount, falling back to defaultSoundUrl
 	useEffect(() => {
 		loadUploadedFile()
-			.then((stored) => {
+			.then(async (stored) => {
 				if (stored) {
-					loadFromArrayBuffer(stored.arrayBuffer, stored.name).catch((err) =>
-						console.error("[fileStore] Failed to restore file:", err),
-					);
+					await loadFromArrayBuffer(stored.arrayBuffer, stored.name);
+					return;
+				}
+				if (defaultSoundUrl) {
+					const res = await fetch(defaultSoundUrl);
+					if (!res.ok)
+						throw new Error(
+							`Failed to fetch ${defaultSoundUrl}: ${res.status}`,
+						);
+					const ab = await res.arrayBuffer();
+					const name = defaultSoundUrl.split("/").pop() ?? "default";
+					await loadFromArrayBuffer(ab, name);
 				}
 			})
 			.catch((err) =>
-				console.error("[fileStore] Failed to load from IndexedDB:", err),
+				console.error("[useClipNode] Failed to auto-load sound:", err),
 			);
-	}, [loadFromArrayBuffer]);
+	}, [loadFromArrayBuffer, defaultSoundUrl]);
 
 	const loadSound = useCallback(() => {
 		const input = document.createElement("input");

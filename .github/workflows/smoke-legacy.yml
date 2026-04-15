@@ -14,9 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - safari_latest_mac
           - safari_14_mac
-          - firefox_latest_win10
+          - safari_15_mac
+          - firefox_100_win10
 
     steps:
       - uses: actions/checkout@v6
