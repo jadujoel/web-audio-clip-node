@@ -346,13 +346,41 @@ const smokeChecks: SmokeCheck[] = [
 			});
 			console.log(`      📎 Stream URL: ${urlValue}`);
 
-			// Click Stream button
-			const streamBtn = await browser.$("button*=Stream");
-			if (!(await streamBtn.isExisting())) {
+			// Prime AudioContext — Safari 14 requires an AudioContext to be
+			// created and resumed before streaming code can create its own.
+			// Without this priming step, the stream handler silently fails.
+			await browser.execute(async () => {
+				const w = window as unknown as Record<string, unknown>;
+				const AC = (w.AudioContext ?? w.webkitAudioContext) as typeof AudioContext | undefined;
+				if (!AC) return;
+				const ctx = new AC({ sampleRate: 48000 });
+				try { await ctx.resume(); } catch {}
+				try { ctx.close(); } catch {}
+			});
+			await browser.pause(500);
+
+			// Click Stream button — use JS dispatchEvent because WebDriver's native
+			// click on iOS 14 Safari doesn't always trigger React's synthetic handler
+			const streamBtnFound = await browser.execute(() => {
+				const buttons = document.querySelectorAll("button");
+				for (const btn of buttons) {
+					if (btn.textContent?.includes("Stream")) {
+						btn.dispatchEvent(
+							new MouseEvent("click", {
+								bubbles: true,
+								cancelable: true,
+								view: window,
+							}),
+						);
+						return true;
+					}
+				}
+				return false;
+			});
+			if (!streamBtnFound) {
 				errors.push("Missing 'Stream' button");
 				return { errors, logs: await collectLogs(browser) };
 			}
-			await streamBtn.click();
 			await browser.pause(2000);
 
 			// Check if streaming started

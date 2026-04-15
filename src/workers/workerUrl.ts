@@ -1,9 +1,6 @@
 import type { StreamFormat } from "../streaming";
 import type { AudioDecoderPolyfillOptions } from "./audioDecoderPolyfill";
-import {
-	probeAudioDecoderSupport,
-	wrapWithPolyfillBootstrap,
-} from "./audioDecoderPolyfill";
+import { wrapWithPolyfillBootstrap } from "./audioDecoderPolyfill";
 import { oggOpusWorkerCode } from "./ogg-opus-worker-code";
 
 /** Create a Worker from embedded code (blob URL, zero fetch). */
@@ -17,14 +14,15 @@ export function createWorkerFromBlob(code: string): Worker {
 	return worker;
 }
 
-/** Create a Worker with polyfill bootstrap if native AudioDecoder is unavailable. */
+/**
+ * Create a Worker with polyfill bootstrap.
+ * The bootstrap checks whether the native AudioDecoder supports the
+ * requested codec and loads the polyfill only when needed.
+ */
 export function createWorkerWithPolyfill(
 	code: string,
 	polyfillOptions: AudioDecoderPolyfillOptions,
 ): Worker {
-	if (probeAudioDecoderSupport()) {
-		return createWorkerFromBlob(code);
-	}
 	const bootstrapped = wrapWithPolyfillBootstrap(code, polyfillOptions);
 	return createWorkerFromBlob(bootstrapped);
 }

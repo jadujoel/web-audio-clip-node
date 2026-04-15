@@ -540,7 +540,7 @@ async function startStreaming(
 			type: "bufferEnd",
 			data: { totalSamples: samplesDecoded },
 		});
-		self.postMessage({ type: "done", totalSamples: samplesDecoded });
+		self.postMessage({ type: "done", samplesDecoded });
 	} catch (err) {
 		if (signal.aborted) return;
 		const msg = err instanceof Error ? err.message : String(err);

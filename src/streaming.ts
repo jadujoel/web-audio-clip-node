@@ -37,13 +37,30 @@ export const workerFileMap = {
 } as const;
 workerFileMap satisfies Record<StreamFormat, string>;
 
+/** Map each stream format to the WebCodecs codec string its worker uses. */
+export const formatCodecMap: Record<StreamFormat, string> = {
+	Aac: "mp4a.40.2",
+	Flac: "flac",
+	Mp3: "mp3",
+	Mp4Aac: "mp4a.40.2",
+	OggFlac: "flac",
+	OggOpus: "opus",
+	OggVorbis: "vorbis",
+	RawOpusFramed: "opus",
+	WebmOpus: "opus",
+	WebmVorbis: "vorbis",
+};
+
 export function createCdnWorkerFactory(
 	polyfillOptions?: AudioDecoderPolyfillOptions,
 ): (format: StreamFormat) => Promise<Worker> {
 	return async (format: StreamFormat) => {
 		const code = await getWorkerCode(format);
 		if (polyfillOptions?.enabled) {
-			return createWorkerWithPolyfill(code, polyfillOptions);
+			return createWorkerWithPolyfill(code, {
+				...polyfillOptions,
+				codec: formatCodecMap[format],
+			});
 		}
 		return createWorkerFromBlob(code);
 	};
@@ -60,7 +77,10 @@ export async function createStreamingWorker(
 ): Promise<Worker> {
 	const code = await getWorkerCode(format);
 	if (polyfillOptions?.enabled) {
-		return createWorkerWithPolyfill(code, polyfillOptions);
+		return createWorkerWithPolyfill(code, {
+			...polyfillOptions,
+			codec: formatCodecMap[format],
+		});
 	}
 	return createWorkerFromBlob(code);
 }

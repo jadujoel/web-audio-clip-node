@@ -11,7 +11,6 @@ import {
 	getProcessorBlobUrl,
 	getStreamingWorkerUrl,
 	linFromDb,
-	probeAudioDecoderSupport,
 } from "./clip-node-lib";
 import type { AudioDecoderPolyfillOptions, ControlKey } from "./clip-node-lib";
 import type { ClipNodeState, FrameData } from "./clip-node-lib";
@@ -22,10 +21,11 @@ function getWorkerUrl(format: StreamFormat): string {
 	return getStreamingWorkerUrl(format);
 }
 
-function getPolyfillOptions(): AudioDecoderPolyfillOptions | undefined {
-	if (probeAudioDecoderSupport()) return undefined;
-	// Use pathname-aware base so it works on both localhost and GitHub Pages
-	// e.g. https://jadujoel.github.io/web-audio-clip-node/streaming/ → /web-audio-clip-node/polyfill
+function getPolyfillOptions(): AudioDecoderPolyfillOptions {
+	// Always provide polyfill URLs — the worker bootstrap checks whether the
+	// native AudioDecoder supports the requested codec and only loads the
+	// polyfill when needed (e.g. Safari 14 has no AudioDecoder at all, and
+	// modern Safari lacks native FLAC support).
 	const pathParts = location.pathname.replace(/\/+$/, "").split("/");
 	pathParts.pop(); // remove current page segment (e.g. "streaming")
 	const base = `${location.origin}${pathParts.join("/")}/polyfill`;
