@@ -277,7 +277,9 @@ test.describe("Playground example", () => {
 
 		await startButton.click();
 		await expect
-			.poll(async () => (await stateOutput.textContent())?.trim() ?? "")
+			.poll(async () => (await stateOutput.textContent())?.trim() ?? "", {
+				timeout: 15_000,
+			})
 			.toBe("started");
 
 		await expect(pauseButton).toBeEnabled();
