@@ -35,139 +35,85 @@ export class StreamingClipNode extends ClipNode {
 		return this.events as unknown as TypedEventTarget<StreamingClipNodeEvents>;
 	}
 
-	private _cbOnerror: SHandler<"error"> = null;
-	private _cbOnprogress: SHandler<"progress"> = null;
-	private _cbOndone: SHandler<"done"> = null;
-	private _cbOnwaiting: SHandler<"waiting"> = null;
-	private _cbOncanplay: SHandler<"canplay"> = null;
-	private _cbOncanplaythrough: SHandler<"canplaythrough"> = null;
-	private _cbOnloadstart: SHandler<"loadstart"> = null;
-	private _cbOnreadystatechange: SHandler<"readystatechange"> = null;
-	private _cbOnretry: SHandler<"retry"> = null;
-	private _cbOnmetadata: SHandler<"metadata"> = null;
-	private _cbOnbufferchange: SHandler<"bufferchange"> = null;
-
 	// ---------------------------------------------------------------------------
 	// Streaming callback setter/getter pairs
 	// ---------------------------------------------------------------------------
 
 	get onerror() {
-		return this._cbOnerror;
+		return this.streamEvents.getCallback("error");
 	}
 	set onerror(fn: SHandler<"error"> | undefined) {
-		if (this._cbOnerror)
-			this.streamEvents.removeEventListener("error", this._cbOnerror);
-		this._cbOnerror = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("error", fn);
+		this.streamEvents.setCallback("error", fn ?? null);
 	}
 
 	get onprogress() {
-		return this._cbOnprogress;
+		return this.streamEvents.getCallback("progress");
 	}
 	set onprogress(fn: SHandler<"progress"> | undefined) {
-		if (this._cbOnprogress)
-			this.streamEvents.removeEventListener("progress", this._cbOnprogress);
-		this._cbOnprogress = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("progress", fn);
+		this.streamEvents.setCallback("progress", fn ?? null);
 	}
 
 	get ondone() {
-		return this._cbOndone;
+		return this.streamEvents.getCallback("done");
 	}
 	set ondone(fn: SHandler<"done"> | undefined) {
-		if (this._cbOndone)
-			this.streamEvents.removeEventListener("done", this._cbOndone);
-		this._cbOndone = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("done", fn);
+		this.streamEvents.setCallback("done", fn ?? null);
 	}
 
 	get onwaiting() {
-		return this._cbOnwaiting;
+		return this.streamEvents.getCallback("waiting");
 	}
 	set onwaiting(fn: SHandler<"waiting"> | undefined) {
-		if (this._cbOnwaiting)
-			this.streamEvents.removeEventListener("waiting", this._cbOnwaiting);
-		this._cbOnwaiting = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("waiting", fn);
+		this.streamEvents.setCallback("waiting", fn ?? null);
 	}
 
 	get oncanplay() {
-		return this._cbOncanplay;
+		return this.streamEvents.getCallback("canplay");
 	}
 	set oncanplay(fn: SHandler<"canplay"> | undefined) {
-		if (this._cbOncanplay)
-			this.streamEvents.removeEventListener("canplay", this._cbOncanplay);
-		this._cbOncanplay = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("canplay", fn);
+		this.streamEvents.setCallback("canplay", fn ?? null);
 	}
 
 	get oncanplaythrough() {
-		return this._cbOncanplaythrough;
+		return this.streamEvents.getCallback("canplaythrough");
 	}
 	set oncanplaythrough(fn: SHandler<"canplaythrough"> | undefined) {
-		if (this._cbOncanplaythrough)
-			this.streamEvents.removeEventListener(
-				"canplaythrough",
-				this._cbOncanplaythrough,
-			);
-		this._cbOncanplaythrough = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("canplaythrough", fn);
+		this.streamEvents.setCallback("canplaythrough", fn ?? null);
 	}
 
 	get onloadstart() {
-		return this._cbOnloadstart;
+		return this.streamEvents.getCallback("loadstart");
 	}
 	set onloadstart(fn: SHandler<"loadstart"> | undefined) {
-		if (this._cbOnloadstart)
-			this.streamEvents.removeEventListener("loadstart", this._cbOnloadstart);
-		this._cbOnloadstart = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("loadstart", fn);
+		this.streamEvents.setCallback("loadstart", fn ?? null);
 	}
 
 	get onreadystatechange() {
-		return this._cbOnreadystatechange;
+		return this.streamEvents.getCallback("readystatechange");
 	}
 	set onreadystatechange(fn: SHandler<"readystatechange"> | undefined) {
-		if (this._cbOnreadystatechange)
-			this.streamEvents.removeEventListener(
-				"readystatechange",
-				this._cbOnreadystatechange,
-			);
-		this._cbOnreadystatechange = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("readystatechange", fn);
+		this.streamEvents.setCallback("readystatechange", fn ?? null);
 	}
 
 	get onretry() {
-		return this._cbOnretry;
+		return this.streamEvents.getCallback("retry");
 	}
 	set onretry(fn: SHandler<"retry"> | undefined) {
-		if (this._cbOnretry)
-			this.streamEvents.removeEventListener("retry", this._cbOnretry);
-		this._cbOnretry = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("retry", fn);
+		this.streamEvents.setCallback("retry", fn ?? null);
 	}
 
 	get onmetadata() {
-		return this._cbOnmetadata;
+		return this.streamEvents.getCallback("metadata");
 	}
 	set onmetadata(fn: SHandler<"metadata"> | undefined) {
-		if (this._cbOnmetadata)
-			this.streamEvents.removeEventListener("metadata", this._cbOnmetadata);
-		this._cbOnmetadata = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("metadata", fn);
+		this.streamEvents.setCallback("metadata", fn ?? null);
 	}
 
 	get onbufferchange() {
-		return this._cbOnbufferchange;
+		return this.streamEvents.getCallback("bufferchange");
 	}
 	set onbufferchange(fn: SHandler<"bufferchange"> | undefined) {
-		if (this._cbOnbufferchange)
-			this.streamEvents.removeEventListener(
-				"bufferchange",
-				this._cbOnbufferchange,
-			);
-		this._cbOnbufferchange = fn ?? null;
-		if (fn) this.streamEvents.addEventListener("bufferchange", fn);
+		this.streamEvents.setCallback("bufferchange", fn ?? null);
 	}
 
 	protected override _createEvents(): TypedEventTarget<ClipNodeEvents> {
@@ -334,32 +280,22 @@ export class StreamingClipNode extends ClipNode {
 		this._controller.setUrl(value);
 	}
 
-	start(when?: number, offset?: number, duration?: number): void {
+	start(when?: number, offset?: number, duration?: number): undefined | never{
 		this.throwIfDisposed();
 		this._controller.start(when, offset, duration);
+		return undefined;
 	}
 
-	stop(when?: number, initialDelay = 0): void {
+	stop(when?: number, initialDelay = 0): undefined | never {
 		this.throwIfDisposed();
 		this._controller.stop();
 		super.stop(when, initialDelay);
+		return undefined;
 	}
 
 	dispose(): void {
 		if (this.state === "disposed") return;
 		this._controller.dispose();
-		// Clear streaming callback references (events.dispose in super handles listener map)
-		this._cbOnerror = null;
-		this._cbOnprogress = null;
-		this._cbOndone = null;
-		this._cbOnwaiting = null;
-		this._cbOncanplay = null;
-		this._cbOncanplaythrough = null;
-		this._cbOnloadstart = null;
-		this._cbOnreadystatechange = null;
-		this._cbOnretry = null;
-		this._cbOnmetadata = null;
-		this._cbOnbufferchange = null;
 		super.dispose();
 	}
 }

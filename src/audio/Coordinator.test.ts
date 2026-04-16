@@ -3209,3 +3209,100 @@ describe("StreamingClipNode gap playback strategy", () => {
 		expect(node.gapRecoveryFadeSamples).toBe(64);
 	}, 20_000);
 });
+
+describe("TypedEventTarget.setCallback / getCallback", () => {
+	test("setCallback / getCallback round-trip", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		const handler = () => {};
+		node.events.setCallback("started", handler);
+		expect(node.events.getCallback("started")).toBe(handler);
+	});
+
+	test("setCallback with null removes the listener", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		const handler = () => {};
+		node.events.setCallback("started", handler);
+		expect(node.events.getCallback("started")).toBe(handler);
+
+		node.events.setCallback("started", null);
+		expect(node.events.getCallback("started")).toBeNull();
+		expect(node.events.hasListeners("started")).toBe(false);
+	});
+
+	test("dispose clears callbacks so getCallback returns null", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		node.events.setCallback("started", () => {});
+		node.events.setCallback("ended", () => {});
+		node.events.dispose();
+
+		expect(node.events.getCallback("started")).toBeNull();
+		expect(node.events.getCallback("ended")).toBeNull();
+	});
+
+	test("setCallback replaces previous callback", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		const fired: string[] = [];
+		node.events.setCallback("started", () => fired.push("first"));
+		node.events.setCallback("started", () => fired.push("second"));
+		node.events.dispatch("started", {});
+
+		expect(fired).toEqual(["second"]);
+	});
+
+	test("callback-style ondurationchange fires correctly", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		let received = false;
+		node.ondurationchange = () => {
+			received = true;
+		};
+		expect(node.ondurationchange).not.toBeNull();
+		node.duration = 5;
+		expect(received).toBe(true);
+	});
+
+	test("dispose clears onseeking and onseeked via getCallback", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			processorUrl: "/dist/audio/processor.js",
+		});
+		const node = coordinator.createClipNode();
+
+		node.onseeking = () => {};
+		node.onseeked = () => {};
+		node.dispose();
+
+		expect(node.onseeking).toBeNull();
+		expect(node.onseeked).toBeNull();
+	});
+});

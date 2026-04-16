@@ -109,6 +109,6 @@
 		"access": "public"
 	},
 	"dependencies": {
-		"@jadujoel/typed-event-target": "0.0.5"
+		"@jadujoel/typed-event-target": "0.0.6"
 	}
 }

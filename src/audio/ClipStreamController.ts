@@ -24,7 +24,7 @@ export interface PendingStart {
 /** Default pre-buffer: 1 second at 48 kHz. */
 const DEFAULT_PRE_BUFFER_SAMPLES = 48_000;
 /** Default resume-fetch threshold: 10 seconds at 48 kHz. */
-const DEFAULT_RESUME_FETCH_AHEAD = 48_000 * 10;
+const DEFAULT_RESUME_FETCH_AHEAD = 48_000_0;
 
 /**
  * Merge a new [startSample, endSample) span into an existing sorted, merged

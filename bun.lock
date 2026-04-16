@@ -5,7 +5,7 @@
     "": {
       "name": "@jadujoel/web-audio-clip-node",
       "dependencies": {
-        "@jadujoel/typed-event-target": "0.0.5",
+        "@jadujoel/typed-event-target": "0.0.6",
       },
       "devDependencies": {
         "@biomejs/biome": "2.4.11",
@@ -72,7 +72,7 @@
 
     "@isaacs/cliui": ["@isaacs/cliui@8.0.2", "", { "dependencies": { "string-width": "^5.1.2", "string-width-cjs": "npm:string-width@^4.2.0", "strip-ansi": "^7.0.1", "strip-ansi-cjs": "npm:strip-ansi@^6.0.1", "wrap-ansi": "^8.1.0", "wrap-ansi-cjs": "npm:wrap-ansi@^7.0.0" } }, "sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA=="],
 
-    "@jadujoel/typed-event-target": ["@jadujoel/typed-event-target@0.0.5", "", { "peerDependencies": { "typescript": "^6" } }, "sha512-NNze5CE1dwSZ8Uxss5HvkNP81ZmtyzbV/t/B8YV0hOq7IB17k6R9YRIoFsXFeMhIR1k6e/Ay7Yjrt9zR8XgcuQ=="],
+    "@jadujoel/typed-event-target": ["@jadujoel/typed-event-target@0.0.6", "", { "peerDependencies": { "typescript": "^6" } }, "sha512-sPIrxAcgHPUnMyB+FeLazQbkZqfOfGyk6Jhl3BhzwLAkJsrcPjgiWKJO+m2XC+4HLOXPpJAf05DOdRLIGkDGnA=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
