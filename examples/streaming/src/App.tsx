@@ -40,6 +40,29 @@ import { getDefaultUrlForFormat } from "./clip-node-lib";
  * Reads frame data from a ref via its own RAF loop and updates DOM directly,
  * avoiding React re-renders on every animation frame.
  */
+function StreamIcon() {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			<path d="M16.247 7.761a6 6 0 0 1 0 8.478" />
+			<path d="M19.075 4.933a10 10 0 0 1 0 14.134" />
+			<path d="M4.925 19.067a10 10 0 0 1 0-14.134" />
+			<path d="M7.753 16.239a6 6 0 0 1 0-8.478" />
+			<circle cx="12" cy="12" r="2" />
+		</svg>
+	);
+}
+
 function StreamingDisplayPanelInner({
 	nodeState,
 	frameRef,
@@ -594,8 +617,13 @@ export function App() {
 			</select>
 
 			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-				<button type="button" onClick={() => node.stream(url, throttle, format, gapStrategy)}>
-					⏬ Stream
+				<button
+					type="button"
+					onClick={() => node.stream(url, throttle, format, gapStrategy)}
+					style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+				>
+					<StreamIcon />
+					<span>Stream</span>
 				</button>
 				<button type="button" onClick={node.play} disabled={node.nodeState !== "initial" || !node.seekableSamples}>
 					▶ Play
@@ -605,6 +633,13 @@ export function App() {
 				</button>
 				<button type="button" onClick={node.stop} disabled={!isStreaming}>
 					■ Stop
+				</button>
+				<button
+					type="button"
+					onClick={node.dispose}
+					disabled={node.nodeState === "initial" || node.nodeState === "disposed"}
+				>
+					Dispose
 				</button>
 			</div>
 

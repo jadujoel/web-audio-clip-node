@@ -147,6 +147,7 @@ export function useStreamingClipNode({
 				clipRef.current.onstatechange = undefined;
 				clipRef.current.onframe = undefined;
 				clipRef.current.stop();
+				clipRef.current.dispose();
 				clipRef.current.disconnect();
 				clipRef.current = null;
 			}
@@ -311,6 +312,7 @@ export function useStreamingClipNode({
 				}
 				const c = clipRef.current;
 				if (c) {
+					c.dispose();
 					c.disconnect();
 					clipRef.current = null;
 				}
@@ -348,7 +350,8 @@ export function useStreamingClipNode({
 	const stop = useCallback(() => {
 		const clip = clipRef.current;
 		if (!clip) return;
-		clip.stop();
+		const immediateOffset = -(Math.max(0, clip.fadeOut) + 0.2);
+		clip.stop(clip.context.currentTime, immediateOffset);
 		if (workerRef.current) {
 			workerRef.current.postMessage({ type: "abort" });
 			workerRef.current.terminate();
@@ -361,6 +364,33 @@ export function useStreamingClipNode({
 		if (finalDurationRef.current != null) {
 			setAudioDuration(finalDurationRef.current);
 		}
+	}, [setStatus]);
+
+	const dispose = useCallback(() => {
+		frameGenRef.current++;
+		if (workerRef.current) {
+			workerRef.current.postMessage({ type: "abort" });
+			workerRef.current.terminate();
+			workerRef.current = null;
+		}
+		const clip = clipRef.current;
+		if (clip) {
+			clip.onstatechange = undefined;
+			clip.onframe = undefined;
+			clip.dispose();
+			clip.disconnect();
+			clipRef.current = null;
+		}
+		frameRef.current = null;
+		timesLoopedRef.current = "0";
+		finalDurationRef.current = null;
+		setPlaybackGeneration((g) => g + 1);
+		setProgress(0);
+		setAudioDuration(null);
+		setSeekableDuration(null);
+		setSeekableSamples(null);
+		setNodeState("disposed");
+		setStatus("Disposed.");
 	}, [setStatus]);
 
 	const seekPlayhead = useCallback(
@@ -452,6 +482,7 @@ export function useStreamingClipNode({
 		play,
 		pause,
 		stop,
+		dispose,
 		seekPlayhead,
 		applyValue,
 		applyValues,

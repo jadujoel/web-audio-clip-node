@@ -1,9 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
 	injectAudioMonitor,
 	measureAudioSustain,
 } from "../helpers/audio-monitor";
 import { openExample } from "../helpers/navigation";
+
+function estimateDecodedPcmBytes(seconds: number): number {
+	return Math.round(seconds * 48_000 * Float32Array.BYTES_PER_ELEMENT);
+}
+
+async function readDecodedSeekableSeconds(page: Page): Promise<number> {
+	const locator = page.locator("p").filter({ hasText: /^Decoded seekable:/ });
+	if ((await locator.count()) === 0) return 0;
+	const text = (await locator.first().textContent()) ?? "";
+	const match = text.match(/Decoded seekable:\s*([0-9.]+)s/);
+	return match ? Number(match[1]) : 0;
+}
 
 test.describe("Streaming example", () => {
 	test.beforeEach(async ({ page }) => {
@@ -141,6 +153,16 @@ test.describe("Streaming example", () => {
 	test("stream and play buttons render", async ({ page }) => {
 		await expect(page.locator("button:has-text('Stream')")).toBeVisible();
 		await expect(page.locator("button:has-text('Play')")).toBeVisible();
+	});
+
+	test("stream button uses an SVG icon instead of emoji", async ({ page }) => {
+		const streamBtn = page
+			.locator("button")
+			.filter({ hasText: /^Stream$/ })
+			.first();
+		await expect(streamBtn).toBeVisible();
+		await expect(streamBtn.locator("svg")).toBeVisible();
+		await expect(streamBtn).not.toContainText("⏬");
 	});
 
 	test("pause and stop buttons render", async ({ page }) => {
@@ -459,6 +481,113 @@ test.describe("Streaming example", () => {
 			maxDescendingRun,
 			`expected boomerang playback after reload, got playhead samples: ${samples.join(", ")}`,
 		).toBeGreaterThanOrEqual(2);
+	});
+
+	test("stop silences playback promptly even with long stop settings", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox",
+			"streaming playhead not supported in headless Firefox",
+		);
+		test.skip(
+			browserName === "webkit",
+			"streaming playhead not supported in headless WebKit",
+		);
+
+		await injectAudioMonitor(page);
+		await page.addInitScript(() => {
+			localStorage.setItem(
+				"clip-node-state",
+				JSON.stringify({
+					state: {
+						values: {
+							stopDelay: 4,
+							fadeOut: 4,
+						},
+						enabled: {
+							stopDelay: true,
+							fadeOut: true,
+						},
+					},
+					version: 0,
+				}),
+			);
+		});
+		await openExample(page, "streaming");
+
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
+		const stopBtn = page.locator("button:has-text('Stop')").first();
+		const slider = page.locator(".playhead-slider [role='slider']");
+
+		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
+
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+
+		await stopBtn.click();
+
+		const result = await measureAudioSustain(page, 1200, 100);
+		const activeRatio = result.activeSamples / result.totalSamples;
+		expect(
+			activeRatio,
+			`Audio stayed active for ${(activeRatio * 100).toFixed(1)}% of samples after Stop. ` +
+				`RMS values: [${result.rmsValues.map((v) => v.toFixed(4)).join(", ")}]`,
+		).toBeLessThanOrEqual(0.25);
+	});
+
+	test("decoded PCM memory profile grows while streaming and resets after dispose", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName !== "chromium",
+			"decoded memory profile regression is validated in Chromium",
+		);
+		test.setTimeout(90_000);
+
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
+		const disposeBtn = page.locator("button:has-text('Dispose')").first();
+		const decodedSeekable = page
+			.locator("p")
+			.filter({ hasText: /^Decoded seekable:/ });
+
+		expect(
+			estimateDecodedPcmBytes(await readDecodedSeekableSeconds(page)),
+		).toBe(0);
+
+		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15_000 });
+		await playBtn.click();
+
+		await expect
+			.poll(
+				async () =>
+					estimateDecodedPcmBytes(await readDecodedSeekableSeconds(page)),
+				{
+					timeout: 15_000,
+				},
+			)
+			.toBeGreaterThan(128 * 1024);
+
+		const streamingBytes = estimateDecodedPcmBytes(
+			await readDecodedSeekableSeconds(page),
+		);
+		expect(streamingBytes).toBeGreaterThan(128 * 1024);
+
+		await disposeBtn.click();
+		await expect(page.locator("section#display")).toContainText("disposed");
+		await expect(decodedSeekable).toHaveCount(0);
+		expect(
+			estimateDecodedPcmBytes(await readDecodedSeekableSeconds(page)),
+		).toBe(0);
 	});
 
 	test("streaming audio does not go silent during playback", async ({
