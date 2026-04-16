@@ -470,8 +470,16 @@ export async function buildLibrary(): Promise<void> {
 		throw new Error(`esbuild exited with code ${esbuildExit}`);
 	}
 
-	// Emit hashed variant of the CDN bundle
-	const bundleContent = await Bun.file("dist/lib.bundle.js").text();
+	// Rewrite relative sourceMappingURL to an absolute CDN URL so browsers
+	// resolve the map correctly when the bundle is loaded via jsDelivr.
+	let bundleContent = await Bun.file("dist/lib.bundle.js").text();
+	bundleContent = bundleContent.replace(
+		"//# sourceMappingURL=lib.bundle.js.map",
+		`//# sourceMappingURL=https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@${version}/dist/lib.bundle.js.map`,
+	);
+	await Bun.write("dist/lib.bundle.js", bundleContent);
+
+	// Emit hashed variant of the CDN bundle (after sourcemap URL rewrite)
 	const bundleHash = new Bun.CryptoHasher("sha256")
 		.update(bundleContent)
 		.digest("hex")

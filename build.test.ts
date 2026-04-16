@@ -71,6 +71,22 @@ describe("hashed build artifacts", () => {
 		expect(hashed).toHaveLength(1);
 	});
 
+	test("dist/lib.bundle.js sourceMappingURL is an absolute CDN URL", async () => {
+		const content = await Bun.file("dist/lib.bundle.js").text();
+		expect(content).toContain(
+			"//# sourceMappingURL=https://cdn.jsdelivr.net/npm/@jadujoel/web-audio-clip-node@",
+		);
+		expect(content).not.toContain("//# sourceMappingURL=lib.bundle.js.map");
+	});
+
+	test("dist/lib.bundle.js.map exists and is valid JSON", async () => {
+		const mapFile = Bun.file("dist/lib.bundle.js.map");
+		expect(await mapFile.exists()).toBe(true);
+		const parsed = await mapFile.json();
+		expect(parsed).toHaveProperty("version");
+		expect(parsed).toHaveProperty("sources");
+	});
+
 	test("dist/workers/ minified files have hashed variants", async () => {
 		const files = await readdir("dist/workers");
 		const minFiles = files.filter(

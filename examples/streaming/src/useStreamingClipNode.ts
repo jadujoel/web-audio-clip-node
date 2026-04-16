@@ -1,4 +1,8 @@
-import type { AudioDecoderPolyfillOptions, ControlKey } from "./clip-node-lib";
+import type {
+	AudioDecoderPolyfillOptions,
+	ControlKey,
+	LoopMode,
+} from "./clip-node-lib";
 import { useStreamingClipNode as useStreamingClipNodeLib } from "./clip-node-lib";
 
 function getPolyfillOptions(): AudioDecoderPolyfillOptions {
@@ -21,6 +25,7 @@ interface UseStreamingClipNodeParams {
 	values: Record<ControlKey, number>;
 	enabled: Record<ControlKey, boolean>;
 	loop: boolean;
+	loopMode: LoopMode;
 	setValue: (key: ControlKey, val: number) => void;
 }
 

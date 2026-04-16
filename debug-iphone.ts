@@ -177,8 +177,11 @@ async function main() {
 				.join(" | ");
 			info.title = document.title;
 			// Check for AudioDecoder
+			const globalScope = globalThis as typeof globalThis & {
+				AudioDecoder?: unknown;
+			};
 			info.hasAudioDecoder = String(
-				typeof (globalThis as any).AudioDecoder !== "undefined",
+				typeof globalScope.AudioDecoder !== "undefined",
 			);
 			// Check for polyfill script load capability
 			info.userAgent = navigator.userAgent;
@@ -230,12 +233,12 @@ async function main() {
 			try {
 				const buttons = document.querySelectorAll("button");
 				for (const btn of buttons) {
-					if (btn.textContent && btn.textContent.includes("Stream")) {
+					if (btn.textContent?.includes("Stream")) {
 						// Check if button is disabled
 						const info = {
 							text: btn.textContent,
 							disabled: btn.disabled,
-							onclick: typeof (btn as any).onclick,
+							onclick: typeof btn.onclick,
 							listeners: "unknown",
 						};
 						btn.click();
@@ -269,8 +272,12 @@ async function main() {
 		const audioTest = await browser.execute(async () => {
 			const results: Record<string, string> = {};
 			try {
+				const audioWindow = window as Window &
+					typeof globalThis & {
+						webkitAudioContext?: typeof AudioContext;
+					};
 				const AudioCtx =
-					(window as any).AudioContext || (window as any).webkitAudioContext;
+					audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
 				results.audioContextType = AudioCtx
 					? AudioCtx.name || "exists"
 					: "missing";
@@ -312,7 +319,10 @@ async function main() {
 				}
 
 				// Test if we can create a blob worker with importScripts
-				results.hasImportScripts = String(typeof (self as any).importScripts);
+				const workerScope = globalThis as typeof globalThis & {
+					importScripts?: (...urls: string[]) => void;
+				};
+				results.hasImportScripts = String(typeof workerScope.importScripts);
 
 				ctx.close();
 			} catch (e) {
@@ -334,7 +344,7 @@ async function main() {
 				const buttons = document.querySelectorAll("button");
 				let streamBtn: HTMLButtonElement | null = null;
 				for (const btn of buttons) {
-					if (btn.textContent && btn.textContent.includes("Stream")) {
+					if (btn.textContent?.includes("Stream")) {
 						streamBtn = btn;
 						break;
 					}
@@ -375,7 +385,7 @@ async function main() {
 				results.push(`Status: ${JSON.stringify(status)}`);
 			} catch (e) {
 				results.push(
-					`ERROR: ${e instanceof Error ? e.message + "\n" + e.stack : String(e)}`,
+					`ERROR: ${e instanceof Error ? `${e.message}\n${e.stack}` : String(e)}`,
 				);
 			}
 			return results;

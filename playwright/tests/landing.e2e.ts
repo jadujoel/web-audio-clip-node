@@ -43,4 +43,13 @@ test.describe("Landing page", () => {
 		await page.waitForLoadState("domcontentloaded");
 		expect(page.url()).toContain("/cdn-vanilla");
 	});
+
+	test("streaming card has an SVG icon instead of emoji", async ({ page }) => {
+		await openLanding(page);
+		const streamingCard = page.locator('a[href="streaming"]');
+		await expect(streamingCard).toBeVisible();
+		const svg = streamingCard.locator(".card-icon svg");
+		await expect(svg).toBeVisible();
+		await expect(streamingCard.locator(".card-title")).toHaveText(/Streaming/);
+	});
 });

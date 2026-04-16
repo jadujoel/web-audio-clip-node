@@ -382,6 +382,85 @@ test.describe("Streaming example", () => {
 		await expect(loopMode).toHaveValue("boomerang");
 	});
 
+	test("persisted boomerang loop mode is applied after reload", async ({
+		page,
+		browserName,
+	}) => {
+		test.skip(
+			browserName === "firefox" || browserName === "webkit",
+			"streaming boomerang verification is not stable in headless Firefox/WebKit",
+		);
+
+		await page.evaluate(() => {
+			localStorage.setItem(
+				"clip-node-state",
+				JSON.stringify({
+					state: {
+						values: {
+							loopStart: 0,
+							loopEnd: 0.5,
+						},
+						snaps: {},
+						enabled: {},
+						mins: {},
+						maxs: {},
+						maxLocked: {},
+						linkedPairs: {},
+						loop: true,
+						loopMode: "boomerang",
+						tempo: 120,
+					},
+					version: 0,
+				}),
+			);
+		});
+
+		await page.reload();
+		await page.waitForLoadState("networkidle");
+
+		await expect(page.locator("#loop")).toBeChecked();
+		const loopMode = page.locator("#loopMode");
+		await expect(loopMode).toBeVisible();
+		await expect(loopMode).toHaveValue("boomerang");
+
+		const streamBtn = page.locator("button:has-text('Stream')").first();
+		const playBtn = page.locator("button:has-text('Play')").first();
+		const slider = page.locator(".playhead-slider [role='slider']");
+
+		await streamBtn.click();
+		await expect(playBtn).toBeEnabled({ timeout: 15000 });
+		await playBtn.click();
+
+		await expect(async () => {
+			const val = Number(await slider.getAttribute("aria-valuenow"));
+			expect(val).toBeGreaterThan(0);
+		}).toPass({ timeout: 15000 });
+
+		const samples: number[] = [];
+		for (let i = 0; i < 20; i++) {
+			samples.push(Number(await slider.getAttribute("aria-valuenow")));
+			await page.waitForTimeout(120);
+		}
+
+		expect(Math.max(...samples)).toBeGreaterThan(20_000);
+
+		let descendingRun = 0;
+		let maxDescendingRun = 0;
+		for (let i = 1; i < samples.length; i++) {
+			if (samples[i] < samples[i - 1] - 400) {
+				descendingRun += 1;
+				maxDescendingRun = Math.max(maxDescendingRun, descendingRun);
+			} else {
+				descendingRun = 0;
+			}
+		}
+
+		expect(
+			maxDescendingRun,
+			`expected boomerang playback after reload, got playhead samples: ${samples.join(", ")}`,
+		).toBeGreaterThanOrEqual(2);
+	});
+
 	test("streaming audio does not go silent during playback", async ({
 		page,
 		browserName,

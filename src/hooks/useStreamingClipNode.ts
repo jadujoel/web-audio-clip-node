@@ -1,4 +1,10 @@
-import { type RefObject, useCallback, useRef, useState } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { ClipNode } from "../audio/ClipNode";
 import type {
 	ClipNodeState,
@@ -22,6 +28,7 @@ interface UseStreamingClipNodeParams {
 	values: Record<ControlKey, number>;
 	enabled: Record<ControlKey, boolean>;
 	loop: boolean;
+	loopMode: LoopMode;
 	setValue: (key: ControlKey, val: number) => void;
 	polyfillOptions?: AudioDecoderPolyfillOptions;
 }
@@ -30,6 +37,7 @@ export function useStreamingClipNode({
 	values,
 	enabled,
 	loop,
+	loopMode,
 	setValue,
 	polyfillOptions,
 }: UseStreamingClipNodeParams) {
@@ -43,6 +51,7 @@ export function useStreamingClipNode({
 	const configureClip = useCallback(
 		(ctx: AudioContext, clip: ClipNode) => {
 			clip.loop = loop;
+			clip.loopMode = loopMode;
 			clip.connect(ctx.destination);
 
 			for (const key of Object.keys(values) as ControlKey[]) {
@@ -75,7 +84,7 @@ export function useStreamingClipNode({
 
 			clipRef.current = clip;
 		},
-		[enabled, loop, values],
+		[enabled, loop, loopMode, values],
 	);
 	const [infoLatency, setInfoLatency] = useState("unknown");
 	const statusRef = useRef<string | null>("Idle");
@@ -104,6 +113,13 @@ export function useStreamingClipNode({
 		statusRef.current = next;
 		setStatusMessage(next);
 	}, []);
+
+	useEffect(() => {
+		const clip = clipRef.current;
+		if (!clip) return;
+		clip.loop = loop;
+		clip.loopMode = loopMode;
+	}, [loop, loopMode]);
 
 	const stream = useCallback(
 		async (

@@ -175,6 +175,7 @@ export function App() {
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
+		loopMode: controls.loopMode,
 		setValue: controls.setValue,
 	});
 
