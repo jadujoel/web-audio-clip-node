@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { openExample } from "../helpers/navigation";
 
@@ -245,7 +246,7 @@ test.describe("Playground example", () => {
 		await page.locator("section#buttons button:has-text('Load Sound')").click();
 		const fileChooser = await fileChooserPromise;
 		await fileChooser.setFiles(
-			"/Users/admin/workspace/web-audio-clip-node/src/sounds/example.mp3",
+			resolve(import.meta.dirname, "../../src/sounds/example.mp3"),
 		);
 
 		const soundOutput = page.locator("code:has-text('Sound:') + output");
