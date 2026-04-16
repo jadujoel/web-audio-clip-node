@@ -1,7 +1,7 @@
 // Minimal ID3v2 tag parser for extracting text metadata from MP3 files.
 // Supports ID3v2.3 and ID3v2.4 text frames.
 
-import type { AudioMetadata } from "../audio/types";
+import type { AudioMetadata } from "../audio/clip/types";
 
 /** Parse an ID3v2 tag from the beginning of a buffer.
  *  Returns extracted metadata, or null if no ID3v2 tag found. */

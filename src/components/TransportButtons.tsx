@@ -1,5 +1,5 @@
 import { memo, type NamedExoticComponent } from "react";
-import type { ClipNodeState } from "../audio/types";
+import type { ClipNodeState } from "../audio/clip/types";
 
 export interface TransportButtonsProps {
 	nodeState: ClipNodeState;

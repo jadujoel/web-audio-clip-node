@@ -27,7 +27,7 @@ import {
 	handleProcessorMessage,
 	type OutboundMessage,
 	processBlock,
-} from "./processor-kernel";
+} from "./kernel";
 import type { ClipProcessorOptions } from "./types";
 import { State } from "./types";
 

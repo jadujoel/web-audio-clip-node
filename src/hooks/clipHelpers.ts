@@ -1,4 +1,4 @@
-import type { ClipNode } from "../audio/ClipNode";
+import type { ClipNode } from "../audio/clip/node";
 import { linFromDb } from "../audio/utils";
 import type { ControlKey } from "../controls/controlDefs";
 

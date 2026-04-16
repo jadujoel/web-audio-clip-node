@@ -21,7 +21,7 @@ const {
 	getProcessorBlobUrlMock: vi.fn(() => "blob:test-processor"),
 }));
 
-vi.mock("../audio/workletUrl", () => ({
+vi.mock("../audio/clip/url", () => ({
 	getProcessorBlobUrl: getProcessorBlobUrlMock,
 }));
 

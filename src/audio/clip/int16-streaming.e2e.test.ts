@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-	applyBufferRangeWrite,
-	getProperties,
-	processBlock,
-} from "./processor-kernel";
+import { applyBufferRangeWrite, getProperties, processBlock } from "./kernel";
 import { State } from "./types";
 
 describe("float32 streaming pipeline (end-to-end)", () => {

@@ -1,5 +1,5 @@
-import type { ClipNode } from "./ClipNode";
-import type { StreamingClipNode } from "./StreamingClipNode";
+import type { ClipNode } from "./clip/node";
+import type { StreamingClipNode } from "./clip/streaming-node";
 
 export interface MediaSessionOptions {
 	title?: string;
@@ -82,7 +82,7 @@ export function bindMediaSession(
 
 	const handleStateChange = (e: {
 		readonly type: "statechange";
-		readonly state: import("./types").ClipNodeState;
+		readonly state: import("./clip/types").ClipNodeState;
 	}) => {
 		switch (e.state) {
 			case "started":
@@ -111,7 +111,7 @@ export function bindMediaSession(
 	let handleMetadata:
 		| ((e: {
 				readonly type: "metadata";
-				readonly metadata: import("./types").AudioMetadata;
+				readonly metadata: import("./clip/types").AudioMetadata;
 		  }) => void)
 		| undefined;
 	if (isStreamingNode(node)) {

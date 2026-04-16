@@ -1,6 +1,6 @@
 import { create, type UseBoundStore } from "zustand";
 import { persist } from "zustand/middleware";
-import type { LoopMode } from "../audio/types";
+import type { LoopMode } from "../audio/clip/types";
 import {
 	buildDefaults,
 	type ControlKey,

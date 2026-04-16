@@ -10,7 +10,7 @@
 			"**",
 			"!!**/dist",
 			"!!**/webpage",
-			"!!src/audio/processor-code.ts",
+			"!!src/audio/**/code.ts",
 			"!!src/audio/version.ts",
 			"!!src/workers/*-worker-code.ts",
 			"!!examples"

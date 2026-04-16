@@ -1,9 +1,12 @@
-import type { AudioDecoderPolyfillOptions, StreamFormat } from "../streaming";
+import type {
+	AudioDecoderPolyfillOptions,
+	StreamFormat,
+} from "../../streaming";
 import {
 	createStreamingWorker,
 	detectStreamFormatFromResponse,
-} from "../streaming";
-import { estimateByteOffsetFromSample } from "../streamTimeline";
+} from "../../streaming";
+import { estimateByteOffsetFromSample } from "../../streamTimeline";
 import type {
 	AudioMetadata,
 	BufferedRange,

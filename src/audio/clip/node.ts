@@ -4,6 +4,7 @@ import {
 	TypedEventTarget,
 } from "@jadujoel/typed-event-target";
 import { err, errAsync, ok, type Result, ResultAsync } from "neverthrow";
+import { audioBufferFromFloat32Array } from "../utils";
 import type {
 	ClipNodeEvents,
 	ClipNodeState,
@@ -11,7 +12,6 @@ import type {
 	LoopMode,
 	StreamBufferSpan,
 } from "./types";
-import { audioBufferFromFloat32Array } from "./utils";
 
 type Handler<K extends keyof ClipNodeEvents> = TypedEventListener<
 	EventFor<ClipNodeEvents, K>

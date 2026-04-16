@@ -1,15 +1,18 @@
 import { describe, expect, test } from "vitest";
 
-import { createContext, renderContext } from "../../TestPreload";
-import { assertSamplesMatch, computeRms } from "../test-utils/audio-assertions";
-import { ClipNode } from "./ClipNode";
+import { createContext, renderContext } from "../../../TestPreload";
+import {
+	assertSamplesMatch,
+	computeRms,
+} from "../../test-utils/audio-assertions";
+import { ClipNode } from "./node";
 
 describe("AudioWorklet browser integration", () => {
 	test("loads the processor module without crashing", async () => {
 		const context = createContext({ sampleRate: 48_000 });
 
 		await expect(
-			context.audioWorklet.addModule("/dist/audio/processor.js"),
+			context.audioWorklet.addModule("/dist/clip-processor.bundle.js"),
 		).resolves.toBeUndefined();
 	});
 
@@ -23,7 +26,7 @@ describe("AudioWorklet browser integration", () => {
 
 		expect(context).toBeInstanceOf(OfflineAudioContext);
 		await expect(
-			context.audioWorklet.addModule("/dist/audio/processor.js"),
+			context.audioWorklet.addModule("/dist/clip-processor.bundle.js"),
 		).resolves.toBeUndefined();
 	});
 
@@ -35,7 +38,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		const buffer = context.createBuffer(2, 12_000, context.sampleRate);
 		buffer.getChannelData(0).fill(0.25);
@@ -60,7 +63,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		const buffer = context.createBuffer(2, 48_000, context.sampleRate);
 		buffer.getChannelData(0).fill(0.25);
@@ -89,7 +92,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		const buffer1 = context.createBuffer(2, 12_000, context.sampleRate);
 		buffer1.getChannelData(0).fill(0.25);
@@ -120,7 +123,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		const clip = new ClipNode(context);
 		clip.connect(context.destination);
@@ -156,7 +159,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		const clip = new ClipNode(context);
 		clip.connect(context.destination);
@@ -200,7 +203,7 @@ describe("AudioWorklet browser integration", () => {
 			preferOffline: true,
 		});
 
-		await context.audioWorklet.addModule("/dist/audio/processor.js");
+		await context.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 
 		// Create known sine wave signals
 		const inputL = new Float32Array(length);

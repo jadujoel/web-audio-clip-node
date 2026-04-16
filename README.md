@@ -526,7 +526,7 @@ clip.events.addEventListener("readystatechange", ({ state }) => {
 |--------|----------|----------|
 | Blob URL | `getProcessorBlobUrl()` | Default for package consumers — zero setup |
 | CDN | `getProcessorCdnUrl("latest")` | Plain browser usage via jsDelivr |
-| Self-hosted | `getProcessorModuleUrl(baseUrl)` | You serve `processor.js` from your own server |
+| Self-hosted | `getProcessorModuleUrl(baseUrl)` | You serve `clip-processor.bundle.js` from your own server |
 
 ## Entry Points
 

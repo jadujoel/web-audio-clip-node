@@ -24,7 +24,7 @@ async function writeWithHash(filePath: string, content: string): Promise<void> {
 
 export async function buildProcessor(minify = true): Promise<string> {
 	const output = await Bun.build({
-		entrypoints: ["./src/audio/processor.ts"],
+		entrypoints: ["./src/audio/clip/processor.ts"],
 		target: "browser",
 		minify,
 		throw: true,
@@ -171,7 +171,7 @@ export async function buildWebpage(): Promise<void> {
 	const hasSelfHostedExample = existsSync("examples/self-hosted/index.html");
 	const hasSelfHostedSetup = existsSync("examples/self-hosted/package.json");
 	const hasSelfHostedProcessor = existsSync(
-		"examples/self-hosted/public/processor.js",
+		"examples/self-hosted/public/clip-processor.bundle.js",
 	);
 
 	// Link library to examples that use package imports
@@ -188,7 +188,7 @@ export async function buildWebpage(): Promise<void> {
 	}
 	await Promise.all(linkTasks);
 
-	// Self-hosted needs processor.js copied
+	// Self-hosted needs clip-processor.bundle.js copied
 	if (hasSelfHostedExample && hasSelfHostedSetup) {
 		await Bun.$`bun run --cwd examples/self-hosted setup`;
 	}
@@ -293,11 +293,11 @@ export async function buildWebpage(): Promise<void> {
 
 	await Promise.all(buildTasks);
 
-	// Copy self-hosted processor.js into its webpage output
+	// Copy self-hosted clip-processor.bundle.js into its webpage output
 	if (hasSelfHostedExample && hasSelfHostedProcessor) {
 		await cp(
-			"examples/self-hosted/public/processor.js",
-			join(webpageDir, "self-hosted", "processor.js"),
+			"examples/self-hosted/public/clip-processor.bundle.js",
+			join(webpageDir, "self-hosted", "clip-processor.bundle.js"),
 		);
 	}
 
@@ -340,8 +340,28 @@ export async function buildWebpage(): Promise<void> {
 async function buildProcessorCodeModule(): Promise<string> {
 	const code = await buildProcessor();
 	await Bun.write(
-		"src/audio/processor-code.ts",
+		"src/audio/clip/code.ts",
 		`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const processorCode =\n\t${JSON.stringify(code)};\n`,
+	);
+	return code;
+}
+
+async function buildDuckProcessorCodeModule(): Promise<string> {
+	const output = await Bun.build({
+		entrypoints: ["./src/audio/duck/processor.ts"],
+		target: "browser",
+		minify: true,
+		throw: true,
+		sourcemap: "linked",
+		outdir: "dist",
+	});
+	const code = await output.outputs[0].text();
+	if (!code) {
+		throw new Error("Failed to read duck processor code.");
+	}
+	await Bun.write(
+		"src/audio/duck/code.ts",
+		`// AUTO-GENERATED — do not edit. Run 'bun run build:lib' to regenerate.\nexport const duckProcessorCode =\n\t${JSON.stringify(code)};\n`,
 	);
 	return code;
 }
@@ -427,11 +447,17 @@ export async function buildLibrary(): Promise<void> {
 	// 1. Compile processor and generate embedded code module
 	const processorSource = await buildProcessorCodeModule();
 
+	// 1a. Compile duck processor and generate embedded code module
+	const duckProcessorSource = await buildDuckProcessorCodeModule();
+
 	// 1b. Compile all streaming workers and generate embedded code modules
 	await buildWorkerCodeModules();
 
-	// 2. Write standalone processor.js for CDN usage (with hashed variant)
-	await writeWithHash("dist/processor.js", processorSource);
+	// 2. Write standalone clip-processor.bundle.js for CDN usage (with hashed variant)
+	await writeWithHash("dist/clip-processor.bundle.js", processorSource);
+
+	// 2a. Write standalone duck-processor.bundle.js for CDN usage
+	await writeWithHash("dist/duck-processor.bundle.js", duckProcessorSource);
 
 	// 3. Generate version module from package.json
 	const { version } = await Bun.file("package.json").json();

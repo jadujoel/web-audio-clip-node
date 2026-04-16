@@ -1,6 +1,6 @@
 import "./TestPreload.ts";
 
-import { ClipNode } from "./src/audio/ClipNode.ts";
+import { ClipNode } from "./src/audio/clip/node.ts";
 
 async function main() {
 	const context = new AudioContext({
@@ -11,7 +11,7 @@ async function main() {
 		entrypoints: ["src/audio/processor.ts"],
 		outdir: "dist/audio",
 	});
-	await context.audioWorklet.addModule("./dist/audio/processor.js");
+	await context.audioWorklet.addModule("./dist/clip-processor.bundle.js");
 	console.log("AudioWorkletProcessor module loaded successfully.");
 
 	const srcFile = "./src/sounds/lml.webm";

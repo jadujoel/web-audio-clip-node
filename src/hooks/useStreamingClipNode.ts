@@ -5,14 +5,14 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { ClipNode } from "../audio/ClipNode";
+import { ClipNode } from "../audio/clip/node";
 import type {
 	ClipNodeState,
 	FrameData,
 	GapPlaybackStrategy,
 	LoopMode,
-} from "../audio/types";
-import { getProcessorBlobUrl } from "../audio/workletUrl";
+} from "../audio/clip/types";
+import { getProcessorBlobUrl } from "../audio/clip/url";
 import type { ControlKey } from "../controls/controlDefs";
 import type { StreamFormat } from "../streaming";
 import {

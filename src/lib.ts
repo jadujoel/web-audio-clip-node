@@ -2,13 +2,8 @@ import "./polyfills";
 
 // Re-export Result types for consumers
 export type { Result, ResultAsync } from "neverthrow";
-
-// Core audio
-export { ClipNode } from "./audio/ClipNode";
 export { Coordinator } from "./audio/Coordinator";
-export type { MediaSessionOptions } from "./audio/media-session";
-export { bindMediaSession } from "./audio/media-session";
-export { processorCode } from "./audio/processor-code";
+export { processorCode } from "./audio/clip/code";
 // Processor kernel (for advanced / testing)
 export {
 	createFilterState,
@@ -16,8 +11,10 @@ export {
 	handleProcessorMessage,
 	processBlock,
 	SAMPLE_BLOCK_SIZE,
-} from "./audio/processor-kernel";
-export { StreamingClipNode } from "./audio/StreamingClipNode";
+} from "./audio/clip/kernel";
+// Core audio
+export { ClipNode } from "./audio/clip/node";
+export { StreamingClipNode } from "./audio/clip/streaming-node";
 // Types
 export type {
 	AudioMetadata,
@@ -39,8 +36,24 @@ export type {
 	StreamingClipNodeEvents,
 	StreamPreload,
 	StreamReadyState,
-} from "./audio/types";
-export { State } from "./audio/types";
+} from "./audio/clip/types";
+export { State } from "./audio/clip/types";
+export {
+	getProcessorBlobUrl,
+	getProcessorCdnUrl,
+	getProcessorModuleUrl,
+} from "./audio/clip/url";
+export { duckProcessorCode } from "./audio/duck/code";
+export type { DuckProcessorState } from "./audio/duck/kernel";
+export {
+	createDuckProcessorState,
+	processDuckBlock,
+} from "./audio/duck/kernel";
+export type { DuckNodeOptions } from "./audio/duck/node";
+export { DuckNode } from "./audio/duck/node";
+export { getDuckProcessorBlobUrl } from "./audio/duck/url";
+export type { MediaSessionOptions } from "./audio/media-session";
+export { bindMediaSession } from "./audio/media-session";
 export type { SliderPreset, TempoRelativeSnap } from "./audio/utils";
 // Utils
 export {
@@ -55,11 +68,6 @@ export {
 	presets,
 	remapTempoRelativeValue,
 } from "./audio/utils";
-export {
-	getProcessorBlobUrl,
-	getProcessorCdnUrl,
-	getProcessorModuleUrl,
-} from "./audio/workletUrl";
 export type { ControlDef, ControlKey } from "./controls/controlDefs";
 // Controls
 export {

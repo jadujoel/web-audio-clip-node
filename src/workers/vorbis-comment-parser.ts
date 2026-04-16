@@ -1,7 +1,7 @@
 // Minimal Vorbis Comment parser for extracting metadata from Ogg/FLAC streams.
 // Used by Ogg Opus, Ogg Vorbis, Ogg FLAC, and native FLAC workers.
 
-import type { AudioMetadata } from "../audio/types";
+import type { AudioMetadata } from "../audio/clip/types";
 
 /** Parse a Vorbis Comment block (without the framing bit).
  *  `data` should start at the vendor string length field. */

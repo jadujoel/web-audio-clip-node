@@ -1,5 +1,5 @@
-import { processorCode } from "./processor-code";
-import { VERSION } from "./version";
+import { VERSION } from "../version";
+import { processorCode } from "./code";
 
 const PACKAGE_NAME = "@jadujoel/web-audio-clip-node";
 const PACKAGE_VERSION: string = VERSION;
@@ -12,12 +12,12 @@ export function getProcessorBlobUrl(): string {
 
 /** jsDelivr CDN URL. For script-tag / no-bundler usage. */
 export function getProcessorCdnUrl(version: string = PACKAGE_VERSION): string {
-	return `https://cdn.jsdelivr.net/npm/${PACKAGE_NAME}@${version}/dist/processor.js`;
+	return `https://cdn.jsdelivr.net/npm/${PACKAGE_NAME}@${version}/dist/clip-processor.bundle.js`;
 }
 
-/** Custom URL relative to a base. For self-hosted processor.js. */
+/** Custom URL relative to a base. For self-hosted clip-processor.bundle.js. */
 export function getProcessorModuleUrl(
 	baseUrl: string = document.baseURI,
 ): string {
-	return new URL("./processor.js", baseUrl).toString();
+	return new URL("./clip-processor.bundle.js", baseUrl).toString();
 }

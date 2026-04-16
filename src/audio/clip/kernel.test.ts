@@ -19,7 +19,7 @@ import {
 	processBlock,
 	SAMPLE_BLOCK_SIZE,
 	setOffset,
-} from "./processor-kernel";
+} from "./kernel";
 import type { BlockParameters, ClipProcessorOptions } from "./types";
 import { State } from "./types";
 

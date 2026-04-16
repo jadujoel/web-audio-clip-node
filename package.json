@@ -33,7 +33,7 @@
 			"types": "./dist/streaming.d.ts",
 			"import": "./dist/streaming.js"
 		},
-		"./processor": "./dist/processor.js",
+		"./processor": "./dist/clip-processor.bundle.js",
 		"./styles.css": {
 			"types": "./dist/styles.css.d.ts",
 			"default": "./dist/styles.css"

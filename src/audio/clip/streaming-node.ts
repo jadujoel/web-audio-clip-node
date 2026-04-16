@@ -4,9 +4,9 @@ import type {
 } from "@jadujoel/typed-event-target";
 import { TypedEventTarget } from "@jadujoel/typed-event-target";
 import { err, ok, type Result } from "neverthrow";
-import { ClipNode } from "./ClipNode";
-import type { StreamingClipNodeOptions } from "./ClipStreamController";
-import { ClipStreamController } from "./ClipStreamController";
+import { ClipNode } from "./node";
+import type { StreamingClipNodeOptions } from "./stream-controller";
+import { ClipStreamController } from "./stream-controller";
 import type {
 	AudioMetadata,
 	BufferedRange,
@@ -22,7 +22,7 @@ import type {
 export type {
 	PendingStart,
 	StreamingClipNodeOptions,
-} from "./ClipStreamController";
+} from "./stream-controller";
 
 type SHandler<K extends keyof StreamingClipNodeEvents> = TypedEventListener<
 	EventFor<StreamingClipNodeEvents, K>

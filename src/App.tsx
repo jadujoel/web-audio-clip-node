@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { LoopMode } from "./audio/types";
+import type { LoopMode } from "./audio/clip/types";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";

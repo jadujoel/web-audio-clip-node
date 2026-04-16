@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createContext } from "../../TestPreload";
 import type { StreamFormat } from "../streaming";
-import { ClipNode } from "./ClipNode";
 import { Coordinator } from "./Coordinator";
+import { ClipNode } from "./clip/node";
+import type { AudioMetadata } from "./clip/types";
 import { bindMediaSession } from "./media-session";
-import type { AudioMetadata } from "./types";
 
 // --- Fake MediaSession ---
 
@@ -138,7 +138,7 @@ afterEach(() => {
 describe("bindMediaSession", () => {
 	test("sets metadata from options", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node, {
@@ -159,7 +159,7 @@ describe("bindMediaSession", () => {
 
 	test("sets default title when no options given", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node);
@@ -171,7 +171,7 @@ describe("bindMediaSession", () => {
 
 	test("play action handler calls resume", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node);
@@ -188,7 +188,7 @@ describe("bindMediaSession", () => {
 
 	test("pause action handler calls pause", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node);
@@ -202,7 +202,7 @@ describe("bindMediaSession", () => {
 
 	test("stop action handler calls stop", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node);
@@ -216,7 +216,7 @@ describe("bindMediaSession", () => {
 
 	test("seekbackward handler seeks back by offset", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		(node as unknown as { _playhead: number })._playhead = 30 * 48_000;
@@ -236,7 +236,7 @@ describe("bindMediaSession", () => {
 
 	test("seekforward handler seeks forward by offset", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		(node as unknown as { _playhead: number })._playhead = 30 * 48_000;
@@ -256,7 +256,7 @@ describe("bindMediaSession", () => {
 
 	test("seekto handler sets currentTime", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		const portMessages = capturePortMessages(node);
@@ -275,7 +275,7 @@ describe("bindMediaSession", () => {
 
 	test("playback state updates on node state changes", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		bindMediaSession(node);
@@ -305,7 +305,7 @@ describe("bindMediaSession", () => {
 
 	test("unbind removes all action handlers", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		const unbind = bindMediaSession(node, { title: "Test" });
@@ -330,7 +330,7 @@ describe("bindMediaSession", () => {
 
 	test("unbind restores previous onstatechange callback", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 
 		const states: string[] = [];
@@ -353,10 +353,10 @@ describe("bindMediaSession", () => {
 
 	test("auto-updates metadata from streaming node onmetadata", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "./dist/clip-processor.bundle.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(
@@ -401,7 +401,7 @@ describe("bindMediaSession", () => {
 
 	test("seekbackward defaults to 10 seconds when no seekOffset", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		(node as unknown as { _playhead: number })._playhead = 30 * 48_000;
@@ -421,7 +421,7 @@ describe("bindMediaSession", () => {
 
 	test("seekforward clamps to duration", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		(node as unknown as { _playhead: number })._playhead = 55 * 48_000;
@@ -440,7 +440,7 @@ describe("bindMediaSession", () => {
 
 	test("seekbackward clamps to 0", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
 		const node = new ClipNode(ctx);
 		node.duration = 60;
 		(node as unknown as { _playhead: number })._playhead = 3 * 48_000;

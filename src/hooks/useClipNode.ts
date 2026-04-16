@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ClipNode } from "../audio/ClipNode";
-import type { ClipNodeState, FrameData, LoopMode } from "../audio/types";
+import { ClipNode } from "../audio/clip/node";
+import type { ClipNodeState, FrameData, LoopMode } from "../audio/clip/types";
+import { getProcessorBlobUrl } from "../audio/clip/url";
 import { float32ArrayFromAudioBuffer, linFromDb } from "../audio/utils";
-import { getProcessorBlobUrl } from "../audio/workletUrl";
 import type { ControlKey } from "../controls/controlDefs";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { loadFromCache } from "../data/cache";

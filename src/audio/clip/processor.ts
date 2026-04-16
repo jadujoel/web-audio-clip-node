@@ -26,7 +26,7 @@ import {
 	getProperties,
 	handleProcessorMessage,
 	processBlock,
-} from "./processor-kernel";
+} from "./kernel";
 import type { ClipProcessorOptions, ProcessorWorkletOptions } from "./types";
 import { State } from "./types";
 

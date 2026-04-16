@@ -1,19 +1,22 @@
 import type { AudioDecoderPolyfillOptions, StreamFormat } from "../streaming";
 import { createCdnWorkerFactory } from "../streaming";
-import { ClipNode } from "./ClipNode";
-import { StreamingClipNode } from "./StreamingClipNode";
+import { ClipNode } from "./clip/node";
+import { StreamingClipNode } from "./clip/streaming-node";
 import type {
 	ClipWorkletOptions,
 	GapPlaybackStrategy,
 	StreamPreload,
-} from "./types";
-import { getProcessorBlobUrl } from "./workletUrl";
+} from "./clip/types";
+import { getProcessorBlobUrl } from "./clip/url";
+import type { DuckNodeOptions } from "./duck/node";
+import { DuckNode } from "./duck/node";
+import { getDuckProcessorBlobUrl } from "./duck/url";
 
 export type {
 	PendingStart,
 	StreamingClipNodeOptions,
-} from "./StreamingClipNode";
-export { StreamingClipNode } from "./StreamingClipNode";
+} from "./clip/streaming-node";
+export { StreamingClipNode } from "./clip/streaming-node";
 
 export interface CoordinatorStreamingOptions {
 	format?: StreamFormat;
@@ -72,6 +75,8 @@ export class Coordinator {
 		public workerFactory?: (format: StreamFormat) => Worker | Promise<Worker>,
 		private moduleLoaded?: undefined | Promise<void>,
 		private nodes = new Set<ClipNode>(),
+		private duckNodes = new Set<DuckNode>(),
+		private duckModuleLoaded?: undefined | Promise<void>,
 	) {}
 
 	/** One-line setup using embedded workers. All format workers are bundled -
@@ -160,10 +165,32 @@ export class Coordinator {
 		return node;
 	}
 
+	private addDuckModule(processorUrl?: string): Promise<void> {
+		if (this.duckModuleLoaded !== undefined) return this.duckModuleLoaded;
+		this.duckModuleLoaded = this.context.audioWorklet
+			.addModule(processorUrl ?? getDuckProcessorBlobUrl())
+			.catch((err) => {
+				this.duckModuleLoaded = undefined;
+				console.warn("Failed to load DuckProcessor module:", err);
+			});
+		return this.duckModuleLoaded;
+	}
+
+	async createDuckNode(options?: DuckNodeOptions): Promise<DuckNode> {
+		await this.addDuckModule();
+		const node = new DuckNode(this.context, options);
+		this.duckNodes.add(node);
+		return node;
+	}
+
 	dispose(): void {
 		for (const node of this.nodes) {
 			node.dispose();
 		}
 		this.nodes.clear();
+		for (const node of this.duckNodes) {
+			node.dispose();
+		}
+		this.duckNodes.clear();
 	}
 }

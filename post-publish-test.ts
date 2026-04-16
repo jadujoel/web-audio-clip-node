@@ -285,13 +285,13 @@ try {
 	console.log("\n--- Processor entry (./processor) ---");
 	const processorPath = join(
 		tmp,
-		"node_modules/@jadujoel/web-audio-clip-node/dist/processor.js",
+		"node_modules/@jadujoel/web-audio-clip-node/dist/clip-processor.bundle.js",
 	);
 	const processorSource = await Bun.file(processorPath).text();
-	assert(processorSource.length > 0, "processor.js is non-empty");
+	assert(processorSource.length > 0, "clip-processor.bundle.js is non-empty");
 	assert(
 		processorSource.includes("registerProcessor"),
-		"processor.js calls registerProcessor",
+		"clip-processor.bundle.js calls registerProcessor",
 	);
 
 	// -----------------------------------------------------------------------
