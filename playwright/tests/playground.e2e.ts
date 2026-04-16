@@ -239,7 +239,14 @@ test.describe("Playground example", () => {
 
 	test("pause then delayed stop never resumes before ending", async ({
 		page,
+		browserName,
 	}) => {
+		// Headless Firefox on CI never transitions scheduled → started
+		// because its AudioContext stays suspended without real audio output.
+		test.skip(
+			browserName === "firefox",
+			"AudioWorklet does not process in headless Firefox",
+		);
 		test.setTimeout(45_000);
 
 		const fileChooserPromise = page.waitForEvent("filechooser");
