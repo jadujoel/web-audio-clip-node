@@ -1,29 +1,36 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, render, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ControlKey } from "../controls/controlDefs";
 
-const addModuleMock = mock(async () => undefined);
-const decodeAudioDataMock = mock(
-	async () => ({ duration: 1.5 }) as AudioBuffer,
-);
-const loadUploadedFileMock = mock(async () => ({
-	name: "restored.wav",
-	arrayBuffer: new ArrayBuffer(8),
+const {
+	addModuleMock,
+	decodeAudioDataMock,
+	loadUploadedFileMock,
+	saveUploadedFileMock,
+	loadFromCacheMock,
+	getProcessorBlobUrlMock,
+} = vi.hoisted(() => ({
+	addModuleMock: vi.fn(async () => undefined),
+	decodeAudioDataMock: vi.fn(async () => ({ duration: 1.5 }) as AudioBuffer),
+	loadUploadedFileMock: vi.fn(async () => ({
+		name: "restored.wav",
+		arrayBuffer: new ArrayBuffer(8),
+	})),
+	saveUploadedFileMock: vi.fn(async () => undefined),
+	loadFromCacheMock: vi.fn(async () => undefined),
+	getProcessorBlobUrlMock: vi.fn(() => "blob:test-processor"),
 }));
-const saveUploadedFileMock = mock(async () => undefined);
-const loadFromCacheMock = mock(async () => undefined);
-const getProcessorBlobUrlMock = mock(() => "blob:test-processor");
 
-mock.module("../audio/workletUrl", () => ({
+vi.mock("../audio/workletUrl", () => ({
 	getProcessorBlobUrl: getProcessorBlobUrlMock,
 }));
 
-mock.module("../data/fileStore", () => ({
+vi.mock("../data/fileStore", () => ({
 	loadUploadedFile: loadUploadedFileMock,
 	saveUploadedFile: saveUploadedFileMock,
 }));
 
-mock.module("../data/cache", () => ({
+vi.mock("../data/cache", () => ({
 	loadFromCache: loadFromCacheMock,
 }));
 

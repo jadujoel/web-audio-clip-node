@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { DetuneControl } from "./DetuneControl";
 
 afterEach(cleanup);
@@ -70,7 +70,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("toggle fires onToggle", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={0}
@@ -85,7 +85,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("double-click resets to default", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={500}
@@ -100,7 +100,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("does not fire onChange when disabled", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={0}
@@ -116,7 +116,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("click-to-edit commits value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={0}
@@ -134,7 +134,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("click-to-edit: Escape cancels", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={0}
@@ -151,7 +151,7 @@ describe("DetuneControl", () => {
 	});
 
 	test("click-to-edit: clamps value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<DetuneControl
 				value={0}

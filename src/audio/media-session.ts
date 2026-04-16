@@ -1,6 +1,5 @@
 import type { ClipNode } from "./ClipNode";
 import type { StreamingClipNode } from "./StreamingClipNode";
-import type { AudioMetadata } from "./types";
 
 export interface MediaSessionOptions {
 	title?: string;
@@ -67,10 +66,25 @@ export function bindMediaSession(
 	});
 
 	// --- Playback state updates ---
-	const prevOnstatechange = node.onstatechange;
-	node.onstatechange = (state) => {
-		prevOnstatechange?.(state);
-		switch (state) {
+	function updatePositionState() {
+		const dur = node.duration;
+		if (dur <= 0 || !Number.isFinite(dur)) return;
+		try {
+			session.setPositionState({
+				duration: dur,
+				playbackRate: node.playbackRate.value,
+				position: Math.max(0, Math.min(node.currentTime, dur)),
+			});
+		} catch {
+			// setPositionState can throw if values are invalid
+		}
+	}
+
+	const handleStateChange = (e: {
+		readonly type: "statechange";
+		readonly state: import("./types").ClipNodeState;
+	}) => {
+		switch (e.state) {
 			case "started":
 			case "resumed":
 				session.playbackState = "playing";
@@ -86,41 +100,30 @@ export function bindMediaSession(
 		}
 		updatePositionState();
 	};
+	node.events.addEventListener("statechange", handleStateChange);
 
-	// --- Position state updates ---
-	function updatePositionState() {
-		const dur = node.duration;
-		if (dur <= 0 || !Number.isFinite(dur)) return;
-		try {
-			session.setPositionState({
-				duration: dur,
-				playbackRate: node.playbackRate.value,
-				position: Math.max(0, Math.min(node.currentTime, dur)),
-			});
-		} catch {
-			// setPositionState can throw if values are invalid
-		}
-	}
-
-	const prevOntimeupdate = node.ontimeupdate;
-	node.ontimeupdate = (ct: number) => {
-		prevOntimeupdate?.(ct);
+	const handleTimeUpdate = () => {
 		updatePositionState();
 	};
+	node.events.addEventListener("timeupdate", handleTimeUpdate);
 
 	// --- Auto-metadata from streaming node ---
-	let prevOnmetadata: ((meta: AudioMetadata) => void) | undefined;
+	let handleMetadata:
+		| ((e: {
+				readonly type: "metadata";
+				readonly metadata: import("./types").AudioMetadata;
+		  }) => void)
+		| undefined;
 	if (isStreamingNode(node)) {
-		prevOnmetadata = node.onmetadata;
-		node.onmetadata = (meta: AudioMetadata) => {
-			prevOnmetadata?.(meta);
+		handleMetadata = (e) => {
 			session.metadata = new MediaMetadata({
-				title: meta.title ?? options?.title ?? "Unknown",
-				artist: meta.artist ?? options?.artist,
-				album: meta.album ?? options?.album,
+				title: e.metadata.title ?? options?.title ?? "Unknown",
+				artist: e.metadata.artist ?? options?.artist,
+				album: e.metadata.album ?? options?.album,
 				artwork: options?.artwork,
 			});
 		};
+		node.streamEvents.addEventListener("metadata", handleMetadata);
 	}
 
 	// --- Unbind ---
@@ -130,10 +133,10 @@ export function bindMediaSession(
 		}
 		session.playbackState = "none";
 		session.metadata = null;
-		node.onstatechange = prevOnstatechange;
-		node.ontimeupdate = prevOntimeupdate;
-		if (isStreamingNode(node)) {
-			node.onmetadata = prevOnmetadata;
+		node.events.removeEventListener("statechange", handleStateChange);
+		node.events.removeEventListener("timeupdate", handleTimeUpdate);
+		if (isStreamingNode(node) && handleMetadata) {
+			node.streamEvents.removeEventListener("metadata", handleMetadata);
 		}
 	};
 }

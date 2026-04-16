@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { isFlacStream, parseOggFlacHeader } from "./ogg-flac-decode-worker";
 
 /**
@@ -164,7 +164,9 @@ describe("parseOggFlacHeader", () => {
 	});
 
 	test("parses real OGG FLAC file header", async () => {
-		const data = await Bun.file("src/sounds/example-flac.oga").arrayBuffer();
+		const data = await fetch("/src/sounds/example-flac.oga").then((r) =>
+			r.arrayBuffer(),
+		);
 		const buf = new Uint8Array(data);
 		// Find first OGG page and extract first packet
 		if (

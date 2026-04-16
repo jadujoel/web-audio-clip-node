@@ -151,7 +151,10 @@ function AudioControlInner({
 					className="control-toggle"
 					checked={enabled}
 					disabled={forceDisabled}
-					onChange={(e) => onToggle?.(e.target.checked)}
+					onChange={(e) => {
+						if (forceDisabled) return;
+						onToggle?.(e.target.checked);
+					}}
 				/>
 			)}
 			{!hasToggle && <span className="control-toggle-placeholder" />}

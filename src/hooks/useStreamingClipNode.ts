@@ -63,16 +63,16 @@ export function useStreamingClipNode({
 				}
 			}
 
-			clip.onstatechange = (s) => setNodeState(s);
+			clip.onstatechange = (e) => setNodeState(e.state);
 			clip.onlooped = () => {
 				timesLoopedRef.current = clip.timesLooped.toString();
 			};
 			// Capture the generation at clip creation time so stale frames
 			// from a torn-down clip are ignored.
 			const gen = frameGenRef.current;
-			clip.onframe = (data) => {
+			clip.onframe = (e) => {
 				if (frameGenRef.current === gen) {
-					frameRef.current = data;
+					frameRef.current = e.data;
 				}
 			};
 
@@ -144,8 +144,8 @@ export function useStreamingClipNode({
 				workerRef.current = null;
 			}
 			if (clipRef.current) {
-				clipRef.current.onstatechange = undefined;
-				clipRef.current.onframe = undefined;
+				clipRef.current.onstatechange = null;
+				clipRef.current.onframe = null;
 				clipRef.current.stop();
 				clipRef.current.dispose();
 				clipRef.current.disconnect();
@@ -375,8 +375,8 @@ export function useStreamingClipNode({
 		}
 		const clip = clipRef.current;
 		if (clip) {
-			clip.onstatechange = undefined;
-			clip.onframe = undefined;
+			clip.onstatechange = null;
+			clip.onframe = null;
 			clip.dispose();
 			clip.disconnect();
 			clipRef.current = null;

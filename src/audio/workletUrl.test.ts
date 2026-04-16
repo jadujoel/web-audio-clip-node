@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
 	getProcessorBlobUrl,
 	getProcessorCdnUrl,
@@ -28,7 +28,7 @@ describe("getProcessorModuleUrl", () => {
 describe("getProcessorBlobUrl", () => {
 	test("returns a blob: URL", () => {
 		const url = getProcessorBlobUrl();
-		expect(url).toStartWith("blob:");
+		expect(url.startsWith("blob:")).toBe(true);
 	});
 });
 
@@ -43,6 +43,6 @@ describe("getProcessorCdnUrl", () => {
 	test("uses a default version when none is provided", () => {
 		const url = getProcessorCdnUrl();
 		expect(url).toContain("@jadujoel/web-audio-clip-node@");
-		expect(url).toEndWith("/dist/processor.js");
+		expect(url.endsWith("/dist/processor.js")).toBe(true);
 	});
 });

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
 	buildXiphExtradata,
 	isVorbisStream,
@@ -105,7 +105,9 @@ describe("parseVorbisIdentification", () => {
 	});
 
 	test("parses real OGG Vorbis file header", async () => {
-		const data = await Bun.file("src/sounds/example-vorbis.ogg").arrayBuffer();
+		const data = await fetch("/src/sounds/example-vorbis.ogg").then((r) =>
+			r.arrayBuffer(),
+		);
 		const buf = new Uint8Array(data);
 		// Skip OGG page header to find first packet
 		// OGG header: "OggS" (4) + version (1) + headerType (1) + granulePos (8) + serial (4) + pageSeq (4) + crc (4) + segCount (1) = 27 bytes + segment table

@@ -64,7 +64,7 @@
 
       clip.buffer = generateTone(context)
       clip.connect(context.destination);
-      clip.onstatechange = (s) => { statusEl.textContent = s; };
+      clip.onstatechange = (e) => { statusEl.textContent = e.state; };
 
       playBtn.onclick = async () => {
         await context.resume();

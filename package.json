@@ -59,14 +59,16 @@
 		"examples": "bun examples.ts",
 		"lint": "biome check",
 		"serve-webpage": "bun serve-webpage.ts",
-		"test": "bun test --max-concurrency=4 --timeout=20000",
+		"test": "vitest run",
+		"test:bun": "bun test build.test.ts test-runner-config.test.ts src/examplesConfig.test.ts src/streaming.test.ts",
+		"test:all": "vitest run && bun run test:bun",
 		"test:e2e": "bunx playwright test",
 		"test:e2e:chromium": "bunx playwright test --project=chromium",
 		"test:e2e:firefox": "bunx playwright test --project=firefox",
 		"test:e2e:webkit": "bunx playwright test --project=webkit",
 		"smoke:legacy": "bun smoke-legacy.ts",
 		"typecheck": "tsc --noEmit",
-		"validate": "bun run build && bun run lint && bun run typecheck && bun test --max-concurrency=4 --timeout=20000",
+		"validate": "bun run build && bun run lint && bun run typecheck && bun run test:all",
 		"prepublishOnly": "bun run build:lib"
 	},
 	"peerDependencies": {
@@ -92,23 +94,21 @@
 		"@testing-library/react": "16.3.2",
 		"@types/react": "19.2.14",
 		"@types/react-dom": "19.2.3",
+		"@vitejs/plugin-react": "6.0.1",
+		"@vitest/browser-playwright": "4.1.4",
 		"bun-types": "1.3.12",
-		"happy-dom": "20.8.9",
-		"isomorphic-web-audio-api": "1.0.2",
 		"libav.js": "6.8.8",
 		"libavjs-webcodecs-polyfill": "0.5.5",
 		"react": "19.2.5",
 		"react-dom": "19.2.5",
+		"vitest": "4.1.4",
 		"webdriverio": "9.27.0",
 		"zustand": "5.0.12"
 	},
 	"publishConfig": {
 		"access": "public"
 	},
-	"patchedDependencies": {
-		"node-web-audio-api@1.0.9": "patches/node-web-audio-api@1.0.9.patch"
-	},
 	"dependencies": {
-		"@jadujoel/typed-event-target": "0.0.4"
+		"@jadujoel/typed-event-target": "0.0.5"
 	}
 }

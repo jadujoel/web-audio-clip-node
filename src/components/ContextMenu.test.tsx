@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ContextMenu } from "./ContextMenu";
 
 afterEach(cleanup);
@@ -13,11 +13,11 @@ function renderMenu(overrides = {}) {
 		max: 4,
 		maxLocked: false,
 		audioDuration: 10,
-		onSnapChange: mock(() => {}),
-		onMinChange: mock(() => {}),
-		onMaxChange: mock(() => {}),
-		onMaxLockedChange: mock(() => {}),
-		onClose: mock(() => {}),
+		onSnapChange: vi.fn(() => {}),
+		onMinChange: vi.fn(() => {}),
+		onMaxChange: vi.fn(() => {}),
+		onMaxLockedChange: vi.fn(() => {}),
+		onClose: vi.fn(() => {}),
 	};
 	const props = { ...defaults, ...overrides };
 	return { ...render(<ContextMenu {...props} />), props };

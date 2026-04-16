@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { StreamingPlayheadTimeline } from "./StreamingPlayheadTimeline";
 
@@ -103,7 +103,7 @@ describe("StreamingPlayheadTimeline", () => {
 	});
 
 	test("floors sample position when changing via keyboard", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<StreamingPlayheadTimeline
 				value={0}

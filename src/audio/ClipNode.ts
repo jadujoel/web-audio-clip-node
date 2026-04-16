@@ -1,32 +1,39 @@
+import {
+	type EventFor,
+	type TypedEventListener,
+	TypedEventTarget,
+} from "@jadujoel/typed-event-target";
 import type {
-	ClipNodeEventMap,
+	ClipNodeEvents,
 	ClipNodeState,
 	ClipWorkletOptions,
-	FrameData,
 	LoopMode,
 	StreamBufferSpan,
 } from "./types";
 import { audioBufferFromFloat32Array } from "./utils";
 
-type EventCallback = (...args: unknown[]) => void;
+type Handler<K extends keyof ClipNodeEvents> = TypedEventListener<
+	EventFor<ClipNodeEvents, K>
+> | null;
 
 export class ClipNode extends AudioWorkletNode {
-	onscheduled?: () => void;
-	onstarted?: () => void;
-	onpaused?: () => void;
-	onresumed?: () => void;
-	onended?: () => void;
-	onlooped?: () => void;
-	onstopped?: () => void;
-	private _onframe?: (data: FrameData) => void;
-	ondisposed?: () => void;
-	onstatechange?: (state: ClipNodeState) => void;
-	ondurationchange?: (duration: number) => void;
-	onratechange?: (rate: number) => void;
-	onseeking?: () => void;
-	onseeked?: () => void;
+	readonly events: TypedEventTarget<ClipNodeEvents>;
 
-	private _listeners = new Map<string, Set<EventCallback>>();
+	private _cbOnscheduled: Handler<"scheduled"> = null;
+	private _cbOnstarted: Handler<"started"> = null;
+	private _cbOnpaused: Handler<"paused"> = null;
+	private _cbOnresumed: Handler<"resumed"> = null;
+	private _cbOnended: Handler<"ended"> = null;
+	private _cbOnlooped: Handler<"looped"> = null;
+	private _cbOnstopped: Handler<"stopped"> = null;
+	private _cbOnframe: Handler<"frame"> = null;
+	private _cbOndisposed: Handler<"disposed"> = null;
+	private _cbOnstatechange: Handler<"statechange"> = null;
+	private _cbOndurationchange: Handler<"durationchange"> = null;
+	private _cbOnratechange: Handler<"ratechange"> = null;
+	private _cbOnseeking: Handler<"seeking"> = null;
+	private _cbOnseeked: Handler<"seeked"> = null;
+	private _cbOntimeupdate: Handler<"timeupdate"> = null;
 
 	private _buffer?: AudioBuffer;
 	private _loopStart = 0;
@@ -44,7 +51,6 @@ export class ClipNode extends AudioWorkletNode {
 	private _bufferWriteCursor = 0;
 	private _hasStreamingPort = false;
 	private _muted = false;
-	private _ontimeupdate?: (currentTime: number) => void;
 	private _lastTimeUpdate = -Infinity;
 	private _timeUpdateInterval = 250;
 	protected _writtenSpans: StreamBufferSpan[] = [];
@@ -57,33 +63,170 @@ export class ClipNode extends AudioWorkletNode {
 	state: ClipNodeState = "initial";
 	cpu = 0;
 
-	get onframe(): ((data: FrameData) => void) | undefined {
-		return this._onframe;
+	// ---------------------------------------------------------------------------
+	// Callback setter/getter pairs — each delegates to `this.events`
+	// ---------------------------------------------------------------------------
+
+	get onscheduled() {
+		return this._cbOnscheduled;
 	}
-	set onframe(cb: ((data: FrameData) => void) | undefined) {
-		const hadCallback = !!this._onframe;
-		this._onframe = cb;
-		const hasCallback = !!cb;
-		if (hadCallback !== hasCallback) {
-			this.port.postMessage({
-				type: "enableFrameReporting",
-				data: hasCallback,
-			});
-		}
+	set onscheduled(fn: Handler<"scheduled"> | undefined) {
+		if (this._cbOnscheduled)
+			this.events.removeEventListener("scheduled", this._cbOnscheduled);
+		this._cbOnscheduled = fn ?? null;
+		if (fn) this.events.addEventListener("scheduled", fn);
 	}
 
-	get ontimeupdate(): ((currentTime: number) => void) | undefined {
-		return this._ontimeupdate;
+	get onstarted() {
+		return this._cbOnstarted;
 	}
-	set ontimeupdate(cb: ((currentTime: number) => void) | undefined) {
-		this._ontimeupdate = cb;
-		// Auto-enable frame reporting if setting a callback and it's not already on
-		if (cb && !this._onframe) {
-			this.port.postMessage({
-				type: "enableFrameReporting",
-				data: true,
-			});
-		}
+	set onstarted(fn: Handler<"started"> | undefined) {
+		if (this._cbOnstarted)
+			this.events.removeEventListener("started", this._cbOnstarted);
+		this._cbOnstarted = fn ?? null;
+		if (fn) this.events.addEventListener("started", fn);
+	}
+
+	get onpaused() {
+		return this._cbOnpaused;
+	}
+	set onpaused(fn: Handler<"paused"> | undefined) {
+		if (this._cbOnpaused)
+			this.events.removeEventListener("paused", this._cbOnpaused);
+		this._cbOnpaused = fn ?? null;
+		if (fn) this.events.addEventListener("paused", fn);
+	}
+
+	get onresumed() {
+		return this._cbOnresumed;
+	}
+	set onresumed(fn: Handler<"resumed"> | undefined) {
+		if (this._cbOnresumed)
+			this.events.removeEventListener("resumed", this._cbOnresumed);
+		this._cbOnresumed = fn ?? null;
+		if (fn) this.events.addEventListener("resumed", fn);
+	}
+
+	get onended() {
+		return this._cbOnended;
+	}
+	set onended(fn: Handler<"ended"> | undefined) {
+		if (this._cbOnended)
+			this.events.removeEventListener("ended", this._cbOnended);
+		this._cbOnended = fn ?? null;
+		if (fn) this.events.addEventListener("ended", fn);
+	}
+
+	get onlooped() {
+		return this._cbOnlooped;
+	}
+	set onlooped(fn: Handler<"looped"> | undefined) {
+		if (this._cbOnlooped)
+			this.events.removeEventListener("looped", this._cbOnlooped);
+		this._cbOnlooped = fn ?? null;
+		if (fn) this.events.addEventListener("looped", fn);
+	}
+
+	get onstopped() {
+		return this._cbOnstopped;
+	}
+	set onstopped(fn: Handler<"stopped"> | undefined) {
+		if (this._cbOnstopped)
+			this.events.removeEventListener("stopped", this._cbOnstopped);
+		this._cbOnstopped = fn ?? null;
+		if (fn) this.events.addEventListener("stopped", fn);
+	}
+
+	get onframe() {
+		return this._cbOnframe;
+	}
+	set onframe(fn: Handler<"frame"> | undefined) {
+		if (this._cbOnframe)
+			this.events.removeEventListener("frame", this._cbOnframe);
+		this._cbOnframe = fn ?? null;
+		if (fn) this.events.addEventListener("frame", fn);
+		this._updateFrameReporting();
+	}
+
+	get ondisposed() {
+		return this._cbOndisposed;
+	}
+	set ondisposed(fn: Handler<"disposed"> | undefined) {
+		if (this._cbOndisposed)
+			this.events.removeEventListener("disposed", this._cbOndisposed);
+		this._cbOndisposed = fn ?? null;
+		if (fn) this.events.addEventListener("disposed", fn);
+	}
+
+	get onstatechange() {
+		return this._cbOnstatechange;
+	}
+	set onstatechange(fn: Handler<"statechange"> | undefined) {
+		if (this._cbOnstatechange)
+			this.events.removeEventListener("statechange", this._cbOnstatechange);
+		this._cbOnstatechange = fn ?? null;
+		if (fn) this.events.addEventListener("statechange", fn);
+	}
+
+	get ondurationchange() {
+		return this._cbOndurationchange;
+	}
+	set ondurationchange(fn: Handler<"durationchange"> | undefined) {
+		if (this._cbOndurationchange)
+			this.events.removeEventListener(
+				"durationchange",
+				this._cbOndurationchange,
+			);
+		this._cbOndurationchange = fn ?? null;
+		if (fn) this.events.addEventListener("durationchange", fn);
+	}
+
+	get onratechange() {
+		return this._cbOnratechange;
+	}
+	set onratechange(fn: Handler<"ratechange"> | undefined) {
+		if (this._cbOnratechange)
+			this.events.removeEventListener("ratechange", this._cbOnratechange);
+		this._cbOnratechange = fn ?? null;
+		if (fn) this.events.addEventListener("ratechange", fn);
+	}
+
+	get onseeking() {
+		return this._cbOnseeking;
+	}
+	set onseeking(fn: Handler<"seeking"> | undefined) {
+		if (this._cbOnseeking)
+			this.events.removeEventListener("seeking", this._cbOnseeking);
+		this._cbOnseeking = fn ?? null;
+		if (fn) this.events.addEventListener("seeking", fn);
+	}
+
+	get onseeked() {
+		return this._cbOnseeked;
+	}
+	set onseeked(fn: Handler<"seeked"> | undefined) {
+		if (this._cbOnseeked)
+			this.events.removeEventListener("seeked", this._cbOnseeked);
+		this._cbOnseeked = fn ?? null;
+		if (fn) this.events.addEventListener("seeked", fn);
+	}
+
+	get ontimeupdate() {
+		return this._cbOntimeupdate;
+	}
+	set ontimeupdate(fn: Handler<"timeupdate"> | undefined) {
+		if (this._cbOntimeupdate)
+			this.events.removeEventListener("timeupdate", this._cbOntimeupdate);
+		this._cbOntimeupdate = fn ?? null;
+		if (fn) this.events.addEventListener("timeupdate", fn);
+		this._updateFrameReporting();
+	}
+
+	private _updateFrameReporting(): void {
+		const needed =
+			this.events.hasListeners("frame") ||
+			this.events.hasListeners("timeupdate");
+		this.port.postMessage({ type: "enableFrameReporting", data: needed });
 	}
 
 	get timeUpdateInterval(): number {
@@ -93,10 +236,7 @@ export class ClipNode extends AudioWorkletNode {
 		this._timeUpdateInterval = Math.max(0, ms);
 	}
 
-	constructor(
-		public context: BaseAudioContext,
-		options: ClipWorkletOptions = {},
-	) {
+	constructor(context: BaseAudioContext, options: ClipWorkletOptions = {}) {
 		super(context, "ClipProcessor", {
 			numberOfInputs: options.numberOfInputs ?? 0,
 			outputChannelCount: options.outputChannelCount ?? [2],
@@ -108,6 +248,7 @@ export class ClipNode extends AudioWorkletNode {
 			parameterData: options.parameterData,
 		});
 
+		this.events = this._createEvents();
 		this._buffer = audioBufferFromFloat32Array(
 			this.context,
 			options.processorOptions?.buffer,
@@ -115,28 +256,8 @@ export class ClipNode extends AudioWorkletNode {
 		this.port.onmessage = this.handleMessage;
 	}
 
-	on<K extends keyof ClipNodeEventMap>(
-		event: K,
-		callback: (...args: ClipNodeEventMap[K]) => void,
-	): void {
-		if (!this._listeners.has(event)) {
-			this._listeners.set(event, new Set());
-		}
-		this._listeners.get(event)?.add(callback as EventCallback);
-	}
-
-	off<K extends keyof ClipNodeEventMap>(
-		event: K,
-		callback: (...args: ClipNodeEventMap[K]) => void,
-	): void {
-		this._listeners.get(event)?.delete(callback as EventCallback);
-	}
-
-	protected emit<K extends keyof ClipNodeEventMap>(
-		event: K,
-		...args: ClipNodeEventMap[K]
-	): void {
-		for (const fn of this._listeners.get(event) ?? []) fn(...args);
+	protected _createEvents(): TypedEventTarget<ClipNodeEvents> {
+		return TypedEventTarget.from<ClipNodeEvents>();
 	}
 
 	private handleMessage = (message: MessageEvent) => {
@@ -146,53 +267,45 @@ export class ClipNode extends AudioWorkletNode {
 				const [_ct, _cf, ph, tt] = data as [number, number, number, number];
 				this._playhead = ph;
 				this.cpu = tt;
-				this._onframe?.(data);
-				this.emit("frame", data);
-				if (this._ontimeupdate) {
+				this.events.dispatch("frame", { data });
+				if (this.events.hasListeners("timeupdate")) {
 					const now = performance.now();
 					if (now - this._lastTimeUpdate >= this._timeUpdateInterval) {
 						this._lastTimeUpdate = now;
-						const ct = this.currentTime;
-						this._ontimeupdate(ct);
-						this.emit("timeupdate", ct);
+						this.events.dispatch("timeupdate", {
+							currentTime: this.currentTime,
+						});
 					}
 				}
 				break;
 			}
 			case "scheduled":
 				this.setState("scheduled");
-				this.onscheduled?.();
-				this.emit("scheduled");
+				this.events.dispatch("scheduled", {});
 				break;
 			case "started":
 				this.setState("started");
-				this.onstarted?.();
-				this.emit("started");
+				this.events.dispatch("started", {});
 				break;
 			case "stopped":
 				this.setState("stopped");
-				this.onstopped?.();
-				this.emit("stopped");
+				this.events.dispatch("stopped", {});
 				break;
 			case "paused":
 				this.setState("paused");
-				this.onpaused?.();
-				this.emit("paused");
+				this.events.dispatch("paused", {});
 				break;
 			case "resume":
 				this.setState("resumed");
-				this.onresumed?.();
-				this.emit("resumed");
+				this.events.dispatch("resumed", {});
 				break;
 			case "ended":
 				this.setState("ended");
-				this.onended?.();
-				this.emit("ended");
+				this.events.dispatch("ended", {});
 				break;
 			case "looped":
 				this.timesLooped++;
-				this.onlooped?.();
-				this.emit("looped");
+				this.events.dispatch("looped", {});
 				break;
 			case "bufferState": {
 				const bs = data as {
@@ -271,16 +384,14 @@ export class ClipNode extends AudioWorkletNode {
 	protected _completeSeeked(): void {
 		if (!this._seeking) return;
 		this._seeking = false;
-		this.onseeked?.();
-		this.emit("seeked");
+		this.events.dispatch("seeked", {});
 	}
 
 	private setState(newState: ClipNodeState) {
 		this._previousState = this.state;
 		this.state = newState;
 		if (this.state !== this._previousState) {
-			this.onstatechange?.(this.state);
-			this.emit("statechange", this.state);
+			this.events.dispatch("statechange", { state: this.state });
 		}
 	}
 
@@ -344,8 +455,7 @@ export class ClipNode extends AudioWorkletNode {
 		const newDuration = ab.duration;
 		if (this._duration !== newDuration) {
 			this._duration = newDuration;
-			this.ondurationchange?.(newDuration);
-			this.emit("durationchange", newDuration);
+			this.events.dispatch("durationchange", { duration: newDuration });
 		}
 	}
 
@@ -488,8 +598,7 @@ export class ClipNode extends AudioWorkletNode {
 	set duration(value: number) {
 		if (this._duration !== value) {
 			this._duration = value;
-			this.ondurationchange?.(value);
-			this.emit("durationchange", value);
+			this.events.dispatch("durationchange", { duration: value });
 		}
 	}
 
@@ -512,8 +621,7 @@ export class ClipNode extends AudioWorkletNode {
 	set playhead(value: number) {
 		this.throwIfDisposed();
 		this._seeking = true;
-		this.onseeking?.();
-		this.emit("seeking");
+		this.events.dispatch("seeking", {});
 		this.port.postMessage({ type: "playhead", data: value });
 		this.onSeekStarted(value);
 	}
@@ -532,8 +640,7 @@ export class ClipNode extends AudioWorkletNode {
 
 	setPlaybackRate(value: number): void {
 		this.playbackRate.value = value;
-		this.onratechange?.(value);
-		this.emit("ratechange", value);
+		this.events.dispatch("ratechange", { rate: value });
 	}
 	get detune(): AudioParam {
 		// biome-ignore lint/style/noNonNullAssertion: it is definitely set in the processor
@@ -630,29 +737,29 @@ export class ClipNode extends AudioWorkletNode {
 		}
 		this.port.postMessage({ type: "dispose" });
 		this.port.close();
-		this.ondisposed?.();
-		this.emit("disposed");
+		this.events.dispatch("disposed", {});
 		this._buffer = undefined;
 		this._writtenSpans = [];
 		this._committedLength = 0;
 		this._streamTotalLength = null;
 		this._streamEnded = false;
-		this.onended = undefined;
-		this._onframe = undefined;
-		this.onlooped = undefined;
-		this.onpaused = undefined;
-		this.onresumed = undefined;
-		this.onstarted = undefined;
-		this.onstopped = undefined;
-		this.onscheduled = undefined;
-		this.onstatechange = undefined;
-		this.ondurationchange = undefined;
-		this.onratechange = undefined;
-		this.onseeking = undefined;
-		this.onseeked = undefined;
-		this._ontimeupdate = undefined;
-		this.ondisposed = undefined;
-		this._listeners.clear();
+		// Clear all callback references (events.dispose clears the listener map)
+		this.events.dispose();
+		this._cbOnscheduled = null;
+		this._cbOnstarted = null;
+		this._cbOnpaused = null;
+		this._cbOnresumed = null;
+		this._cbOnended = null;
+		this._cbOnlooped = null;
+		this._cbOnstopped = null;
+		this._cbOnframe = null;
+		this._cbOndisposed = null;
+		this._cbOnstatechange = null;
+		this._cbOndurationchange = null;
+		this._cbOnratechange = null;
+		this._cbOnseeking = null;
+		this._cbOnseeked = null;
+		this._cbOntimeupdate = null;
 		this.state = "disposed";
 	}
 }

@@ -1,5 +1,4 @@
-import { describe, expect, test } from "bun:test";
-import * as fs from "node:fs";
+import { describe, expect, test } from "vitest";
 import {
 	_buildSampleMap,
 	_codecStringFromAOT,
@@ -212,9 +211,11 @@ describe("parseEsds", () => {
 });
 
 describe("parseMp4 integration", () => {
-	test("parses real M4A file", () => {
+	test("parses real M4A file", async () => {
 		const data = new Uint8Array(
-			fs.readFileSync("src/sounds/example.m4a").buffer,
+			(await fetch("/src/sounds/example.m4a").then((r) =>
+				r.arrayBuffer(),
+			)) as ArrayBuffer,
 		);
 
 		const result = parseMp4(data);

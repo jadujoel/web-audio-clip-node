@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { TransportButtons } from "./TransportButtons";
 
 afterEach(cleanup);
@@ -147,7 +147,7 @@ describe("TransportButtons", () => {
 	});
 
 	test("clicking Start calls onStart", () => {
-		const onStart = mock(() => {});
+		const onStart = vi.fn(() => {});
 		const { container } = render(
 			<TransportButtons
 				nodeState="initial"
@@ -169,7 +169,7 @@ describe("TransportButtons", () => {
 	});
 
 	test("clicking Stop calls onStop", () => {
-		const onStop = mock(() => {});
+		const onStop = vi.fn(() => {});
 		const { container } = render(
 			<TransportButtons
 				nodeState="started"
@@ -191,7 +191,7 @@ describe("TransportButtons", () => {
 	});
 
 	test("clicking Load Sound calls onLoadSound", () => {
-		const onLoadSound = mock(() => {});
+		const onLoadSound = vi.fn(() => {});
 		const { container } = render(
 			<TransportButtons
 				nodeState="initial"

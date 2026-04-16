@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { findFlacFrames, parseFlacMetadata } from "./flac-decode-worker";
 
 function makeFlacBuffer(opts?: {
@@ -174,7 +174,9 @@ describe("parseFlacMetadata", () => {
 	});
 
 	test("parses real FLAC file header", async () => {
-		const data = await Bun.file("src/sounds/example.flac").arrayBuffer();
+		const data = await fetch("/src/sounds/example.flac").then((r) =>
+			r.arrayBuffer(),
+		);
 		const buf = new Uint8Array(data);
 		const result = parseFlacMetadata(buf);
 		if (result == null) throw new Error("Expected non-null result");
@@ -250,7 +252,9 @@ describe("findFlacFrames", () => {
 	});
 
 	test("finds frames in real FLAC audio data", async () => {
-		const data = await Bun.file("src/sounds/example.flac").arrayBuffer();
+		const data = await fetch("/src/sounds/example.flac").then((r) =>
+			r.arrayBuffer(),
+		);
 		const buf = new Uint8Array(data);
 		const meta = parseFlacMetadata(buf);
 		if (meta == null) throw new Error("Expected non-null metadata");

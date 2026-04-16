@@ -10,12 +10,12 @@ async function main() {
   const clip = coordinator.createStreamingClipNode();
   clip.connect(context.destination);
 
-  clip.onprogress = (bytes) => {
-    const kb = (bytes / 1024) | 0;
+  clip.onprogress = (e) => {
+    const kb = (e.bytesReceived / 1024) | 0;
     setStatus(`Downloading... ${kb} KB`);
   };
   clip.ondone = () => setStatus("Stream Downloaded.");
-  clip.onerror = (msg) => setStatus(`Error: ${msg}`);
+  clip.onerror = (e) => setStatus(`Error: ${e.error}`);
   clip.onstarted = () => setStatus("Streaming...");
   clip.onended = () => setStatus("Stream Ended.");
 

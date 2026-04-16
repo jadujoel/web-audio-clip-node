@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { parseAdtsFrames } from "./aac-adts-decode-worker";
 
 /**
@@ -156,10 +156,11 @@ describe("parseAdtsFrames", () => {
 		expect(result.leftover.length).toBeGreaterThan(0);
 	});
 
-	test("parses real ADTS file header bytes", () => {
-		const fs = require("node:fs");
+	test("parses real ADTS file header bytes", async () => {
 		const data = new Uint8Array(
-			fs.readFileSync("src/sounds/example.aac").buffer,
+			(await fetch("/src/sounds/example.aac").then((r) =>
+				r.arrayBuffer(),
+			)) as ArrayBuffer,
 		);
 		const first4k = data.slice(0, 4096);
 

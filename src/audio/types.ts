@@ -118,40 +118,40 @@ export type StreamPreload = "none" | "metadata" | "auto";
 export type GapPlaybackStrategy = "hold" | "silence";
 
 // ---------------------------------------------------------------------------
-// Event maps for on()/off() support
+// Event maps for TypedEventTarget — each value is the payload object
 // ---------------------------------------------------------------------------
 
-export interface ClipNodeEventMap {
-	scheduled: [];
-	started: [];
-	paused: [];
-	resumed: [];
-	ended: [];
-	looped: [];
-	stopped: [];
-	frame: [FrameData];
-	disposed: [];
-	statechange: [ClipNodeState];
-	durationchange: [number];
-	ratechange: [number];
-	timeupdate: [number];
-	seeking: [];
-	seeked: [];
-}
+export type ClipNodeEvents = {
+	scheduled: Record<string, never>;
+	started: Record<string, never>;
+	paused: Record<string, never>;
+	resumed: Record<string, never>;
+	ended: Record<string, never>;
+	looped: Record<string, never>;
+	stopped: Record<string, never>;
+	frame: { data: FrameData };
+	disposed: Record<string, never>;
+	statechange: { state: ClipNodeState };
+	durationchange: { duration: number };
+	ratechange: { rate: number };
+	timeupdate: { currentTime: number };
+	seeking: Record<string, never>;
+	seeked: Record<string, never>;
+};
 
-export interface StreamingClipNodeEventMap extends ClipNodeEventMap {
-	error: [StreamError];
-	progress: [number];
-	done: [];
-	bufferchange: [BufferedRange[]];
-	waiting: [];
-	canplay: [];
-	canplaythrough: [];
-	loadstart: [];
-	readystatechange: [StreamReadyState];
-	retry: [attempt: number, delay: number, error: string];
-	metadata: [AudioMetadata];
-}
+export type StreamingClipNodeEvents = ClipNodeEvents & {
+	error: { error: StreamError };
+	progress: { bytesReceived: number };
+	done: Record<string, never>;
+	bufferchange: { buffered: BufferedRange[] };
+	waiting: Record<string, never>;
+	canplay: Record<string, never>;
+	canplaythrough: Record<string, never>;
+	loadstart: Record<string, never>;
+	readystatechange: { state: StreamReadyState };
+	retry: { attempt: number; delay: number; error: string };
+	metadata: { metadata: AudioMetadata };
+};
 
 export interface BufferedRange {
 	start: number;

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { AudioControl } from "./AudioControl";
 
 function q(
@@ -87,7 +87,7 @@ describe("AudioControl", () => {
 	});
 
 	test("onToggle fires when toggle is changed", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -105,7 +105,7 @@ describe("AudioControl", () => {
 	});
 
 	test("onSnapChange fires when snap is selected in context menu", () => {
-		const onSnapChange = mock(() => {});
+		const onSnapChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Offset"
@@ -153,7 +153,7 @@ describe("AudioControl", () => {
 	});
 
 	test("passes defaultValue through to slider for double-click reset", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Pan"
@@ -181,7 +181,7 @@ describe("AudioControl", () => {
 	});
 
 	test("editing: Enter commits value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -200,7 +200,7 @@ describe("AudioControl", () => {
 	});
 
 	test("editing: Escape cancels without changing value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -221,7 +221,7 @@ describe("AudioControl", () => {
 	});
 
 	test("editing: value is clamped to [min, max]", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -240,7 +240,7 @@ describe("AudioControl", () => {
 	});
 
 	test("editing: blur commits value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -259,7 +259,7 @@ describe("AudioControl", () => {
 	});
 
 	test("disabled state: slider and controls dimmed when toggle off", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Gain"
@@ -277,7 +277,7 @@ describe("AudioControl", () => {
 	});
 
 	test("forceDisabled disables toggle and slider even when enabled", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<AudioControl
 				label="Crossfade"

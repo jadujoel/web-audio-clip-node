@@ -118,10 +118,10 @@ export function useClipNode({
 
 			node.connect(ctx.destination);
 
-			node.onstatechange = (s) => setNodeState(s);
+			node.onstatechange = (e) => setNodeState(e.state);
 			node.onlooped = () => setInfoTimesLooped(node.timesLooped.toString());
-			node.onframe = (data) => {
-				frameRef.current = data;
+			node.onframe = (e) => {
+				frameRef.current = e.data;
 			};
 
 			node.addEventListener("processorerror", (e) =>

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { PlayheadSlider } from "./PlayheadSlider";
 
 afterEach(cleanup);
@@ -56,7 +56,7 @@ describe("PlayheadSlider", () => {
 	});
 
 	test("calls onChange with floored sample position", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<PlayheadSlider value={0} audioDuration={10} onChange={onChange} />,
 		);

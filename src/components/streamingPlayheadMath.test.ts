@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { buildStreamingPlayheadModel } from "./streamingPlayheadMath";
 

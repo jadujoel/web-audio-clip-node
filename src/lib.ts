@@ -20,7 +20,7 @@ export type {
 	AudioMetadata,
 	BufferedRange,
 	BufferRangeWrite,
-	ClipNodeEventMap,
+	ClipNodeEvents,
 	ClipNodeState,
 	ClipProcessorOptions,
 	ClipProcessorState,
@@ -33,7 +33,7 @@ export type {
 	StreamBufferState,
 	StreamError,
 	StreamErrorCode,
-	StreamingClipNodeEventMap,
+	StreamingClipNodeEvents,
 	StreamPreload,
 	StreamReadyState,
 } from "./audio/types";

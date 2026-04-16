@@ -18,3 +18,4 @@ ignored
 .env
 lt.log
 AGENTS.md
+.vitest-attachments

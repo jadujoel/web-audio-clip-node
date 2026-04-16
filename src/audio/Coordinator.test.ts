@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "vitest";
 import { createContext } from "../../TestPreload";
 import type { StreamFormat } from "../streaming";
 import { ClipNode } from "./ClipNode";
@@ -35,18 +35,6 @@ function fakeWorkerFactory(_format: StreamFormat): Worker {
 	return lastWorker as unknown as Worker;
 }
 
-let processorBuilt = false;
-
-beforeAll(async () => {
-	if (!processorBuilt) {
-		await Bun.build({
-			entrypoints: ["src/audio/processor.ts"],
-			outdir: "dist/audio",
-		});
-		processorBuilt = true;
-	}
-});
-
 afterEach(() => {
 	lastWorker = undefined as unknown as FakeWorker;
 });
@@ -55,7 +43,7 @@ describe("Coordinator.fromContext", () => {
 	test("returns a Coordinator instance", () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		const coordinator = Coordinator.fromContext(ctx, {
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		expect(coordinator).toBeInstanceOf(Coordinator);
 	});
@@ -66,11 +54,11 @@ describe("Coordinator.addModule", () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
-		await coordinator.addModule("./dist/audio/processor.js");
+		await coordinator.addModule("/dist/audio/processor.js");
 		// Second call is idempotent — returns the same cached promise
-		await coordinator.addModule("./dist/audio/processor.js");
+		await coordinator.addModule("/dist/audio/processor.js");
 		expect(true).toBe(true);
 	});
 });
@@ -78,10 +66,10 @@ describe("Coordinator.addModule", () => {
 describe("Coordinator.createClipNode", () => {
 	test("returns a regular ClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		expect(node).toBeInstanceOf(ClipNode);
@@ -92,10 +80,10 @@ describe("Coordinator.createClipNode", () => {
 describe("Coordinator.createStreamingClipNode", () => {
 	test("returns a StreamingClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode();
 		expect(node).toBeInstanceOf(StreamingClipNode);
@@ -103,7 +91,7 @@ describe("Coordinator.createStreamingClipNode", () => {
 
 	test("respects explicit stream format", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		const capturedFormats: StreamFormat[] = [];
 		const trackingFactory = (format: StreamFormat): Worker => {
@@ -115,7 +103,7 @@ describe("Coordinator.createStreamingClipNode", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -130,10 +118,10 @@ describe("Coordinator.createStreamingClipNode", () => {
 describe("Coordinator.dispose", () => {
 	test("stops all managed nodes", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const regular = coordinator.createClipNode();
@@ -155,10 +143,10 @@ describe("Coordinator.dispose", () => {
 describe("StreamingClipNode.url setter", () => {
 	test("creates a worker and posts an init message with the url and sampleRate", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -178,10 +166,10 @@ describe("StreamingClipNode.url setter", () => {
 
 	test("forwards useInt16=true to the decode worker init message", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -199,10 +187,10 @@ describe("StreamingClipNode.url setter", () => {
 
 	test("forwards throttle to the decode worker init message", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -220,10 +208,10 @@ describe("StreamingClipNode.url setter", () => {
 
 	test("terminates previous worker when url is reassigned", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -242,10 +230,10 @@ describe("StreamingClipNode.url setter", () => {
 
 	test("url getter returns the last set value", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode();
 		node.url = "https://example.com/audio.opus";
@@ -256,10 +244,10 @@ describe("StreamingClipNode.url setter", () => {
 describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => {
 	test("does not start until samplesDecoded reaches threshold", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -289,10 +277,10 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 
 	test("starts on done even when below pre-buffer threshold", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -316,10 +304,10 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 
 	test("starts on done when worker reports totalSamples", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -340,7 +328,7 @@ describe("StreamingClipNode.start - deferred until pre-buffer threshold", () => 
 describe("StreamingClipNode.start - no double stream on url+start() race", () => {
 	test("setting url and immediately calling start() starts the stream only once", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCount = 0;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -351,14 +339,16 @@ describe("StreamingClipNode.start - no double stream on url+start() race", () =>
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 
 		const loadstartEvents: number[] = [];
-		node.on("loadstart", () => loadstartEvents.push(1));
+		node.streamEvents.addEventListener("loadstart", () =>
+			loadstartEvents.push(1),
+		);
 
 		// Reproduce the race: set URL then immediately call start() without awaiting
 		node.url = "https://example.com/audio.opus";
@@ -374,7 +364,7 @@ describe("StreamingClipNode.start - no double stream on url+start() race", () =>
 
 	test("calling start() twice initializes decoder only once", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCount = 0;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -385,7 +375,7 @@ describe("StreamingClipNode.start - no double stream on url+start() race", () =>
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -408,10 +398,10 @@ describe("StreamingClipNode.start - no double stream on url+start() race", () =>
 describe("StreamingClipNode.stop", () => {
 	test("terminates the managed worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -428,10 +418,10 @@ describe("StreamingClipNode.stop", () => {
 
 	test("sends abort message before terminating worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -451,10 +441,10 @@ describe("StreamingClipNode.stop", () => {
 describe("StreamingClipNode callbacks", () => {
 	test("onerror fires on error message from worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -467,8 +457,8 @@ describe("StreamingClipNode callbacks", () => {
 		node.downloaded.catch(() => {});
 
 		const errors: StreamError[] = [];
-		node.onerror = (error) => {
-			errors.push(error);
+		node.onerror = (e) => {
+			errors.push(e.error);
 		};
 
 		lastWorker.receive({ type: "error", message: "network failure" });
@@ -479,10 +469,10 @@ describe("StreamingClipNode callbacks", () => {
 
 	test("onprogress fires on progress message from worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -492,8 +482,8 @@ describe("StreamingClipNode callbacks", () => {
 		await Promise.resolve();
 
 		let received = -1;
-		node.onprogress = (bytes) => {
-			received = bytes;
+		node.onprogress = (e) => {
+			received = e.bytesReceived;
 		};
 
 		lastWorker.receive({ type: "progress", bytesReceived: 4096 });
@@ -502,10 +492,10 @@ describe("StreamingClipNode callbacks", () => {
 
 	test("ondone fires on done message from worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -525,10 +515,10 @@ describe("StreamingClipNode callbacks", () => {
 
 	test("onerror receives typed error with code from worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -538,8 +528,8 @@ describe("StreamingClipNode callbacks", () => {
 		node.downloaded.catch(() => {});
 
 		const errors: StreamError[] = [];
-		node.onerror = (error) => {
-			errors.push(error);
+		node.onerror = (e) => {
+			errors.push(e.error);
 		};
 
 		lastWorker.receive({
@@ -554,10 +544,10 @@ describe("StreamingClipNode callbacks", () => {
 
 	test("error property persists after error", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -573,10 +563,10 @@ describe("StreamingClipNode callbacks", () => {
 
 	test("error resets when new URL is set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -605,10 +595,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("resolves when stream completes", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -635,10 +625,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("rejects when stream errors", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -654,10 +644,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("resets when a new URL is set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -700,10 +690,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("does not resolve on done until streamEnd is committed", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -736,10 +726,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("normalizes done sample count when declared count is below committed", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -776,10 +766,10 @@ describe("StreamingClipNode.downloaded", () => {
 
 	test("stays pending when no stream started", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -797,7 +787,7 @@ describe("StreamingClipNode.downloaded", () => {
 describe("StreamingClipNode format auto-detection", () => {
 	test("auto-detects OggOpus format from .opus URL when no format set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		const capturedFormats: StreamFormat[] = [];
 		const trackingFactory = (format: StreamFormat): Worker => {
@@ -809,7 +799,7 @@ describe("StreamingClipNode format auto-detection", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode();
 		node.url = "https://example.com/audio.opus";
@@ -822,10 +812,10 @@ describe("StreamingClipNode format auto-detection", () => {
 describe("ClipNode.currentTime", () => {
 	test("returns playhead converted to seconds", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		// Simulate the playhead being at 48000 samples (1 second at 48kHz)
@@ -835,10 +825,10 @@ describe("ClipNode.currentTime", () => {
 
 	test("setting currentTime sets playhead in samples", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		// Setting currentTime should round to nearest sample
@@ -852,10 +842,10 @@ describe("ClipNode.currentTime", () => {
 
 	test("currentTime is 0 initially", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		expect(node.currentTime).toBe(0);
@@ -863,10 +853,10 @@ describe("ClipNode.currentTime", () => {
 
 	test("handles fractional seconds correctly", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		(node as unknown as { _playhead: number })._playhead = 24_000;
@@ -877,15 +867,15 @@ describe("ClipNode.currentTime", () => {
 describe("ClipNode.ondurationchange", () => {
 	test("fires when duration setter is called with a new value", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		let receivedDuration = -1;
-		node.ondurationchange = (d) => {
-			receivedDuration = d;
+		node.ondurationchange = (e) => {
+			receivedDuration = e.duration;
 		};
 		node.duration = 5.0;
 		expect(receivedDuration).toBe(5.0);
@@ -893,10 +883,10 @@ describe("ClipNode.ondurationchange", () => {
 
 	test("does NOT fire when same value is set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.duration = 5.0;
@@ -910,15 +900,15 @@ describe("ClipNode.ondurationchange", () => {
 
 	test("fires when duration changes again", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const durations: number[] = [];
-		node.ondurationchange = (d) => {
-			durations.push(d);
+		node.ondurationchange = (e) => {
+			durations.push(e.duration);
 		};
 		node.duration = 3.0;
 		node.duration = 5.0;
@@ -929,10 +919,10 @@ describe("ClipNode.ondurationchange", () => {
 describe("ClipNode.muted", () => {
 	test("defaults to false", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		expect(node.muted).toBe(false);
@@ -940,10 +930,10 @@ describe("ClipNode.muted", () => {
 
 	test("can be set to true", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.muted = true;
@@ -952,10 +942,10 @@ describe("ClipNode.muted", () => {
 
 	test("setting same value does not re-post message", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.muted = true;
@@ -965,10 +955,10 @@ describe("ClipNode.muted", () => {
 
 	test("can toggle back to false", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.muted = true;
@@ -980,15 +970,15 @@ describe("ClipNode.muted", () => {
 describe("ClipNode.setPlaybackRate / onratechange", () => {
 	test("onratechange fires when setPlaybackRate is called", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		let receivedRate = -1;
-		node.onratechange = (rate) => {
-			receivedRate = rate;
+		node.onratechange = (e) => {
+			receivedRate = e.rate;
 		};
 		node.setPlaybackRate(2.0);
 		expect(receivedRate).toBe(2.0);
@@ -996,10 +986,10 @@ describe("ClipNode.setPlaybackRate / onratechange", () => {
 
 	test("setPlaybackRate sets the AudioParam value", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.setPlaybackRate(1.5);
@@ -1010,10 +1000,10 @@ describe("ClipNode.setPlaybackRate / onratechange", () => {
 describe("StreamingClipNode auto-dispose worker", () => {
 	test("worker is terminated and nulled after done", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -1043,10 +1033,10 @@ describe("StreamingClipNode auto-dispose worker", () => {
 
 	test("worker is terminated and nulled after error", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -1066,10 +1056,10 @@ describe("StreamingClipNode auto-dispose worker", () => {
 
 	test("stop() after done does not send abort (worker already disposed)", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -1107,14 +1097,14 @@ describe("StreamingClipNode auto-dispose worker", () => {
 describe("ClipNode.on / off (addEventListener)", () => {
 	test("on() receives events emitted by state changes", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const events: string[] = [];
-		node.on("statechange", (state) => events.push(state));
+		node.events.addEventListener("statechange", (e) => events.push(e.state));
 		// Force a state change via the processor message
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
@@ -1126,15 +1116,15 @@ describe("ClipNode.on / off (addEventListener)", () => {
 
 	test("off() removes a listener", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const events: string[] = [];
-		const cb = (state: string) => events.push(state);
-		node.on("statechange", cb);
+		const cb = (e: { state: string }) => events.push(e.state);
+		node.events.addEventListener("statechange", cb);
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage({
@@ -1142,7 +1132,7 @@ describe("ClipNode.on / off (addEventListener)", () => {
 		} as MessageEvent);
 		expect(events).toEqual(["started"]);
 
-		node.off("statechange", cb);
+		node.events.removeEventListener("statechange", cb);
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage({
@@ -1154,16 +1144,16 @@ describe("ClipNode.on / off (addEventListener)", () => {
 
 	test("multiple listeners for the same event", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const a: string[] = [];
 		const b: string[] = [];
-		node.on("started", () => a.push("a"));
-		node.on("started", () => b.push("b"));
+		node.events.addEventListener("started", () => a.push("a"));
+		node.events.addEventListener("started", () => b.push("b"));
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage({
@@ -1175,14 +1165,14 @@ describe("ClipNode.on / off (addEventListener)", () => {
 
 	test("dispose() clears all listeners", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const events: string[] = [];
-		node.on("disposed", () => events.push("disposed"));
+		node.events.addEventListener("disposed", () => events.push("disposed"));
 		node.dispose();
 		// The disposed event fires during dispose
 		expect(events).toEqual(["disposed"]);
@@ -1190,14 +1180,16 @@ describe("ClipNode.on / off (addEventListener)", () => {
 
 	test("durationchange event via on()", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const durations: number[] = [];
-		node.on("durationchange", (d) => durations.push(d));
+		node.events.addEventListener("durationchange", (e) =>
+			durations.push(e.duration),
+		);
 		node.duration = 5;
 		node.duration = 10;
 		node.duration = 10; // same, should not fire
@@ -1206,14 +1198,14 @@ describe("ClipNode.on / off (addEventListener)", () => {
 
 	test("ratechange event via on()", async () => {
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const rates: number[] = [];
-		node.on("ratechange", (r) => rates.push(r));
+		node.events.addEventListener("ratechange", (e) => rates.push(e.rate));
 		node.setPlaybackRate(2);
 		expect(rates).toEqual([2]);
 	});
@@ -1223,7 +1215,7 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 	test("on('progress') receives progress events", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1234,7 +1226,9 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 			},
 		);
 		const received: number[] = [];
-		node.on("progress", (bytes) => received.push(bytes));
+		node.streamEvents.addEventListener("progress", (e) =>
+			received.push(e.bytesReceived),
+		);
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve(); // let async _startStream settle
 
@@ -1246,7 +1240,7 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 	test("on('done') fires when stream completes", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1257,7 +1251,7 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 			},
 		);
 		let fired = false;
-		node.on("done", () => {
+		node.streamEvents.addEventListener("done", () => {
 			fired = true;
 		});
 		node.url = "https://example.com/test.mp3";
@@ -1270,7 +1264,7 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 	test("on('error') fires on stream error", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1281,7 +1275,7 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 			},
 		);
 		const errors: StreamError[] = [];
-		node.on("error", (err) => errors.push(err));
+		node.streamEvents.addEventListener("error", (e) => errors.push(e.error));
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve();
 		node.downloaded.catch(() => {}); // prevent unhandled rejection
@@ -1300,14 +1294,14 @@ describe("StreamingClipNode.on / off (streaming events)", () => {
 describe("ClipNode.ontimeupdate", () => {
 	test("fires during frame processing with currentTime", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const times: number[] = [];
-		node.ontimeupdate = (ct) => times.push(ct);
+		node.ontimeupdate = (e) => times.push(e.currentTime);
 		// Simulate a frame message
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
@@ -1319,15 +1313,15 @@ describe("ClipNode.ontimeupdate", () => {
 
 	test("throttles to timeUpdateInterval", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.timeUpdateInterval = 1000; // 1 second
 		const times: number[] = [];
-		node.ontimeupdate = (ct) => times.push(ct);
+		node.ontimeupdate = (e) => times.push(e.currentTime);
 		const handleMessage = (
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage;
@@ -1347,10 +1341,10 @@ describe("ClipNode.ontimeupdate", () => {
 
 	test("custom interval is respected", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		node.timeUpdateInterval = 100;
@@ -1361,14 +1355,16 @@ describe("ClipNode.ontimeupdate", () => {
 
 	test("also emits timeupdate via on()", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createClipNode();
 		const times: number[] = [];
-		node.on("timeupdate", (ct) => times.push(ct));
+		node.events.addEventListener("timeupdate", (e) =>
+			times.push(e.currentTime),
+		);
 		// Need to set ontimeupdate to trigger the logic
 		node.ontimeupdate = () => {};
 		(
@@ -1384,7 +1380,7 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 	test("buffered returns empty array initially", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1401,7 +1397,7 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 	test("buffered returns ranges in seconds after bufferState message", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1432,7 +1428,7 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 	test("onbufferchange fires on buffer state updates", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1443,7 +1439,7 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 			},
 		);
 		const received: { start: number; end: number }[][] = [];
-		node.onbufferchange = (ranges) => received.push(ranges);
+		node.onbufferchange = (e) => received.push(e.buffered);
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage({
@@ -1464,7 +1460,7 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 	test("bufferchange event via on()", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1475,7 +1471,9 @@ describe("StreamingClipNode.buffered (buffered ranges API)", () => {
 			},
 		);
 		const received: { start: number; end: number }[][] = [];
-		node.on("bufferchange", (ranges) => received.push(ranges));
+		node.streamEvents.addEventListener("bufferchange", (e) =>
+			received.push(e.buffered),
+		);
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
 		).handleMessage({
@@ -1498,7 +1496,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("readyState starts as 'empty'", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1514,7 +1512,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("readyState transitions: empty → loading → canplay → complete", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1526,7 +1524,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 			},
 		);
 		const states: StreamReadyState[] = [];
-		node.onreadystatechange = (s) => states.push(s);
+		node.onreadystatechange = (e) => states.push(e.state);
 
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve();
@@ -1561,7 +1559,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("does not transition to complete until streamEnd is committed", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1601,7 +1599,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("onloadstart fires when url is set", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1623,7 +1621,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("oncanplay fires when preBufferSamples is met", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1649,7 +1647,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("onwaiting fires on buffer underrun, then canplay on recovery", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1711,7 +1709,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("readystatechange event fires via on()", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1723,7 +1721,9 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 			},
 		);
 		const states: StreamReadyState[] = [];
-		node.on("readystatechange", (s) => states.push(s));
+		node.streamEvents.addEventListener("readystatechange", (e) =>
+			states.push(e.state),
+		);
 
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve();
@@ -1750,7 +1750,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("loadstart / waiting / canplay events fire via on()", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1762,9 +1762,11 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 			},
 		);
 		const events: string[] = [];
-		node.on("loadstart", () => events.push("loadstart"));
-		node.on("canplay", () => events.push("canplay"));
-		node.on("waiting", () => events.push("waiting"));
+		node.streamEvents.addEventListener("loadstart", () =>
+			events.push("loadstart"),
+		);
+		node.streamEvents.addEventListener("canplay", () => events.push("canplay"));
+		node.streamEvents.addEventListener("waiting", () => events.push("waiting"));
 
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve();
@@ -1799,7 +1801,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("setting new url resets readyState to loading", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1825,7 +1827,7 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 	test("dispose clears readyState callbacks", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -1841,18 +1843,18 @@ describe("StreamingClipNode.readyState + buffering events", () => {
 		node.oncanplaythrough = () => {};
 		node.onreadystatechange = () => {};
 		node.dispose();
-		expect(node.onloadstart).toBeUndefined();
-		expect(node.oncanplay).toBeUndefined();
-		expect(node.onwaiting).toBeUndefined();
-		expect(node.oncanplaythrough).toBeUndefined();
-		expect(node.onreadystatechange).toBeUndefined();
+		expect(node.onloadstart).toBeNull();
+		expect(node.oncanplay).toBeNull();
+		expect(node.onwaiting).toBeNull();
+		expect(node.oncanplaythrough).toBeNull();
+		expect(node.onreadystatechange).toBeNull();
 	});
 });
 
 describe("preload strategy", () => {
 	test("preload: 'none' — setting URL does not create a worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCreated = false;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -1863,7 +1865,7 @@ describe("preload strategy", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -1878,7 +1880,7 @@ describe("preload strategy", () => {
 
 	test("preload: 'none' — start() triggers fetch", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCreated = false;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -1889,7 +1891,7 @@ describe("preload strategy", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -1907,7 +1909,7 @@ describe("preload strategy", () => {
 
 	test("preload: 'metadata' — does not create worker on URL set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCreated = false;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -1918,7 +1920,7 @@ describe("preload strategy", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -1933,7 +1935,7 @@ describe("preload strategy", () => {
 
 	test("preload: 'metadata' — start() triggers full fetch", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCreated = false;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -1944,7 +1946,7 @@ describe("preload strategy", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -1961,7 +1963,7 @@ describe("preload strategy", () => {
 
 	test("preload: 'auto' — fetch starts immediately (default behavior)", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 
 		let workerCreated = false;
 		const trackingFactory = (_format: StreamFormat): Worker => {
@@ -1972,7 +1974,7 @@ describe("preload strategy", () => {
 
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: trackingFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -1997,10 +1999,10 @@ describe("buffer backpressure", () => {
 
 	test("sends pause-fetch when buffer is far ahead", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2030,10 +2032,10 @@ describe("buffer backpressure", () => {
 
 	test("sends resume-fetch when buffer drops below threshold", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2079,10 +2081,10 @@ describe("buffer backpressure", () => {
 
 	test("no backpressure when pauseFetchAheadSamples is 0 (disabled)", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2113,10 +2115,10 @@ describe("buffer backpressure", () => {
 describe("retry on network failure", () => {
 	test("passes retry config to worker init message", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2132,10 +2134,10 @@ describe("retry on network failure", () => {
 
 	test("passes null retry config when retry is false", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2151,18 +2153,18 @@ describe("retry on network failure", () => {
 
 	test("onretry callback fires when worker sends retry message", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 
 		const retryEvents: { attempt: number; delay: number; error: string }[] = [];
-		node.onretry = (attempt, delay, error) => {
-			retryEvents.push({ attempt, delay, error });
+		node.onretry = (e) => {
+			retryEvents.push({ attempt: e.attempt, delay: e.delay, error: e.error });
 		};
 
 		node.url = "https://example.com/audio.opus";
@@ -2186,18 +2188,18 @@ describe("retry on network failure", () => {
 
 	test("retry event emitter fires with correct args", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 
 		const retryEvents: [number, number, string][] = [];
-		node.on("retry", (attempt, delay, error) => {
-			retryEvents.push([attempt, delay, error]);
+		node.streamEvents.addEventListener("retry", (e) => {
+			retryEvents.push([e.attempt, e.delay, e.error]);
 		});
 
 		node.url = "https://example.com/audio.opus";
@@ -2216,10 +2218,10 @@ describe("retry on network failure", () => {
 
 	test("default retry config is null when not specified", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2236,18 +2238,18 @@ describe("retry on network failure", () => {
 describe("metadata extraction", () => {
 	test("onmetadata callback fires when worker sends metadata", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 
 		const receivedMetadata: unknown[] = [];
-		node.onmetadata = (meta) => {
-			receivedMetadata.push(meta);
+		node.onmetadata = (e) => {
+			receivedMetadata.push(e.metadata);
 		};
 
 		node.url = "https://example.com/audio.opus";
@@ -2268,10 +2270,10 @@ describe("metadata extraction", () => {
 
 	test("metadata getter returns last received metadata", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2292,18 +2294,18 @@ describe("metadata extraction", () => {
 
 	test("metadata event emitter fires", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
 		});
 
 		const events: unknown[] = [];
-		node.on("metadata", (meta) => {
-			events.push(meta);
+		node.streamEvents.addEventListener("metadata", (e) => {
+			events.push(e.metadata);
 		});
 
 		node.url = "https://example.com/audio.opus";
@@ -2320,10 +2322,10 @@ describe("metadata extraction", () => {
 
 	test("metadata resets on new stream", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 		const node = coordinator.createStreamingClipNode(undefined, {
 			format: "OggOpus",
@@ -2350,7 +2352,7 @@ describe("metadata extraction", () => {
 describe("ClipNode seeking", () => {
 	test("onseeking and onseeked fire when playhead is set", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		let seekingFired = false;
@@ -2373,7 +2375,7 @@ describe("ClipNode seeking", () => {
 
 	test("seeking getter is true during seek", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		let seekingDuringSeeking = false;
@@ -2389,15 +2391,15 @@ describe("ClipNode seeking", () => {
 
 	test("seeking and seeked events fire via emit", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		let seekingEmit = false;
 		let seekedEmit = false;
-		node.on("seeking", () => {
+		node.events.addEventListener("seeking", () => {
 			seekingEmit = true;
 		});
-		node.on("seeked", () => {
+		node.events.addEventListener("seeked", () => {
 			seekedEmit = true;
 		});
 
@@ -2410,25 +2412,25 @@ describe("ClipNode seeking", () => {
 
 	test("dispose clears onseeking and onseeked", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		node.onseeking = () => {};
 		node.onseeked = () => {};
 		node.dispose();
 
-		expect(node.onseeking).toBeUndefined();
-		expect(node.onseeked).toBeUndefined();
+		expect(node.onseeking).toBeNull();
+		expect(node.onseeked).toBeNull();
 	});
 });
 
 describe("StreamingClipNode seeking", () => {
 	test("seek within buffered span completes immediately", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -2472,10 +2474,10 @@ describe("StreamingClipNode seeking", () => {
 
 	test("seek outside buffer sends seek message to worker", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -2525,10 +2527,10 @@ describe("StreamingClipNode seeking", () => {
 
 	test("seeked message from worker completes the seek", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -2574,10 +2576,10 @@ describe("StreamingClipNode seeking", () => {
 
 	test("seek with no worker completes immediately", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {
@@ -2602,7 +2604,7 @@ describe("StreamingClipNode seeking", () => {
 describe("ClipNode dispose guards", () => {
 	test("dispose is idempotent — calling twice does not throw", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		node.dispose(); // should not throw
@@ -2611,7 +2613,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("start throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.start()).toThrow("Cannot use a disposed ClipNode");
@@ -2619,7 +2621,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("stop throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.stop()).toThrow("Cannot use a disposed ClipNode");
@@ -2627,7 +2629,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("pause throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.pause()).toThrow("Cannot use a disposed ClipNode");
@@ -2635,7 +2637,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("resume throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.resume()).toThrow("Cannot use a disposed ClipNode");
@@ -2643,7 +2645,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("setting buffer throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		const ab = ctx.createBuffer(2, 48_000, 48_000);
@@ -2654,7 +2656,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("setting playhead throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => {
@@ -2664,7 +2666,7 @@ describe("ClipNode dispose guards", () => {
 
 	test("dispose clears buffer and stream state", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		const ab = ctx.createBuffer(2, 48_000, 48_000);
 		node.buffer = ab;
@@ -2675,10 +2677,10 @@ describe("ClipNode dispose guards", () => {
 
 	test("disposed event fires exactly once on first dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		let count = 0;
-		node.on("disposed", () => count++);
+		node.events.addEventListener("disposed", () => count++);
 		node.dispose();
 		node.dispose();
 		expect(count).toBe(1);
@@ -2688,7 +2690,7 @@ describe("ClipNode dispose guards", () => {
 describe("StreamingClipNode dispose guards", () => {
 	test("dispose is idempotent for StreamingClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2705,7 +2707,7 @@ describe("StreamingClipNode dispose guards", () => {
 
 	test("start throws after StreamingClipNode dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2721,7 +2723,7 @@ describe("StreamingClipNode dispose guards", () => {
 
 	test("stop throws after StreamingClipNode dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2737,7 +2739,7 @@ describe("StreamingClipNode dispose guards", () => {
 
 	test("setting url throws after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2756,7 +2758,7 @@ describe("StreamingClipNode dispose guards", () => {
 	test("dispose clears pending start and metadata", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2783,7 +2785,7 @@ describe("StreamingClipNode dispose guards", () => {
 	test("dispose terminates worker", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2803,7 +2805,7 @@ describe("StreamingClipNode dispose guards", () => {
 
 	test("dispose clears all streaming callbacks", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2829,26 +2831,26 @@ describe("StreamingClipNode dispose guards", () => {
 
 		node.dispose();
 
-		expect(node.onerror).toBeUndefined();
-		expect(node.onprogress).toBeUndefined();
-		expect(node.ondone).toBeUndefined();
-		expect(node.onwaiting).toBeUndefined();
-		expect(node.oncanplay).toBeUndefined();
-		expect(node.oncanplaythrough).toBeUndefined();
-		expect(node.onloadstart).toBeUndefined();
-		expect(node.onreadystatechange).toBeUndefined();
-		expect(node.onbufferchange).toBeUndefined();
-		expect(node.onretry).toBeUndefined();
-		expect(node.onmetadata).toBeUndefined();
-		expect(node.onended).toBeUndefined();
-		expect(node.onstarted).toBeUndefined();
+		expect(node.onerror).toBeNull();
+		expect(node.onprogress).toBeNull();
+		expect(node.ondone).toBeNull();
+		expect(node.onwaiting).toBeNull();
+		expect(node.oncanplay).toBeNull();
+		expect(node.oncanplaythrough).toBeNull();
+		expect(node.onloadstart).toBeNull();
+		expect(node.onreadystatechange).toBeNull();
+		expect(node.onbufferchange).toBeNull();
+		expect(node.onretry).toBeNull();
+		expect(node.onmetadata).toBeNull();
+		expect(node.onended).toBeNull();
+		expect(node.onstarted).toBeNull();
 	});
 });
 
 describe("ClipNode.getDecodedBuffer", () => {
 	test("throws when called on a disposed node", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		expect(() => node.getDecodedBuffer()).toThrow(
@@ -2858,7 +2860,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 
 	test("resolves with AudioBuffer when processor responds", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		const promise = node.getDecodedBuffer();
@@ -2882,7 +2884,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 
 	test("rejects when processor returns empty buffer", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		const promise = node.getDecodedBuffer();
@@ -2898,7 +2900,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 
 	test("rejects when node is disposed while waiting", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		const promise = node.getDecodedBuffer();
@@ -2909,7 +2911,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 
 	test("returns same promise when called multiple times before response", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		const p1 = node.getDecodedBuffer();
@@ -2947,7 +2949,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("targetNumSamples can be set before url", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2966,7 +2968,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("targetDuration can be set before url", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -2986,7 +2988,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("default strategy is 'hold' when no target is set", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3003,7 +3005,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("gapPlaybackStrategy can be set explicitly", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3021,7 +3023,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("gapRecoveryFadeSamples can be configured", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3039,7 +3041,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("runtime targetNumSamples setter updates strategy accordingly", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3065,7 +3067,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("silence strategy: no waiting event on gap traversal", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3110,7 +3112,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("silence strategy: canplaythrough is immediate with known target", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3125,7 +3127,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 		);
 
 		const states: StreamReadyState[] = [];
-		node.onreadystatechange = (s) => states.push(s);
+		node.onreadystatechange = (e) => states.push(e.state);
 
 		node.url = "https://example.com/test.mp3";
 		await Promise.resolve();
@@ -3153,7 +3155,7 @@ describe("StreamingClipNode gap playback strategy", () => {
 	test("hold strategy: waiting event fires on buffer underrun", async () => {
 		const worker = new FakeWorker();
 		const ctx = createContext();
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
 			ctx,
 			{},
@@ -3187,10 +3189,10 @@ describe("StreamingClipNode gap playback strategy", () => {
 
 	test("coordinator passes gap options through to StreamingClipNode", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
-		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const coordinator = Coordinator.fromContext(ctx, {
 			workerFactory: fakeWorkerFactory,
-			processorUrl: "./dist/audio/processor.js",
+			processorUrl: "/dist/audio/processor.js",
 		});
 
 		const node = coordinator.createStreamingClipNode(undefined, {

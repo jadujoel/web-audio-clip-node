@@ -1,36 +1,8 @@
-import { GlobalWindow } from "happy-dom";
-import {
-	AnalyserNode,
-	AudioBuffer,
-	AudioBufferSourceNode,
-	AudioContext,
-	AudioDestinationNode,
-	AudioListener,
-	AudioNode,
-	AudioParam,
-	AudioParamMap,
-	AudioScheduledSourceNode,
-	AudioWorklet,
-	AudioWorkletNode,
-	BaseAudioContext,
-	BiquadFilterNode,
-	ChannelMergerNode,
-	ChannelSplitterNode,
-	ConstantSourceNode,
-	ConvolverNode,
-	DelayNode,
-	DynamicsCompressorNode,
-	GainNode,
-	IIRFilterNode,
-	MediaStreamAudioSourceNode,
-	OfflineAudioCompletionEvent,
-	OfflineAudioContext,
-	OscillatorNode,
-	PannerNode,
-	PeriodicWave,
-	StereoPannerNode,
-	WaveShaperNode,
-} from "isomorphic-web-audio-api";
+/**
+ * Test utilities for managing AudioContext lifecycle.
+ *
+ * In browser mode (Vitest), all Web Audio and DOM APIs are native.
+ */
 
 type ManagedAudioContext = AudioContext | OfflineAudioContext;
 
@@ -84,78 +56,10 @@ export async function closeRegisteredAudioContexts(): Promise<void> {
 	}
 }
 
-void (async () => {
-	try {
-		const { afterEach } = await import("bun:test");
-		afterEach(async () => {
-			await closeRegisteredAudioContexts();
-		});
-	} catch {
-		// Ignore when this preload is imported outside Bun's test runner.
-	}
-})();
-
-globalThis.AnalyserNode ??= AnalyserNode;
-globalThis.AudioBuffer ??= AudioBuffer;
-globalThis.AudioBufferSourceNode ??= AudioBufferSourceNode;
-globalThis.AudioContext ??= AudioContext;
-globalThis.AudioDestinationNode ??= AudioDestinationNode;
-globalThis.AudioListener ??= AudioListener;
-globalThis.AudioNode ??= AudioNode;
-globalThis.AudioParam ??= AudioParam;
-globalThis.AudioParamMap ??= AudioParamMap;
-globalThis.AudioScheduledSourceNode ??= AudioScheduledSourceNode;
-globalThis.AudioWorklet ??= AudioWorklet;
-globalThis.AudioWorkletNode ??= AudioWorkletNode;
-globalThis.BaseAudioContext ??= BaseAudioContext;
-globalThis.BiquadFilterNode ??= BiquadFilterNode;
-globalThis.ChannelMergerNode ??= ChannelMergerNode;
-globalThis.ChannelSplitterNode ??= ChannelSplitterNode;
-globalThis.ConstantSourceNode ??= ConstantSourceNode;
-globalThis.ConvolverNode ??= ConvolverNode;
-globalThis.DelayNode ??= DelayNode;
-globalThis.DynamicsCompressorNode ??= DynamicsCompressorNode;
-globalThis.GainNode ??= GainNode;
-globalThis.IIRFilterNode ??= IIRFilterNode;
-globalThis.MediaStreamAudioSourceNode ??= MediaStreamAudioSourceNode;
-globalThis.OfflineAudioCompletionEvent ??= OfflineAudioCompletionEvent;
-globalThis.OfflineAudioContext ??= OfflineAudioContext;
-globalThis.OscillatorNode ??= OscillatorNode;
-globalThis.PannerNode ??= PannerNode;
-globalThis.PeriodicWave ??= PeriodicWave;
-globalThis.StereoPannerNode ??= StereoPannerNode;
-globalThis.WaveShaperNode ??= WaveShaperNode;
-
-// Install browser globals (document, navigator, location, window, etc.)
-// from happy-dom so the engine code that touches the DOM doesn't crash in Bun.
-const happyWindow = new GlobalWindow();
-const browserGlobals = ["document", "navigator", "location", "window"] as const;
-
-for (const key of browserGlobals) {
-	if (globalThis[key] === undefined) {
-		// @ts-expect-error - globalThis[key] is assignable
-		globalThis[key] = happyWindow[key];
-	}
-}
-
-// @ts-expect-error - readonly
-globalThis.navigator.userActivation ??= {
-	isActive: true,
-	hasBeenActive: true,
-};
-
-/**
- * Try to create a real AudioContext; fall back to OfflineAudioContext when
- * no audio device is available (e.g. CI runners).
- */
 /**
  * Create an AudioContext for tests.
  *
- * Defaults to OfflineAudioContext so that no native real-time audio thread is
- * spawned (node-web-audio-api / isomorphic-web-audio-api creates a live Rust
- * audio thread per AudioContext, and unclosed contexts accumulate rapidly
- * across a test suite, causing 800 %+ CPU saturation and timeouts).
- *
+ * Defaults to OfflineAudioContext to keep tests fast and deterministic.
  * Pass `preferOffline: false` only when you explicitly need real-time
  * behaviour (e.g. testing AudioContext.state transitions).
  */
@@ -192,7 +96,7 @@ export function createContext(opts?: {
 /**
  * Run audio through the context and then clean up.
  * - OfflineAudioContext: calls startRendering()
- * - AudioContext: sleeps for the given duration then closes
+ * - AudioContext: waits for the given duration then closes
  */
 export async function renderContext(
 	context: AudioContext | OfflineAudioContext,
@@ -201,7 +105,7 @@ export async function renderContext(
 	if (context instanceof OfflineAudioContext) {
 		await context.startRendering();
 	} else {
-		await Bun.sleep(durationMs);
+		await new Promise((resolve) => setTimeout(resolve, durationMs));
 		await context.close();
 	}
 }

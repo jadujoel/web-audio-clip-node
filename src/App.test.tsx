@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
 	buildDefaults,
 	DEFAULT_MAX_8_BARS,
@@ -10,18 +10,18 @@ import { useClipControls } from "./store/clipStore";
 
 type UseClipNodeImpl = typeof import("./hooks/useClipNode").useClipNode;
 
-const applyValueMock = mock(() => {});
-const applyValuesMock = mock(() => {});
-const applyToggleMock = mock(() => {});
-const setLoopOnNodeMock = mock(() => {});
-const setLoopModeOnNodeMock = mock(() => {});
+const applyValueMock = vi.fn(() => {});
+const applyValuesMock = vi.fn(() => {});
+const applyToggleMock = vi.fn(() => {});
+const setLoopOnNodeMock = vi.fn(() => {});
+const setLoopModeOnNodeMock = vi.fn(() => {});
 
-const cacheMatchMock = mock(async () => undefined);
-const cachePutMock = mock(async () => undefined);
+const cacheMatchMock = vi.fn(async () => undefined);
+const cachePutMock = vi.fn(async () => undefined);
 
 if (!("caches" in globalThis)) {
 	globalThis.caches = {
-		open: mock(
+		open: vi.fn(
 			async () =>
 				({
 					match: cacheMatchMock,
@@ -44,13 +44,13 @@ const useClipNodeStub: UseClipNodeImpl = () => {
 		infoTimesLooped: "0",
 		infoLatency: "unknown",
 		infoTimeTaken: "unknown",
-		start: mock(async () => {}),
-		stop: mock(() => {}),
-		pause: mock(() => {}),
-		resume: mock(() => {}),
-		dispose: mock(() => {}),
-		logState: mock(() => {}),
-		loadSound: mock(() => {}),
+		start: vi.fn(async () => {}),
+		stop: vi.fn(() => {}),
+		pause: vi.fn(() => {}),
+		resume: vi.fn(() => {}),
+		dispose: vi.fn(() => {}),
+		logState: vi.fn(() => {}),
+		loadSound: vi.fn(() => {}),
 		applyValue: applyValueMock,
 		applyValues: applyValuesMock,
 		applyToggle: applyToggleMock,

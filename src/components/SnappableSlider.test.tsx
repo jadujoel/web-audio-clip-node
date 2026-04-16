@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { SnappableSlider } from "./SnappableSlider";
 
 function q(
@@ -43,7 +43,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("ArrowRight increases value by step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -59,7 +59,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("ArrowLeft decreases value by step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -75,7 +75,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("ArrowUp increases value by step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -91,7 +91,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("ArrowDown decreases value by step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -107,7 +107,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("Home sets to min", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={10} max={100} value={50} onChange={onChange} />,
 		);
@@ -117,7 +117,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("End sets to max", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={200} value={50} onChange={onChange} />,
 		);
@@ -127,7 +127,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("PageUp increases by 10x step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -143,7 +143,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("PageDown decreases by 10x step", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -159,7 +159,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("clamps at max", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -175,7 +175,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("clamps at min", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -191,7 +191,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("double-click resets to defaultValue", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -207,7 +207,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("double-click without defaultValue does nothing", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={75} onChange={onChange} />,
 		);
@@ -217,7 +217,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("default step is (max - min) / 100", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
@@ -260,12 +260,12 @@ describe("SnappableSlider", () => {
 	});
 
 	test("reuses drag bounds for a single drag gesture", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
 		const slider = q(container, '[role="slider"]') as HTMLDivElement;
-		const getBoundingClientRect = mock(() => ({
+		const getBoundingClientRect = vi.fn(() => ({
 			left: 10,
 			top: 0,
 			right: 210,
@@ -292,7 +292,7 @@ describe("SnappableSlider", () => {
 		expect(onChange).toHaveBeenCalled();
 	});
 	test("enableSnap with snaps: value snaps to closest snap point", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -311,7 +311,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("mouseDown starts drag and updates value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
@@ -336,7 +336,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("touchStart starts drag and updates value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
@@ -353,13 +353,15 @@ describe("SnappableSlider", () => {
 				y: 0,
 				toJSON: () => {},
 			}) as DOMRect;
-		fireEvent.touchStart(slider, { touches: [{ clientX: 150 }] });
+		fireEvent.touchStart(slider, {
+			touches: [new Touch({ identifier: 0, target: slider, clientX: 150 })],
+		});
 		expect(onChange).toHaveBeenCalled();
 		fireEvent.touchEnd(document);
 	});
 
 	test("Alt key sets isOptionKeyHeld and prevents snapping", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -383,7 +385,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("Alt+mouseDown bypasses snap during drag", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -414,7 +416,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("mouseDown without Alt snaps during drag", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -451,7 +453,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("wheel does not change value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -467,7 +469,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("shift+wheel does not change value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={0}
@@ -487,7 +489,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("drag with mousemove and mouseup cleans up", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
@@ -513,7 +515,7 @@ describe("SnappableSlider", () => {
 	});
 
 	test("drag with touchmove and touchend cleans up", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider min={0} max={100} value={50} onChange={onChange} />,
 		);
@@ -530,10 +532,14 @@ describe("SnappableSlider", () => {
 				y: 0,
 				toJSON: () => {},
 			}) as DOMRect;
-		fireEvent.touchStart(slider, { touches: [{ clientX: 100 }] });
+		fireEvent.touchStart(slider, {
+			touches: [new Touch({ identifier: 0, target: slider, clientX: 100 })],
+		});
 		onChange.mockClear();
 		// Simulate touchmove on document
-		fireEvent.touchMove(document, { touches: [{ clientX: 150 }] });
+		fireEvent.touchMove(document, {
+			touches: [new Touch({ identifier: 0, target: slider, clientX: 150 })],
+		});
 		// Trigger touchend on document to stop drag
 		fireEvent.touchEnd(document);
 	});
@@ -606,7 +612,7 @@ describe("logarithmic mode", () => {
 	});
 
 	test("ArrowRight increases in log space", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<SnappableSlider
 				min={32}

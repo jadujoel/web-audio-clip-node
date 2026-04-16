@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { PlaybackRateControl } from "./PlaybackRateControl";
 
 afterEach(cleanup);
@@ -56,7 +56,7 @@ describe("PlaybackRateControl", () => {
 	});
 
 	test("toggle fires onToggle", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<PlaybackRateControl
 				value={1}
@@ -71,7 +71,7 @@ describe("PlaybackRateControl", () => {
 	});
 
 	test("double-click resets to default", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<PlaybackRateControl
 				value={2}
@@ -86,7 +86,7 @@ describe("PlaybackRateControl", () => {
 	});
 
 	test("click-to-edit commits value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<PlaybackRateControl
 				value={1}
@@ -104,7 +104,7 @@ describe("PlaybackRateControl", () => {
 	});
 
 	test("click-to-edit: Escape cancels", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<PlaybackRateControl
 				value={1}
@@ -121,7 +121,7 @@ describe("PlaybackRateControl", () => {
 	});
 
 	test("click-to-edit: clamps value", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<PlaybackRateControl
 				value={1}

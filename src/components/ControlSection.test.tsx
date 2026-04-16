@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ControlDef, ControlKey } from "../controls/controlDefs";
 import {
 	buildLinkedControlPairDefaults,
@@ -188,7 +188,7 @@ describe("ControlSection", () => {
 	});
 
 	test("renders linked pair toggle and forwards changes", () => {
-		const onLinkedChange = mock(() => {});
+		const onLinkedChange = vi.fn(() => {});
 		const linked = buildLinkedControlPairDefaults();
 
 		const linkedDefs: ControlDef[] = [
@@ -360,7 +360,7 @@ describe("ControlSection", () => {
 	});
 
 	test("onValueChange is called with correct key", () => {
-		const onValueChange = mock(() => {});
+		const onValueChange = vi.fn(() => {});
 		const { container } = render(
 			<ControlSection
 				legend="Params"
@@ -390,7 +390,7 @@ describe("ControlSection", () => {
 	});
 
 	test("onToggle is called when toggle changes", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<ControlSection
 				legend="Params"
@@ -545,7 +545,7 @@ describe("ControlSection", () => {
 	});
 
 	test("onSnapChange is called via context menu", () => {
-		const onSnapChange = mock(() => {});
+		const onSnapChange = vi.fn(() => {});
 		const defsWithSnap: ControlDef[] = [
 			{
 				key: "offset",

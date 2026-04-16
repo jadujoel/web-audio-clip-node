@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 import {
 	appendWebmOpusBytes,
 	createWebmOpusParserState,
@@ -112,18 +112,18 @@ describe("webm opus parser", () => {
 		const packet = new Uint8Array([0xaa, 0xbb, 0xcc]);
 		const elements = [
 			detail({ name: "TrackEntry", type: "m", isEnd: false }),
-			detail({ name: "TrackNumber", type: "u", value: 1, data: Buffer.alloc(0) }),
-			detail({ name: "TrackType", type: "u", value: 2, data: Buffer.alloc(0) }),
-			detail({ name: "CodecID", type: "s", value: "A_OPUS", data: Buffer.alloc(0) }),
-			detail({ name: "CodecPrivate", type: "b", value: Buffer.from(opusHead), data: Buffer.from(opusHead) }),
-			detail({ name: "CodecDelay", type: "u", value: 6_500_000, data: Buffer.alloc(0) }),
+			detail({ name: "TrackNumber", type: "u", value: 1, data: new Uint8Array(0) }),
+			detail({ name: "TrackType", type: "u", value: 2, data: new Uint8Array(0) }),
+			detail({ name: "CodecID", type: "s", value: "A_OPUS", data: new Uint8Array(0) }),
+			detail({ name: "CodecPrivate", type: "b", value: new Uint8Array(opusHead), data: new Uint8Array(opusHead) }),
+			detail({ name: "CodecDelay", type: "u", value: 6_500_000, data: new Uint8Array(0) }),
 			detail({ name: "Audio", type: "m", isEnd: false }),
-			detail({ name: "Channels", type: "u", value: 2, data: Buffer.alloc(0) }),
+			detail({ name: "Channels", type: "u", value: 2, data: new Uint8Array(0) }),
 			detail({ name: "Audio", type: "m", isEnd: true }),
 			detail({ name: "TrackEntry", type: "m", isEnd: true }),
-			detail({ name: "TimestampScale", type: "u", value: 1_000_000, data: Buffer.alloc(0) }),
-			detail({ name: "Timestamp", type: "u", value: 100, data: Buffer.alloc(0) }),
-			detail({ name: "SimpleBlock", type: "b", value: Buffer.from(packet), data: Buffer.from(buildSimpleBlock(1, 20, packet)) }),
+			detail({ name: "TimestampScale", type: "u", value: 1_000_000, data: new Uint8Array(0) }),
+			detail({ name: "Timestamp", type: "u", value: 100, data: new Uint8Array(0) }),
+			detail({ name: "SimpleBlock", type: "b", value: new Uint8Array(packet), data: new Uint8Array(buildSimpleBlock(1, 20, packet)) }),
 		] as WebmElementDetail[];
 		const state = createWebmOpusParserState();
 		const parsed = processWebmOpusElements(elements, state);

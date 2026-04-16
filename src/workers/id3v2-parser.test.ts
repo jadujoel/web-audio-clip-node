@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { parseId3v2 } from "./id3v2-parser";
 
 function makeId3v2Tag(frames: { id: string; data: Uint8Array }[]): Uint8Array {

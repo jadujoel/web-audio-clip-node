@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { FilterControl } from "./FilterControl";
 
 afterEach(cleanup);
@@ -66,7 +66,7 @@ describe("FilterControl", () => {
 	});
 
 	test("disabled state when enabled=false", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<FilterControl
 				label="Lowpass"
@@ -84,7 +84,7 @@ describe("FilterControl", () => {
 	});
 
 	test("toggle fires onToggle", () => {
-		const onToggle = mock(() => {});
+		const onToggle = vi.fn(() => {});
 		const { container } = render(
 			<FilterControl
 				label="Lowpass"
@@ -102,7 +102,7 @@ describe("FilterControl", () => {
 	});
 
 	test("double-click resets to default", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<FilterControl
 				label="Lowpass"
@@ -120,7 +120,7 @@ describe("FilterControl", () => {
 	});
 
 	test("click-to-edit value display", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<FilterControl
 				label="Lowpass"
@@ -142,7 +142,7 @@ describe("FilterControl", () => {
 	});
 
 	test("click-to-edit: Escape cancels", () => {
-		const onChange = mock(() => {});
+		const onChange = vi.fn(() => {});
 		const { container } = render(
 			<FilterControl
 				label="Lowpass"
