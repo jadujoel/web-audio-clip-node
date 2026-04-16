@@ -33,6 +33,36 @@ interface UseStreamingClipNodeParams {
 	polyfillOptions?: AudioDecoderPolyfillOptions;
 }
 
+export interface UseStreamingClipNodeReturn {
+	nodeState: ClipNodeState;
+	statusMessage: string | null;
+	progress: number;
+	audioDuration: number | null;
+	seekableDuration: number | null;
+	seekableSamples: number | null;
+	frameRef: RefObject<FrameData | null>;
+	timesLoopedRef: RefObject<string>;
+	infoLatency: string;
+	playbackGeneration: number;
+	stream: (
+		url: string,
+		throttle: number,
+		format?: StreamFormat,
+		gapStrategy?: GapPlaybackStrategy,
+	) => Promise<void>;
+	play: () => void;
+	pause: () => void;
+	stop: () => void;
+	dispose: () => void;
+	seekPlayhead: (targetSample: number) => void;
+	applyValue: (key: ControlKey, val: number) => void;
+	applyValues: (valuesToApply: Partial<Record<ControlKey, number>>) => void;
+	applyToggle: (key: ControlKey, on: boolean) => void;
+	setLoopOnNode: (checked: boolean) => void;
+	setLoopModeOnNode: (mode: LoopMode) => void;
+	setGapPlaybackStrategyOnNode: (strategy: GapPlaybackStrategy) => void;
+}
+
 export function useStreamingClipNode({
 	values,
 	enabled,
@@ -40,7 +70,7 @@ export function useStreamingClipNode({
 	loopMode,
 	setValue,
 	polyfillOptions,
-}: UseStreamingClipNodeParams) {
+}: UseStreamingClipNodeParams): UseStreamingClipNodeReturn {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>("Idle");
 	const [progress, setProgress] = useState(0);
@@ -490,5 +520,5 @@ export function useStreamingClipNode({
 		setLoopOnNode,
 		setLoopModeOnNode,
 		setGapPlaybackStrategyOnNode,
-	};
+	} satisfies UseStreamingClipNodeReturn;
 }

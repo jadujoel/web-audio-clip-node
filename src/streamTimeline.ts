@@ -4,7 +4,7 @@ interface EstimateInput {
 	sourceSampleRate: number;
 	targetSampleRate: number;
 	/** Optional format hint for better default bitrate when bitrate is null. */
-	format?: string;
+	format?: string | undefined;
 }
 
 const FALLBACK_BITRATE_BPS = 128_000;

@@ -121,7 +121,7 @@ class ClipProcessor extends AudioWorkletProcessor {
 		};
 	}
 
-	process(
+	override process(
 		_inputs: Float32Array[][],
 		outputs: Float32Array[][],
 		parameters: Record<string, Float32Array>,

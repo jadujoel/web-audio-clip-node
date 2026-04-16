@@ -275,7 +275,7 @@ function setWholeBuffer(
 // ---------------------------------------------------------------------------
 
 export function getProperties(
-	opts: ClipProcessorOptions = {},
+	opts: ClipProcessorOptions | undefined = {},
 	sampleRate: number,
 ): Required<ClipProcessorOptions> {
 	const {

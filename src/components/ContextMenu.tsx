@@ -42,7 +42,7 @@ export function ContextMenu({
 	onMaxChange,
 	onMaxLockedChange,
 	onClose,
-}: ContextMenuProps) {
+}: ContextMenuProps): React.JSX.Element {
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	// Close on click outside or Escape

@@ -42,7 +42,7 @@ export const DEFAULT_TEMPO = 88;
 export const SAMPLE_RATE = 48000;
 
 /** 8 bars in seconds at DEFAULT_TEMPO (4/4 time). */
-export const DEFAULT_MAX_8_BARS = 8 * 4 * (60 / DEFAULT_TEMPO);
+export const DEFAULT_MAX_8_BARS: number = 8 * 4 * (60 / DEFAULT_TEMPO);
 
 export const controlDefs: ControlDef[] = [
 	{
@@ -244,7 +244,7 @@ const playheadDef: ControlDef = {
 	title: "Current sample position of buffer playback.",
 };
 
-export const allDefs = [
+export const allDefs: ControlDef[] = [
 	playheadDef,
 	...controlDefs,
 	...loopControlDefs,

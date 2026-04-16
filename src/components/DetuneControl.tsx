@@ -1,4 +1,11 @@
-import { memo, useCallback, useId, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -16,7 +23,7 @@ function DetuneControlInner({
 	enabled,
 	onChange,
 	onToggle,
-}: DetuneControlProps) {
+}: DetuneControlProps): React.JSX.Element {
 	const preset = presets.cents;
 	const min = preset.min ?? -2400;
 	const max = preset.max ?? 2400;
@@ -110,4 +117,5 @@ function DetuneControlInner({
 	);
 }
 
-export const DetuneControl = memo(DetuneControlInner);
+export const DetuneControl: NamedExoticComponent<DetuneControlProps> =
+	memo(DetuneControlInner);

@@ -1,4 +1,4 @@
-import { memo, useCallback, useId } from "react";
+import { memo, type NamedExoticComponent, useCallback, useId } from "react";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -24,7 +24,7 @@ function PlayheadSliderInner({
 	audioDuration,
 	disabled = false,
 	onChange,
-}: PlayheadSliderProps) {
+}: PlayheadSliderProps): React.JSX.Element {
 	const labelId = useId();
 	const maxSamples = audioDuration != null ? audioDuration * SAMPLE_RATE : 0;
 	const currentSeconds = value / SAMPLE_RATE;
@@ -60,4 +60,5 @@ function PlayheadSliderInner({
 	);
 }
 
-export const PlayheadSlider = memo(PlayheadSliderInner);
+export const PlayheadSlider: NamedExoticComponent<PlayheadSliderProps> =
+	memo(PlayheadSliderInner);

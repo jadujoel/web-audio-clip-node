@@ -1,4 +1,11 @@
-import { memo, useCallback, useId, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -16,7 +23,7 @@ function GainControlInner({
 	enabled,
 	onChange,
 	onToggle,
-}: GainControlProps) {
+}: GainControlProps): React.JSX.Element {
 	const preset = presets.gain;
 	const min = preset.min ?? -100;
 	const max = preset.max ?? 0;
@@ -109,4 +116,5 @@ function GainControlInner({
 	);
 }
 
-export const GainControl = memo(GainControlInner);
+export const GainControl: NamedExoticComponent<GainControlProps> =
+	memo(GainControlInner);

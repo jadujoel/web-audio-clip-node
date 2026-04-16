@@ -1,4 +1,11 @@
-import { memo, useCallback, useId, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -16,7 +23,7 @@ function PlaybackRateControlInner({
 	enabled,
 	onChange,
 	onToggle,
-}: PlaybackRateControlProps) {
+}: PlaybackRateControlProps): React.JSX.Element {
 	const preset = presets.playbackRate;
 	const min = preset.min ?? -4;
 	const max = preset.max ?? 4;
@@ -111,4 +118,5 @@ function PlaybackRateControlInner({
 	);
 }
 
-export const PlaybackRateControl = memo(PlaybackRateControlInner);
+export const PlaybackRateControl: NamedExoticComponent<PlaybackRateControlProps> =
+	memo(PlaybackRateControlInner);

@@ -33,9 +33,9 @@ export function bindMediaSession(
 	// --- Metadata ---
 	session.metadata = new MediaMetadata({
 		title: options?.title ?? "Unknown",
-		artist: options?.artist,
-		album: options?.album,
-		artwork: options?.artwork,
+		...(options?.artist !== undefined && { artist: options.artist }),
+		...(options?.album !== undefined && { album: options.album }),
+		...(options?.artwork !== undefined && { artwork: options.artwork }),
 	});
 
 	// --- Action handlers ---
@@ -118,9 +118,15 @@ export function bindMediaSession(
 		handleMetadata = (e) => {
 			session.metadata = new MediaMetadata({
 				title: e.metadata.title ?? options?.title ?? "Unknown",
-				artist: e.metadata.artist ?? options?.artist,
-				album: e.metadata.album ?? options?.album,
-				artwork: options?.artwork,
+				...(() => {
+					const v = e.metadata.artist ?? options?.artist;
+					return v !== undefined ? { artist: v } : {};
+				})(),
+				...(() => {
+					const v = e.metadata.album ?? options?.album;
+					return v !== undefined ? { album: v } : {};
+				})(),
+				...(options?.artwork !== undefined && { artwork: options.artwork }),
 			});
 		};
 		node.streamEvents.addEventListener("metadata", handleMetadata);

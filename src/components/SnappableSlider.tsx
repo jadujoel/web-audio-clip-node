@@ -9,9 +9,9 @@ export interface SnappableSliderProps {
 	min: number;
 	max: number;
 	value: number;
-	skew?: number;
-	step?: number;
-	defaultValue?: number;
+	skew?: number | undefined;
+	step?: number | undefined;
+	defaultValue?: number | undefined;
 	enableSnap?: boolean;
 	snaps?: number[];
 	ticks?: number[];
@@ -19,8 +19,8 @@ export interface SnappableSliderProps {
 	disabled?: boolean;
 	labelId?: string;
 	valueText?: string;
-	formatTick?: (value: number) => string;
-	onChange?: (value: number) => void;
+	formatTick?: ((value: number) => string) | undefined;
+	onChange?: ((value: number) => void) | undefined;
 }
 
 export function SnappableSlider({
@@ -39,7 +39,7 @@ export function SnappableSlider({
 	valueText,
 	formatTick,
 	onChange,
-}: SnappableSliderProps) {
+}: SnappableSliderProps): React.JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isDragging = useRef(false);
 	const isOptionKeyHeld = useRef(false);

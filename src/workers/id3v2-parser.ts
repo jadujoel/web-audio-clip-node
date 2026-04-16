@@ -73,15 +73,21 @@ export function parseId3v2(buf: Uint8Array): AudioMetadata | null {
 		const normalizedId = isV22 ? mapV22ToV23(frameId) : frameId;
 
 		switch (normalizedId) {
-			case "TIT2":
-				metadata.title = decodeTextFrame(frameData);
+			case "TIT2": {
+				const title = decodeTextFrame(frameData);
+				if (title !== undefined) metadata.title = title;
 				break;
-			case "TPE1":
-				metadata.artist = decodeTextFrame(frameData);
+			}
+			case "TPE1": {
+				const artist = decodeTextFrame(frameData);
+				if (artist !== undefined) metadata.artist = artist;
 				break;
-			case "TALB":
-				metadata.album = decodeTextFrame(frameData);
+			}
+			case "TALB": {
+				const album = decodeTextFrame(frameData);
+				if (album !== undefined) metadata.album = album;
 				break;
+			}
 			case "TRCK": {
 				const track = decodeTextFrame(frameData);
 				if (track) {
@@ -99,9 +105,11 @@ export function parseId3v2(buf: Uint8Array): AudioMetadata | null {
 				}
 				break;
 			}
-			case "TCON":
-				metadata.genre = decodeTextFrame(frameData);
+			case "TCON": {
+				const genre = decodeTextFrame(frameData);
+				if (genre !== undefined) metadata.genre = genre;
 				break;
+			}
 			case "APIC": {
 				const pic = parseApicFrame(frameData);
 				if (pic) metadata.picture = pic;

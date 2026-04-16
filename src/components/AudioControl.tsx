@@ -1,4 +1,12 @@
-import { memo, useCallback, useId, useMemo, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { generateSnapPoints, getSnappedValue, presets } from "../audio/utils";
 import { DEFAULT_TEMPO } from "../controls/controlDefs";
 import { formatTickLabel, formatValueText } from "../controls/formatValueText";
@@ -14,22 +22,22 @@ export interface AudioControlProps {
 	defaultValue?: number;
 	step?: number;
 	tempo?: number;
-	snap?: string;
-	preset?: string;
-	title?: string;
-	enabled?: boolean;
-	hasToggle?: boolean;
-	hasSnap?: boolean;
-	hasMaxLock?: boolean;
-	audioDuration?: number | null;
-	maxLocked?: boolean;
-	onChange?: (value: number) => void;
-	onToggle?: (enabled: boolean) => void;
-	onSnapChange?: (snap: string) => void;
-	onMinChange?: (val: number) => void;
-	onMaxChange?: (val: number) => void;
-	onMaxLockedChange?: (locked: boolean) => void;
-	forceDisabled?: boolean;
+	snap?: string | undefined;
+	preset?: string | undefined;
+	title?: string | undefined;
+	enabled?: boolean | undefined;
+	hasToggle?: boolean | undefined;
+	hasSnap?: boolean | undefined;
+	hasMaxLock?: boolean | undefined;
+	audioDuration?: number | null | undefined;
+	maxLocked?: boolean | undefined;
+	onChange?: ((value: number) => void) | undefined;
+	onToggle?: ((enabled: boolean) => void) | undefined;
+	onSnapChange?: ((snap: string) => void) | undefined;
+	onMinChange?: ((val: number) => void) | undefined;
+	onMaxChange?: ((val: number) => void) | undefined;
+	onMaxLockedChange?: ((locked: boolean) => void) | undefined;
+	forceDisabled?: boolean | undefined;
 }
 
 function AudioControlInner({
@@ -57,7 +65,7 @@ function AudioControlInner({
 	onMaxChange,
 	onMaxLockedChange,
 	forceDisabled = false,
-}: AudioControlProps) {
+}: AudioControlProps): React.JSX.Element {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editText, setEditText] = useState("");
 	const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -254,4 +262,7 @@ function areAudioControlPropsEqual(
 	);
 }
 
-export const AudioControl = memo(AudioControlInner, areAudioControlPropsEqual);
+export const AudioControl: NamedExoticComponent<AudioControlProps> = memo(
+	AudioControlInner,
+	areAudioControlPropsEqual,
+);

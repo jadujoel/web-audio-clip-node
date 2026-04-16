@@ -1,4 +1,11 @@
-import { memo, useCallback, useId, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -25,7 +32,7 @@ function FilterControlInner({
 	enabled,
 	onChange,
 	onToggle,
-}: FilterControlProps) {
+}: FilterControlProps): React.JSX.Element {
 	const preset = presets.hertz;
 	const min = preset.min ?? 32;
 	const max = preset.max ?? 16384;
@@ -118,4 +125,5 @@ function FilterControlInner({
 	);
 }
 
-export const FilterControl = memo(FilterControlInner);
+export const FilterControl: NamedExoticComponent<FilterControlProps> =
+	memo(FilterControlInner);

@@ -22,6 +22,30 @@ interface UseClipNodeParams {
 	defaultSoundUrl?: string;
 }
 
+export interface UseClipNodeReturn {
+	nodeState: ClipNodeState;
+	statusMessage: string | null;
+	soundName: string | null;
+	audioDuration: number | null;
+	infoCurrentTime: string;
+	infoCurrentFrame: string;
+	infoTimesLooped: string;
+	infoLatency: string;
+	infoTimeTaken: string;
+	start: () => Promise<void>;
+	stop: () => void;
+	pause: () => void;
+	resume: () => void;
+	dispose: () => void;
+	logState: () => void;
+	loadSound: () => void;
+	applyValue: (key: ControlKey, val: number) => void;
+	applyValues: (valuesToApply: Partial<Record<ControlKey, number>>) => void;
+	applyToggle: (key: ControlKey, on: boolean) => void;
+	setLoopOnNode: (checked: boolean) => void;
+	setLoopModeOnNode: (mode: LoopMode) => void;
+}
+
 export function useClipNode({
 	values,
 	enabled,
@@ -29,7 +53,7 @@ export function useClipNode({
 	loopMode,
 	setValue,
 	defaultSoundUrl,
-}: UseClipNodeParams) {
+}: UseClipNodeParams): UseClipNodeReturn {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 	const [soundName, setSoundName] = useState<string | null>(null);
@@ -323,5 +347,5 @@ export function useClipNode({
 		applyToggle: applyToggleToNode,
 		setLoopOnNode,
 		setLoopModeOnNode,
-	};
+	} satisfies UseClipNodeReturn;
 }

@@ -11,11 +11,13 @@ export function getProcessorBlobUrl(): string {
 }
 
 /** jsDelivr CDN URL. For script-tag / no-bundler usage. */
-export function getProcessorCdnUrl(version = PACKAGE_VERSION): string {
+export function getProcessorCdnUrl(version: string = PACKAGE_VERSION): string {
 	return `https://cdn.jsdelivr.net/npm/${PACKAGE_NAME}@${version}/dist/processor.js`;
 }
 
 /** Custom URL relative to a base. For self-hosted processor.js. */
-export function getProcessorModuleUrl(baseUrl = document.baseURI): string {
+export function getProcessorModuleUrl(
+	baseUrl: string = document.baseURI,
+): string {
 	return new URL("./processor.js", baseUrl).toString();
 }

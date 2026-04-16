@@ -1,4 +1,4 @@
-import { memo, useCallback, useId } from "react";
+import { memo, type NamedExoticComponent, useCallback, useId } from "react";
 import { SAMPLE_RATE } from "../controls/controlDefs";
 import { SnappableSlider } from "./SnappableSlider";
 import { buildStreamingPlayheadModel } from "./streamingPlayheadMath";
@@ -31,7 +31,7 @@ function StreamingPlayheadTimelineInner({
 	streamProgress,
 	disabled = false,
 	onChange,
-}: StreamingPlayheadTimelineProps) {
+}: StreamingPlayheadTimelineProps): React.JSX.Element {
 	const labelId = useId();
 	const currentSeconds = value / SAMPLE_RATE;
 	const durationSeconds = audioDuration ?? 0;
@@ -82,4 +82,5 @@ function StreamingPlayheadTimelineInner({
 	);
 }
 
-export const StreamingPlayheadTimeline = memo(StreamingPlayheadTimelineInner);
+export const StreamingPlayheadTimeline: NamedExoticComponent<StreamingPlayheadTimelineProps> =
+	memo(StreamingPlayheadTimelineInner);

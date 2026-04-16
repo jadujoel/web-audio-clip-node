@@ -24,7 +24,7 @@
 		"noImplicitAny": true,
 		"noImplicitOverride": true,
 		"noImplicitReturns": true,
-		"noImplicitThis": true,
+		"noImplicitThis": true
 	},
 	"include": ["src"]
 }

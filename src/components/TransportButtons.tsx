@@ -1,7 +1,7 @@
-import { memo } from "react";
+import { memo, type NamedExoticComponent } from "react";
 import type { ClipNodeState } from "../audio/types";
 
-interface TransportButtonsProps {
+export interface TransportButtonsProps {
 	nodeState: ClipNodeState;
 	onStart: () => void;
 	onStop: () => void;
@@ -12,7 +12,7 @@ interface TransportButtonsProps {
 	onLoadSound: () => void;
 }
 
-function TransportButtonsInner({
+export function TransportButtonsInner({
 	nodeState,
 	onStart,
 	onStop,
@@ -21,7 +21,7 @@ function TransportButtonsInner({
 	onDispose,
 	onLog,
 	onLoadSound,
-}: TransportButtonsProps) {
+}: TransportButtonsProps): React.JSX.Element {
 	const cantStop =
 		nodeState === "initial" ||
 		nodeState === "disposed" ||
@@ -78,4 +78,5 @@ function TransportButtonsInner({
 	);
 }
 
-export const TransportButtons = memo(TransportButtonsInner);
+export const TransportButtons: NamedExoticComponent<TransportButtonsProps> =
+	memo(TransportButtonsInner);

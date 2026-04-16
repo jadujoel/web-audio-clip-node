@@ -106,7 +106,7 @@ export class Coordinator {
 
 	static fromWorkerFactory(
 		workerFactory: (format: StreamFormat) => Worker | Promise<Worker>,
-	) {
+	): Coordinator {
 		const context = new AudioContext({
 			sampleRate: 48000,
 			latencyHint: "playback",

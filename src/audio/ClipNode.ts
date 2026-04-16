@@ -20,7 +20,7 @@ type Handler<K extends keyof ClipNodeEvents> = TypedEventListener<
 export class ClipNode extends AudioWorkletNode {
 	readonly events: TypedEventTarget<ClipNodeEvents>;
 
-	private _buffer?: AudioBuffer;
+	private _buffer: AudioBuffer | undefined;
 	private _loopStart = 0;
 	private _loopEnd = 0;
 	private _loop = false;
@@ -56,7 +56,7 @@ export class ClipNode extends AudioWorkletNode {
 		disposed: "Cannot use a disposed ClipNode",
 		noBuffer: "Buffer not set",
 		noData: "No decoded buffer data available",
-	} as const
+	} as const;
 
 	get onscheduled() {
 		return this.events.getCallback("scheduled");
@@ -181,14 +181,9 @@ export class ClipNode extends AudioWorkletNode {
 
 	constructor(context: BaseAudioContext, options: ClipWorkletOptions = {}) {
 		super(context, "ClipProcessor", {
+			...options,
 			numberOfInputs: options.numberOfInputs ?? 0,
 			outputChannelCount: options.outputChannelCount ?? [2],
-			processorOptions: options.processorOptions,
-			channelCount: options.channelCount,
-			channelCountMode: options.channelCountMode,
-			channelInterpretation: options.channelInterpretation,
-			numberOfOutputs: options.numberOfOutputs,
-			parameterData: options.parameterData,
 		});
 
 		this.events = this._createEvents();
@@ -338,40 +333,40 @@ export class ClipNode extends AudioWorkletNode {
 		}
 	}
 
-	toggleGain(value = true) {
+	toggleGain(value = true): void {
 		this.port.postMessage({ type: "toggleGain", data: value });
 	}
-	togglePlaybackRate(value = true) {
+	togglePlaybackRate(value = true): void {
 		this.port.postMessage({ type: "togglePlaybackRate", data: value });
 	}
-	toggleDetune(value = true) {
+	toggleDetune(value = true): void {
 		this.port.postMessage({ type: "toggleDetune", data: value });
 	}
-	togglePan(value = true) {
+	togglePan(value = true): void {
 		this.port.postMessage({ type: "togglePan", data: value });
 	}
-	toggleHighpass(value = true) {
+	toggleHighpass(value = true): void {
 		this.port.postMessage({ type: "toggleHighpass", data: value });
 	}
-	toggleLowpass(value = true) {
+	toggleLowpass(value = true): void {
 		this.port.postMessage({ type: "toggleLowpass", data: value });
 	}
-	toggleFadeIn(value = true) {
+	toggleFadeIn(value = true): void {
 		this.port.postMessage({ type: "toggleFadeIn", data: value });
 	}
-	toggleFadeOut(value = true) {
+	toggleFadeOut(value = true): void {
 		this.port.postMessage({ type: "toggleFadeOut", data: value });
 	}
-	toggleLoopCrossfade(value = true) {
+	toggleLoopCrossfade(value = true): void {
 		this.port.postMessage({ type: "toggleLoopCrossfade", data: value });
 	}
-	toggleLoopStart(value = true) {
+	toggleLoopStart(value = true): void {
 		this.port.postMessage({ type: "toggleLoopStart", data: value });
 	}
-	toggleLoopEnd(value = true) {
+	toggleLoopEnd(value = true): void {
 		this.port.postMessage({ type: "toggleLoopEnd", data: value });
 	}
-	logState() {
+	logState(): void {
 		this.port.postMessage({ type: "logState" });
 	}
 
@@ -402,7 +397,7 @@ export class ClipNode extends AudioWorkletNode {
 		}
 	}
 
-	transferPort(port: MessagePort) {
+	transferPort(port: MessagePort): void {
 		this._hasStreamingPort = true;
 		this.port.postMessage({ type: "transferPort", data: port }, [port]);
 	}
@@ -411,7 +406,7 @@ export class ClipNode extends AudioWorkletNode {
 		totalLength: number,
 		channels: number,
 		options: { streaming?: boolean } = {},
-	) {
+	): void {
 		this._buffer = this.context.createBuffer(
 			channels,
 			totalLength,
@@ -441,7 +436,7 @@ export class ClipNode extends AudioWorkletNode {
 		startSample: number,
 		channelData: Float32Array[],
 		options: { totalLength?: number | null; streamEnded?: boolean } = {},
-	) {
+	): void {
 		this.port.postMessage({
 			type: "bufferRange",
 			data: {
@@ -460,7 +455,7 @@ export class ClipNode extends AudioWorkletNode {
 	appendBufferRange(
 		channelData: Float32Array[],
 		options: { totalLength?: number | null; streamEnded?: boolean } = {},
-	) {
+	): void {
 		this.replaceBufferRange(this._bufferWriteCursor, channelData, options);
 	}
 
@@ -473,8 +468,7 @@ export class ClipNode extends AudioWorkletNode {
 		offset?: number,
 		duration?: number,
 	): Result<undefined, Error> {
-		if (this.isDisposed)
-			return err(new Error(ClipNode.ErrorMessages.disposed));
+		if (this.isDisposed) return err(new Error(ClipNode.ErrorMessages.disposed));
 		if (!this._buffer && !this._hasStreamingPort) {
 			return err(new Error(ClipNode.ErrorMessages.noBuffer));
 		}
@@ -692,7 +686,7 @@ export class ClipNode extends AudioWorkletNode {
 		);
 	}
 
-	dispose() {
+	dispose(): void {
 		if (this.state === "disposed") return;
 		if (this._pendingGetBuffer) {
 			this._pendingGetBuffer.reject(new Error("Node was disposed"));

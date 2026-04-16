@@ -2925,7 +2925,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 		const result = await resultAsync;
 		expect(result.isErr()).toBe(true);
 		if (result.isErr()) {
-			expect(result.error.message).toBe("No decoded buffer available");
+			expect(result.error.message).toBe("No decoded buffer data available");
 		}
 	});
 

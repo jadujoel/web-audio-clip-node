@@ -113,7 +113,7 @@ export class StreamingOpusDecoder {
 		});
 	}
 
-	setTotalBytes(totalBytes: number | null) {
+	setTotalBytes(totalBytes: number | null): void {
 		this.totalBytes = totalBytes;
 	}
 
@@ -179,7 +179,7 @@ export class StreamingOpusDecoder {
 		return ok(undefined);
 	}
 
-	async flush() {
+	async flush(): Promise<void> {
 		await this.decoder.flush();
 		// Flush any remaining batched frames at end-of-stream
 		const flushed = this.batcher.flush();
@@ -191,7 +191,7 @@ export class StreamingOpusDecoder {
 		}
 	}
 
-	close() {
+	close(): void {
 		try {
 			this.decoder.close();
 		} catch {
@@ -199,19 +199,19 @@ export class StreamingOpusDecoder {
 		}
 	}
 
-	get samplesDecoded() {
+	get samplesDecoded(): number {
 		return this.samplesDecodedCount;
 	}
 
-	get channels() {
+	get channels(): number {
 		return this.streamChannels;
 	}
 
-	get hasConfiguredDecoder() {
+	get hasConfiguredDecoder(): boolean {
 		return this.configured;
 	}
 
-	get hasDecodedPackets() {
+	get hasDecodedPackets(): boolean {
 		return this.decodedAnyPacket;
 	}
 

@@ -6,7 +6,7 @@ export function applyValueToClip(
 	node: ClipNode,
 	key: ControlKey,
 	value: number,
-) {
+): void {
 	switch (key) {
 		case "playhead":
 			node.playhead = value;
@@ -63,7 +63,7 @@ export function applyToggleToClip(
 	node: ClipNode,
 	key: ControlKey,
 	on: boolean,
-) {
+): void {
 	switch (key) {
 		case "fadeIn":
 			node.toggleFadeIn(on);

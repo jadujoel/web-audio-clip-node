@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create, type UseBoundStore } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LoopMode } from "../audio/types";
 import {
@@ -60,7 +60,9 @@ function searchParamsIncludes(key: string) {
 const defaults = buildDefaults();
 const linkedPairDefaults = buildLinkedControlPairDefaults();
 
-export const useClipControls = create<ClipControlsState>()(
+export const useClipControls: UseBoundStore<
+	import("zustand").StoreApi<ClipControlsState>
+> = create<ClipControlsState>()(
 	searchParamsIncludes("disable-state")
 		? (set) => ({
 				...defaults,

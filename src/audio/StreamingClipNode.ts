@@ -123,7 +123,7 @@ export class StreamingClipNode extends ClipNode {
 
 	constructor(
 		context: BaseAudioContext,
-		options: ClipWorkletOptions = {},
+		options: ClipWorkletOptions | undefined = {},
 		streamOptions: StreamingClipNodeOptions,
 	) {
 		super(context, options);
@@ -281,7 +281,7 @@ export class StreamingClipNode extends ClipNode {
 		this._controller.setUrl(value);
 	}
 
-	start(
+	override start(
 		when?: number,
 		offset?: number,
 		duration?: number,
@@ -293,7 +293,7 @@ export class StreamingClipNode extends ClipNode {
 		return ok(undefined);
 	}
 
-	stop(when?: number, initialDelay = 0): Result<undefined, Error> {
+	override stop(when?: number, initialDelay = 0): Result<undefined, Error> {
 		if (this.isDisposed) {
 			return err(new Error(ClipNode.ErrorMessages.disposed));
 		}
@@ -301,8 +301,10 @@ export class StreamingClipNode extends ClipNode {
 		return super.stop(when, initialDelay);
 	}
 
-	dispose(): void {
-		if (this.state === "disposed") return;
+	override dispose(): void {
+		if (this.state === "disposed") {
+			return;
+		}
 		this._controller.dispose();
 		super.dispose();
 	}

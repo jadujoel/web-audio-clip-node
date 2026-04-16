@@ -1,4 +1,11 @@
-import { memo, useCallback, useId, useRef, useState } from "react";
+import {
+	memo,
+	type NamedExoticComponent,
+	useCallback,
+	useId,
+	useRef,
+	useState,
+} from "react";
 import { presets } from "../audio/utils";
 import { SnappableSlider } from "./SnappableSlider";
 
@@ -22,7 +29,7 @@ function PanControlInner({
 	enabled,
 	onChange,
 	onToggle,
-}: PanControlProps) {
+}: PanControlProps): React.JSX.Element {
 	const preset = presets.pan;
 	const min = preset.min ?? -1;
 	const max = preset.max ?? 1;
@@ -115,4 +122,5 @@ function PanControlInner({
 	);
 }
 
-export const PanControl = memo(PanControlInner);
+export const PanControl: NamedExoticComponent<PanControlProps> =
+	memo(PanControlInner);

@@ -19,3 +19,4 @@ ignored
 lt.log
 AGENTS.md
 .vitest-attachments
+src/audio/__screenshots__

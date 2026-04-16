@@ -16,9 +16,9 @@ import type {
 } from "./types";
 
 export interface PendingStart {
-	when?: number;
-	offset?: number;
-	duration?: number;
+	when?: number | undefined;
+	offset?: number | undefined;
+	duration?: number | undefined;
 }
 
 /** Default pre-buffer: 1 second at 48 kHz. */
@@ -53,28 +53,30 @@ export interface StreamingClipNodeOptions {
 	defaultFormat: StreamFormat | null;
 	targetSampleRate: number;
 	/** Send decoded PCM chunks as int16 to cut transfer memory roughly in half. */
-	useInt16?: boolean;
+	useInt16?: boolean | undefined;
 	/** Injectable worker factory - used for testing without mocking globals. */
-	createWorker?: (format: StreamFormat) => Worker | Promise<Worker>;
+	createWorker?:
+		| ((format: StreamFormat) => Worker | Promise<Worker>)
+		| undefined;
 	/**
 	 * Minimum decoded samples before playback starts.
 	 * Prevents audible underruns when streaming over slow connections.
 	 * Defaults to 48 000 (~1 s at 48 kHz).
 	 */
-	preBufferSamples?: number;
+	preBufferSamples?: number | undefined;
 	/**
 	 * Controls when streaming data is fetched.
 	 * - "none": URL is stored but fetching is deferred until start()
 	 * - "metadata": Only a HEAD request is made to detect format/size; full fetch on start()
 	 * - "auto": Fetch starts immediately when URL is set (default)
 	 */
-	preload?: StreamPreload;
+	preload?: StreamPreload | undefined;
 	/** Pause fetch when decoded buffer is this many samples ahead of playhead.
 	 * Defaults to 48000 * 30 (30 seconds at 48 kHz). Set to 0 to disable. */
-	pauseFetchAheadSamples?: number;
+	pauseFetchAheadSamples?: number | undefined;
 	/** Resume fetch when decoded buffer drops to this many samples ahead.
 	 * Defaults to 48000 * 10 (10 seconds at 48 kHz). */
-	resumeFetchAheadSamples?: number;
+	resumeFetchAheadSamples?: number | undefined;
 	/** Retry configuration for network failures. Set to false to disable retry. */
 	retry?:
 		| {
@@ -83,23 +85,24 @@ export interface StreamingClipNodeOptions {
 				backoffMultiplier?: number;
 				maxRetryDelayMs?: number;
 		  }
-		| false;
+		| false
+		| undefined;
 	/**
 	 * Policy for handling gaps in decoded audio during streaming.
 	 * - "hold": Clamp playhead at committed edge.
 	 * - "silence": Advance playhead through gaps, outputting silence.
 	 */
-	gapPlaybackStrategy?: GapPlaybackStrategy;
+	gapPlaybackStrategy?: GapPlaybackStrategy | undefined;
 	/** Upfront target length in samples. */
-	targetNumSamples?: number;
+	targetNumSamples?: number | undefined;
 	/** Upfront target length in seconds. */
-	targetDuration?: number;
+	targetDuration?: number | undefined;
 	/** Number of samples to fade-in when transitioning from silence gap to real audio. */
-	gapRecoveryFadeSamples?: number;
+	gapRecoveryFadeSamples?: number | undefined;
 	/** AudioDecoder polyfill options for browsers without native WebCodecs support. */
-	polyfill?: AudioDecoderPolyfillOptions;
+	polyfill?: AudioDecoderPolyfillOptions | undefined;
 	/** Optional network throttling used by the streaming example and tests. */
-	throttle?: number;
+	throttle?: number | undefined;
 }
 
 export interface StreamControllerWorkerMessage {

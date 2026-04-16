@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type NamedExoticComponent } from "react";
 import type { ClipNodeState } from "../audio/types";
 
 interface DisplayPanelProps {
@@ -21,7 +21,7 @@ function DisplayPanelInner({
 	timesLooped,
 	latency,
 	timeTaken,
-}: DisplayPanelProps) {
+}: DisplayPanelProps): React.JSX.Element {
 	return (
 		<section id="display">
 			{statusMessage && (
@@ -49,4 +49,5 @@ function DisplayPanelInner({
 	);
 }
 
-export const DisplayPanel = memo(DisplayPanelInner);
+export const DisplayPanel: NamedExoticComponent<DisplayPanelProps> =
+	memo(DisplayPanelInner);

@@ -1,4 +1,4 @@
-import { memo, useId } from "react";
+import { memo, type NamedExoticComponent, useId } from "react";
 import type { ControlDef, ControlKey } from "../controls/controlDefs";
 import type {
 	LinkedControlPairDef,
@@ -9,7 +9,7 @@ import { AudioControl } from "./AudioControl";
 interface ControlSectionProps {
 	legend: string;
 	defs: ControlDef[];
-	disabledKeys?: Set<ControlKey>;
+	disabledKeys?: Set<ControlKey> | undefined;
 	values: Record<ControlKey, number>;
 	snaps: Record<ControlKey, string>;
 	enabled: Record<ControlKey, boolean>;
@@ -109,7 +109,7 @@ function ControlSectionInner({
 	linkedPairs,
 	onLinkedChange,
 	...controlProps
-}: ControlSectionProps) {
+}: ControlSectionProps): React.JSX.Element {
 	const sectionId = useId();
 	const { pairByFirst, pairedKeys } = buildPairMaps(linkedPairs);
 
@@ -216,7 +216,7 @@ function areControlSectionPropsEqual(
 	);
 }
 
-export const ControlSection = memo(
+export const ControlSection: NamedExoticComponent<ControlSectionProps> = memo(
 	ControlSectionInner,
 	areControlSectionPropsEqual,
 );

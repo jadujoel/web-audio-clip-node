@@ -176,7 +176,10 @@ export async function detectStreamFormatFromResponse(
 
 	// No definitive extension — try HEAD request for Content-Type
 	try {
-		const resp = await fetch(url, { method: "HEAD", signal });
+		const resp = await fetch(url, {
+			method: "HEAD",
+			...(signal != null && { signal }),
+		});
 		const ct = resp.headers.get("Content-Type");
 		if (ct) {
 			const mapped = formatFromContentType(ct);

@@ -35,7 +35,9 @@ function buildControlUpdates<T>(
 	) as Partial<Record<ControlKey, T>>;
 }
 
-export function App({ useClipNodeImpl = useClipNode }: AppProps = {}) {
+export function App({
+	useClipNodeImpl = useClipNode,
+}: AppProps = {}): React.JSX.Element {
 	const controls = useClipControls();
 	const node = useClipNodeImpl({
 		values: controls.values,
