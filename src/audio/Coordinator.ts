@@ -62,6 +62,8 @@ export interface CoordinatorStreamingOptions {
 	gapRecoveryFadeSamples?: number;
 	/** AudioDecoder polyfill options for browsers without native WebCodecs support. */
 	polyfill?: AudioDecoderPolyfillOptions;
+	/** Optional network throttling bytes/sec forwarded to the decode worker. */
+	throttle?: number;
 }
 
 export class Coordinator {
@@ -152,6 +154,7 @@ export class Coordinator {
 			targetDuration: streamingOptions?.targetDuration,
 			gapRecoveryFadeSamples: streamingOptions?.gapRecoveryFadeSamples,
 			polyfill: streamingOptions?.polyfill,
+			throttle: streamingOptions?.throttle,
 		});
 		this.nodes.add(node);
 		return node;

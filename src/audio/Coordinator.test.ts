@@ -197,6 +197,27 @@ describe("StreamingClipNode.url setter", () => {
 		expect(initMsg?.useInt16).toBe(true);
 	});
 
+	test("forwards throttle to the decode worker init message", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "./dist/audio/processor.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			throttle: 204_800,
+		});
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+
+		const worker = lastWorker;
+		const initMsg = worker.messages.find((m) => m.type === "init");
+		expect(initMsg).toBeDefined();
+		expect(initMsg?.throttle).toBe(204_800);
+	});
+
 	test("terminates previous worker when url is reassigned", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("./dist/audio/processor.js");
