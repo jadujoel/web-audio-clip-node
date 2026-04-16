@@ -52,13 +52,17 @@ describe("framed raw Opus transport", () => {
 			packetB,
 		);
 		const state = createFramedRawOpusStreamState();
-		const first = parseFramedRawOpusStream(bytes.slice(0, 20), state);
+		const firstResult = parseFramedRawOpusStream(bytes.slice(0, 20), state);
+		expect(firstResult.isOk()).toBe(true);
+		const first = firstResult._unsafeUnwrap();
 		expect(first.head).toBeNull();
 		expect(first.packets).toHaveLength(0);
-		const second = parseFramedRawOpusStream(
+		const secondResult = parseFramedRawOpusStream(
 			concatBytes(first.leftover, bytes.slice(20)),
 			state,
 		);
+		expect(secondResult.isOk()).toBe(true);
+		const second = secondResult._unsafeUnwrap();
 		expect(second.head?.channels).toBe(2);
 		expect(second.head?.preSkip).toBe(312);
 		expect(second.packets).toEqual([packetA, packetB]);
@@ -67,8 +71,10 @@ describe("framed raw Opus transport", () => {
 
 	it("rejects streams with the wrong magic header", () => {
 		const state = createFramedRawOpusStreamState();
-		expect(() =>
-			parseFramedRawOpusStream(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]), state),
-		).toThrow(/FROPUS01/);
+		const result = parseFramedRawOpusStream(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]), state);
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toMatch(/FROPUS01/);
+		}
 	});
 });

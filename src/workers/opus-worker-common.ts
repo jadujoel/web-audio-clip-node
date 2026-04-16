@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "neverthrow";
 import {
 	estimateTotalSamplesFromContentLength,
 	FrameBatcher,
@@ -116,9 +117,12 @@ export class StreamingOpusDecoder {
 		this.totalBytes = totalBytes;
 	}
 
-	async configure(head: OpusHead, bitstreamFormat: "ogg" | "opus") {
+	async configure(
+		head: OpusHead,
+		bitstreamFormat: "ogg" | "opus",
+	): Promise<Result<void, Error>> {
 		if (head.channels <= 0) {
-			throw new Error("Opus stream contains invalid channel count");
+			return err(new Error("Opus stream contains invalid channel count"));
 		}
 		this.streamChannels = head.channels;
 		this.preSkipSourceSamples = head.preSkip;
@@ -144,22 +148,25 @@ export class StreamingOpusDecoder {
 		};
 		const support = await AudioDecoder.isConfigSupported(config);
 		if (!support.supported) {
-			throw new Error(
-				`Unsupported Opus decoder config: ${JSON.stringify({
-					codec: config.codec,
-					sampleRate: config.sampleRate,
-					numberOfChannels: config.numberOfChannels,
-					descriptionLength: head.description.length,
-				})}`,
+			return err(
+				new Error(
+					`Unsupported Opus decoder config: ${JSON.stringify({
+						codec: config.codec,
+						sampleRate: config.sampleRate,
+						numberOfChannels: config.numberOfChannels,
+						descriptionLength: head.description.length,
+					})}`,
+				),
 			);
 		}
 		this.decoder.configure(config);
 		this.configured = true;
+		return ok(undefined);
 	}
 
-	decodePacket(packet: Uint8Array, timestampUs: number) {
+	decodePacket(packet: Uint8Array, timestampUs: number): Result<void, Error> {
 		if (!this.configured) {
-			throw new Error("Decoder is not configured for Opus stream");
+			return err(new Error("Decoder is not configured for Opus stream"));
 		}
 		this.decoder.decode(
 			new EncodedAudioChunk({
@@ -169,6 +176,7 @@ export class StreamingOpusDecoder {
 			}),
 		);
 		this.decodedAnyPacket = true;
+		return ok(undefined);
 	}
 
 	async flush() {

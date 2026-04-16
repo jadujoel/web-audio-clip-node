@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "neverthrow";
 import {
 	createFallbackOpusHead,
 	type OpusHead,
@@ -291,14 +292,14 @@ function parseBlockFrames(
 	return frames;
 }
 
-function parseBlock(data: Uint8Array): ParsedBlock {
+function parseBlock(data: Uint8Array): Result<ParsedBlock, Error> {
 	const track = readVint(data, 0, false);
 	if (!track) {
-		throw new Error("Invalid WebM block: missing track number");
+		return err(new Error("Invalid WebM block: missing track number"));
 	}
 	let cursor = track.length;
 	if (data.length < cursor + 3) {
-		throw new Error("Invalid WebM block: truncated header");
+		return err(new Error("Invalid WebM block: truncated header"));
 	}
 	let timecode = ((data[cursor] ?? 0) << 8) | (data[cursor + 1] ?? 0);
 	if (timecode & 0x8000) {
@@ -308,11 +309,11 @@ function parseBlock(data: Uint8Array): ParsedBlock {
 	const flags = data[cursor++] ?? 0;
 	const lacing = (flags >> 1) & 0x03;
 	const frames = parseBlockFrames(data.subarray(cursor), lacing);
-	return {
+	return ok({
 		trackNumber: track.value,
 		timecode,
 		frames,
-	};
+	});
 }
 
 function parseWebmElements(
@@ -454,7 +455,9 @@ export function processWebmOpusElements(
 			state.activeTrack != null &&
 			(element.name === "SimpleBlock" || element.name === "Block")
 		) {
-			const block = parseBlock(element.data);
+			const blockResult = parseBlock(element.data);
+			if (blockResult.isErr()) continue;
+			const block = blockResult.value;
 			if (block.trackNumber !== state.activeTrack.trackNumber) {
 				continue;
 			}

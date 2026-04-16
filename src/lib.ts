@@ -1,5 +1,8 @@
 import "./polyfills";
 
+// Re-export Result types for consumers
+export type { Result, ResultAsync } from "neverthrow";
+
 // Core audio
 export { ClipNode } from "./audio/ClipNode";
 export { Coordinator } from "./audio/Coordinator";

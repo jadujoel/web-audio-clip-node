@@ -10,7 +10,21 @@
 		"forceConsistentCasingInFileNames": true,
 		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"types": ["bun-types"],
-		"noEmit": true
+		"noEmit": true,
+		"strictFunctionTypes": true,
+		"verbatimModuleSyntax": true,
+		"alwaysStrict": true,
+		"strictNullChecks": true,
+		"rewriteRelativeImportExtensions": true,
+		"allowImportingTsExtensions": true,
+		"exactOptionalPropertyTypes": true,
+		"isolatedDeclarations": true,
+		"isolatedModules": true,
+		"declaration": true,
+		"noImplicitAny": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
 	},
 	"include": ["src"]
 }

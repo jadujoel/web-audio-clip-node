@@ -3,6 +3,7 @@ import type {
 	TypedEventListener,
 } from "@jadujoel/typed-event-target";
 import { TypedEventTarget } from "@jadujoel/typed-event-target";
+import { err, ok, type Result } from "neverthrow";
 import { ClipNode } from "./ClipNode";
 import type { StreamingClipNodeOptions } from "./ClipStreamController";
 import { ClipStreamController } from "./ClipStreamController";
@@ -186,7 +187,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set gapPlaybackStrategy(value: GapPlaybackStrategy) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.gapPlaybackStrategy = value;
 	}
 
@@ -195,7 +196,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set targetNumSamples(value: number | undefined) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.targetNumSamples = value;
 	}
 
@@ -204,7 +205,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set targetDuration(value: number | undefined) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.targetDuration = value;
 	}
 
@@ -213,7 +214,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set gapRecoveryFadeSamples(value: number) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.gapRecoveryFadeSamples = value;
 	}
 
@@ -226,7 +227,7 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set throttle(value: number) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.throttle = value;
 	}
 
@@ -276,21 +277,28 @@ export class StreamingClipNode extends ClipNode {
 	}
 
 	set url(value: string) {
-		this.throwIfDisposed();
+		if (this.isDisposed) return;
 		this._controller.setUrl(value);
 	}
 
-	start(when?: number, offset?: number, duration?: number): undefined | never{
-		this.throwIfDisposed();
+	start(
+		when?: number,
+		offset?: number,
+		duration?: number,
+	): Result<undefined, Error> {
+		if (this.isDisposed) {
+			return err(new Error(ClipNode.ErrorMessages.disposed));
+		}
 		this._controller.start(when, offset, duration);
-		return undefined;
+		return ok(undefined);
 	}
 
-	stop(when?: number, initialDelay = 0): undefined | never {
-		this.throwIfDisposed();
+	stop(when?: number, initialDelay = 0): Result<undefined, Error> {
+		if (this.isDisposed) {
+			return err(new Error(ClipNode.ErrorMessages.disposed));
+		}
 		this._controller.stop();
-		super.stop(when, initialDelay);
-		return undefined;
+		return super.stop(when, initialDelay);
 	}
 
 	dispose(): void {

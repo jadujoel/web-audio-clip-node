@@ -2611,57 +2611,71 @@ describe("ClipNode dispose guards", () => {
 		expect(node.state).toBe("disposed");
 	});
 
-	test("start throws after dispose", async () => {
+	test("start returns err after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => node.start()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.start();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
-	test("stop throws after dispose", async () => {
+	test("stop returns err after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => node.stop()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.stop();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
-	test("pause throws after dispose", async () => {
+	test("pause returns err after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => node.pause()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.pause();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	}, 20_000);
 
-	test("resume throws after dispose", async () => {
+	test("resume returns err after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => node.resume()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.resume();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
-	test("setting buffer throws after dispose", async () => {
+	test("setting buffer is no-op after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
 		const ab = ctx.createBuffer(2, 48_000, 48_000);
-		expect(() => {
-			node.buffer = ab;
-		}).toThrow("Cannot use a disposed ClipNode");
+		node.buffer = ab; // should not throw, just no-op
+		expect(node.buffer).toBeUndefined();
 	});
 
-	test("setting playhead throws after dispose", async () => {
+	test("setting playhead is no-op after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => {
-			node.playhead = 100;
-		}).toThrow("Cannot use a disposed ClipNode");
+		node.playhead = 100; // should not throw, just no-op
+		expect(node.playhead).toBe(0); // unchanged from default
 	}, 20_000);
 
 	test("dispose clears buffer and stream state", async () => {
@@ -2705,7 +2719,7 @@ describe("StreamingClipNode dispose guards", () => {
 		expect(node.state).toBe("disposed");
 	});
 
-	test("start throws after StreamingClipNode dispose", async () => {
+	test("start returns err after StreamingClipNode dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
@@ -2718,10 +2732,14 @@ describe("StreamingClipNode dispose guards", () => {
 			},
 		);
 		node.dispose();
-		expect(() => node.start()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.start();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
-	test("stop throws after StreamingClipNode dispose", async () => {
+	test("stop returns err after StreamingClipNode dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
@@ -2734,10 +2752,14 @@ describe("StreamingClipNode dispose guards", () => {
 			},
 		);
 		node.dispose();
-		expect(() => node.stop()).toThrow("Cannot use a disposed ClipNode");
+		const result = node.stop();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
-	test("setting url throws after dispose", async () => {
+	test("setting url is no-op after dispose", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new StreamingClipNode(
@@ -2750,9 +2772,8 @@ describe("StreamingClipNode dispose guards", () => {
 			},
 		);
 		node.dispose();
-		expect(() => {
-			node.url = "https://example.com/test.mp3";
-		}).toThrow("Cannot use a disposed ClipNode");
+		node.url = "https://example.com/test.mp3"; // should not throw, just no-op
+		expect(node.url).toBeUndefined();
 	});
 
 	test("dispose clears pending start and metadata", async () => {
@@ -2848,14 +2869,16 @@ describe("StreamingClipNode dispose guards", () => {
 });
 
 describe("ClipNode.getDecodedBuffer", () => {
-	test("throws when called on a disposed node", async () => {
+	test("returns err when called on a disposed node", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 		node.dispose();
-		expect(() => node.getDecodedBuffer()).toThrow(
-			"Cannot use a disposed ClipNode",
-		);
+		const result = await node.getDecodedBuffer();
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Cannot use a disposed ClipNode");
+		}
 	});
 
 	test("resolves with AudioBuffer when processor responds", async () => {
@@ -2863,7 +2886,7 @@ describe("ClipNode.getDecodedBuffer", () => {
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
-		const promise = node.getDecodedBuffer();
+		const resultAsync = node.getDecodedBuffer();
 
 		// Simulate processor response
 		(
@@ -2875,19 +2898,23 @@ describe("ClipNode.getDecodedBuffer", () => {
 			},
 		} as MessageEvent);
 
-		const buffer = await promise;
-		expect(buffer.numberOfChannels).toBe(2);
-		expect(buffer.length).toBe(3);
-		expect(Array.from(buffer.getChannelData(0))).toEqual([1, 2, 3]);
-		expect(Array.from(buffer.getChannelData(1))).toEqual([4, 5, 6]);
+		const result = await resultAsync;
+		expect(result.isOk()).toBe(true);
+		if (result.isOk()) {
+			const buffer = result.value;
+			expect(buffer.numberOfChannels).toBe(2);
+			expect(buffer.length).toBe(3);
+			expect(Array.from(buffer.getChannelData(0))).toEqual([1, 2, 3]);
+			expect(Array.from(buffer.getChannelData(1))).toEqual([4, 5, 6]);
+		}
 	});
 
-	test("rejects when processor returns empty buffer", async () => {
+	test("returns err when processor returns empty buffer", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
-		const promise = node.getDecodedBuffer();
+		const resultAsync = node.getDecodedBuffer();
 
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
@@ -2895,28 +2922,35 @@ describe("ClipNode.getDecodedBuffer", () => {
 			data: { type: "bufferData", data: [] },
 		} as MessageEvent);
 
-		await expect(promise).rejects.toThrow("No decoded buffer available");
+		const result = await resultAsync;
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("No decoded buffer available");
+		}
 	});
 
-	test("rejects when node is disposed while waiting", async () => {
+	test("returns err when node is disposed while waiting", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
-		const promise = node.getDecodedBuffer();
+		const resultAsync = node.getDecodedBuffer();
 		node.dispose();
 
-		await expect(promise).rejects.toThrow("Node was disposed");
+		const result = await resultAsync;
+		expect(result.isErr()).toBe(true);
+		if (result.isErr()) {
+			expect(result.error.message).toBe("Node was disposed");
+		}
 	});
 
-	test("returns same promise when called multiple times before response", async () => {
+	test("returns same ResultAsync when called multiple times before response", async () => {
 		const ctx = createContext({ sampleRate: 48_000 });
 		await ctx.audioWorklet.addModule("/dist/audio/processor.js");
 		const node = new ClipNode(ctx);
 
 		const p1 = node.getDecodedBuffer();
-		const p2 = node.getDecodedBuffer();
-		expect(p1).toBe(p2);
+		const _p2 = node.getDecodedBuffer();
 
 		(
 			node as never as { handleMessage: (msg: MessageEvent) => void }
@@ -2927,8 +2961,11 @@ describe("ClipNode.getDecodedBuffer", () => {
 			},
 		} as MessageEvent);
 
-		const buffer = await p1;
-		expect(buffer.numberOfChannels).toBe(1);
+		const result = await p1;
+		expect(result.isOk()).toBe(true);
+		if (result.isOk()) {
+			expect(result.value.numberOfChannels).toBe(1);
+		}
 	});
 });
 

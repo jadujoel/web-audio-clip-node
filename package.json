@@ -109,6 +109,7 @@
 		"access": "public"
 	},
 	"dependencies": {
-		"@jadujoel/typed-event-target": "0.0.6"
+		"@jadujoel/typed-event-target": "0.0.6",
+		"neverthrow": "8.2.0"
 	}
 }

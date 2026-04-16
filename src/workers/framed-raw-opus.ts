@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "neverthrow";
 import { type OpusHead, parseOpusHead } from "./opus-worker-common";
 
 export const FRAMED_RAW_OPUS_MAGIC = "FROPUS01";
@@ -35,21 +36,23 @@ function readUint32LE(buf: Uint8Array, offset: number): number {
 export function parseFramedRawOpusStream(
 	buf: Uint8Array<ArrayBufferLike>,
 	state: FramedRawOpusStreamState,
-): FramedRawOpusParseResult {
+): Result<FramedRawOpusParseResult, Error> {
 	let cursor = 0;
 	if (!state.headerParsed) {
 		const headerLength = magicBytes.length + 4;
 		if (buf.length < headerLength) {
-			return {
+			return ok({
 				packets: [],
 				leftover: buf,
 				head: state.head,
-			};
+			});
 		}
 		for (let i = 0; i < magicBytes.length; i++) {
 			if (buf[i] !== magicBytes[i]) {
-				throw new Error(
-					`Expected ${FRAMED_RAW_OPUS_MAGIC} header for framed raw Opus transport`,
+				return err(
+					new Error(
+						`Expected ${FRAMED_RAW_OPUS_MAGIC} header for framed raw Opus transport`,
+					),
 				);
 			}
 		}
@@ -57,17 +60,17 @@ export function parseFramedRawOpusStream(
 		const opusHeadStart = headerLength;
 		const opusHeadEnd = opusHeadStart + opusHeadLength;
 		if (buf.length < opusHeadEnd) {
-			return {
+			return ok({
 				packets: [],
 				leftover: buf,
 				head: state.head,
-			};
+			});
 		}
 		const headPacket = buf.slice(opusHeadStart, opusHeadEnd);
 		const head = parseOpusHead(headPacket);
 		if (!head) {
-			throw new Error(
-				"Framed raw Opus stream is missing a valid OpusHead packet",
+			return err(
+				new Error("Framed raw Opus stream is missing a valid OpusHead packet"),
 			);
 		}
 		state.headerParsed = true;
@@ -87,9 +90,9 @@ export function parseFramedRawOpusStream(
 		cursor = packetEnd;
 	}
 
-	return {
+	return ok({
 		packets,
 		leftover: buf.slice(cursor),
 		head: state.head,
-	};
+	});
 }

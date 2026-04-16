@@ -4,6 +4,7 @@
 // @ts-expect-error redeclare self as DedicatedWorkerGlobalScope
 declare const self: DedicatedWorkerGlobalScope;
 
+import { err, ok, type Result } from "neverthrow";
 import { parseVorbisIdentification } from "./vorbis-utils";
 import {
 	BackpressureGate,
@@ -221,26 +222,29 @@ function parseBlockFrames(payload: Uint8Array, lacing: number): Uint8Array[] {
 	return frames;
 }
 
-function parseBlock(data: Uint8Array): {
-	trackNumber: number;
-	timecode: number;
-	frames: Uint8Array[];
-} {
+function parseBlock(data: Uint8Array): Result<
+	{
+		trackNumber: number;
+		timecode: number;
+		frames: Uint8Array[];
+	},
+	Error
+> {
 	const track = readVint(data, 0, false);
-	if (!track) throw new Error("Invalid WebM block: missing track number");
+	if (!track) return err(new Error("Invalid WebM block: missing track number"));
 	let cursor = track.length;
 	if (data.length < cursor + 3)
-		throw new Error("Invalid WebM block: truncated header");
+		return err(new Error("Invalid WebM block: truncated header"));
 	let timecode = ((data[cursor] ?? 0) << 8) | (data[cursor + 1] ?? 0);
 	if (timecode & 0x8000) timecode -= 0x10000;
 	cursor += 2;
 	const flags = data[cursor++] ?? 0;
 	const lacing = (flags >> 1) & 0x03;
-	return {
+	return ok({
 		trackNumber: track.value,
 		timecode,
 		frames: parseBlockFrames(data.subarray(cursor), lacing),
-	};
+	});
 }
 
 function drainCompletedMasters(
@@ -395,7 +399,9 @@ function processElements(
 			state.activeTrack != null &&
 			(el.name === "SimpleBlock" || el.name === "Block")
 		) {
-			const block = parseBlock(el.data);
+			const blockResult = parseBlock(el.data);
+			if (blockResult.isErr()) continue;
+			const block = blockResult.value;
 			if (block.trackNumber !== state.activeTrack.trackNumber) continue;
 			const baseTimestampUs = Math.max(
 				0,

@@ -142,7 +142,18 @@ async function startStreaming(
 
 		// When seeking, use cached opus head to configure decoder immediately
 		if (isSeeking && cachedOpusHead) {
-			await streamDecoder.configure(cachedOpusHead, "opus");
+			const configResult = await streamDecoder.configure(
+				cachedOpusHead,
+				"opus",
+			);
+			if (configResult.isErr()) {
+				self.postMessage({
+					type: "error",
+					code: "DECODE",
+					message: configResult.error.message,
+				});
+				return;
+			}
 		}
 
 		const body =
@@ -160,30 +171,91 @@ async function startStreaming(
 			self.postMessage({ type: "progress", bytesReceived, totalBytes });
 
 			const combined = leftover.length > 0 ? concat(leftover, value) : value;
-			const parsed = parseFramedRawOpusStream(combined, parserState);
+			const parsedResult = parseFramedRawOpusStream(combined, parserState);
+			if (parsedResult.isErr()) {
+				self.postMessage({
+					type: "error",
+					code: "DECODE",
+					message: parsedResult.error.message,
+				});
+				return;
+			}
+			const parsed = parsedResult.value;
 			leftover = parsed.leftover;
 
 			if (parsed.head != null && !streamDecoder.hasConfiguredDecoder) {
 				cachedOpusHead = parsed.head;
-				await streamDecoder.configure(parsed.head, "opus");
+				const configResult = await streamDecoder.configure(parsed.head, "opus");
+				if (configResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: configResult.error.message,
+					});
+					return;
+				}
 			}
 
 			for (const packet of parsed.packets) {
-				streamDecoder.decodePacket(packet, packetTimestampUs);
+				const decodeResult = streamDecoder.decodePacket(
+					packet,
+					packetTimestampUs,
+				);
+				if (decodeResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: decodeResult.error.message,
+					});
+					return;
+				}
 				packetTimestampUs += 1;
 			}
 		}
 
 		if (leftover.length > 0) {
-			const parsed = parseFramedRawOpusStream(leftover, parserState);
+			const parsedResult = parseFramedRawOpusStream(leftover, parserState);
+			if (parsedResult.isErr()) {
+				self.postMessage({
+					type: "error",
+					code: "DECODE",
+					message: parsedResult.error.message,
+				});
+				return;
+			}
+			const parsed = parsedResult.value;
 			if (parsed.leftover.length > 0) {
-				throw new Error("Framed raw Opus stream ended with a partial packet");
+				self.postMessage({
+					type: "error",
+					code: "DECODE",
+					message: "Framed raw Opus stream ended with a partial packet",
+				});
+				return;
 			}
 			if (parsed.head != null && !streamDecoder.hasConfiguredDecoder) {
-				await streamDecoder.configure(parsed.head, "opus");
+				const configResult = await streamDecoder.configure(parsed.head, "opus");
+				if (configResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: configResult.error.message,
+					});
+					return;
+				}
 			}
 			for (const packet of parsed.packets) {
-				streamDecoder.decodePacket(packet, packetTimestampUs);
+				const decodeResult = streamDecoder.decodePacket(
+					packet,
+					packetTimestampUs,
+				);
+				if (decodeResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: decodeResult.error.message,
+					});
+					return;
+				}
 				packetTimestampUs += 1;
 			}
 		}

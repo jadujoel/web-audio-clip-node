@@ -133,7 +133,18 @@ async function startStreaming(
 
 		// When seeking, use cached opus head to configure decoder immediately
 		if (isSeeking && cachedOpusHead) {
-			await streamDecoder.configure(cachedOpusHead, "opus");
+			const configResult = await streamDecoder.configure(
+				cachedOpusHead,
+				"opus",
+			);
+			if (configResult.isErr()) {
+				self.postMessage({
+					type: "error",
+					code: "DECODE",
+					message: configResult.error.message,
+				});
+				return;
+			}
 		}
 
 		const body =
@@ -153,10 +164,29 @@ async function startStreaming(
 			const parsed = appendWebmOpusBytes(value, parserState);
 			if (parsed.head != null && !streamDecoder.hasConfiguredDecoder) {
 				cachedOpusHead = parsed.head;
-				await streamDecoder.configure(parsed.head, "opus");
+				const configResult = await streamDecoder.configure(parsed.head, "opus");
+				if (configResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: configResult.error.message,
+					});
+					return;
+				}
 			}
 			for (const packet of parsed.packets) {
-				streamDecoder.decodePacket(packet.packet, packet.timestampUs);
+				const decodeResult = streamDecoder.decodePacket(
+					packet.packet,
+					packet.timestampUs,
+				);
+				if (decodeResult.isErr()) {
+					self.postMessage({
+						type: "error",
+						code: "DECODE",
+						message: decodeResult.error.message,
+					});
+					return;
+				}
 			}
 		}
 
