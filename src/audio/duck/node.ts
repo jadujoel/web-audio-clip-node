@@ -1,3 +1,5 @@
+import type { DuckNodeParameterNames } from "./processor";
+
 export interface DuckNodeOptions {
 	/** Trigger level above which ducking activates (0–1). Default 0.01. */
 	threshold?: number;
@@ -22,7 +24,12 @@ export interface DuckNodeOptions {
  * ```
  */
 export class DuckNode extends AudioWorkletNode {
-	readonly sidechainInput: GainNode;
+	readonly sidechain: GainNode;
+	override readonly parameters: ReadonlyMap<
+		DuckNodeParameterNames,
+		AudioParam
+	> = super.parameters as ReadonlyMap<DuckNodeParameterNames, AudioParam>;
+	private _bypass = false;
 
 	constructor(context: BaseAudioContext, options: DuckNodeOptions = {}) {
 		super(context, "DuckProcessor", {
@@ -30,39 +37,48 @@ export class DuckNode extends AudioWorkletNode {
 			numberOfOutputs: 1,
 			outputChannelCount: [2],
 			parameterData: {
-				...(options.threshold !== undefined && {
-					threshold: options.threshold,
-				}),
-				...(options.attack !== undefined && { attack: options.attack }),
-				...(options.release !== undefined && { release: options.release }),
-				...(options.depth !== undefined && { depth: options.depth }),
+				...options,
 			},
 		});
 
 		// A pass-through GainNode routed to the worklet's second input.
 		// Users connect their sidechain signal to this node.
-		this.sidechainInput = new GainNode(context);
-		this.sidechainInput.connect(this, 0, 1);
+		this.sidechain = new GainNode(context);
+		this.sidechain.connect(this, 0, 1);
 	}
 
 	get threshold(): AudioParam {
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
 		return this.parameters.get("threshold")!;
 	}
 
 	get attack(): AudioParam {
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
 		return this.parameters.get("attack")!;
 	}
 
 	get release(): AudioParam {
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
 		return this.parameters.get("release")!;
 	}
 
 	get depth(): AudioParam {
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
 		return this.parameters.get("depth")!;
 	}
 
+	get bypass() {
+		return this._bypass;
+	}
+	set bypass(value: boolean) {
+		if (this._bypass !== value) {
+			this._bypass = value;
+			this.port.postMessage({ type: "bypass", value });
+		}
+	}
+
 	dispose(): void {
-		this.sidechainInput.disconnect();
+		this.sidechain.disconnect();
 		this.port.postMessage({ type: "dispose" });
 		this.disconnect();
 	}

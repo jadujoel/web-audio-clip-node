@@ -37,11 +37,27 @@ export function processDuckBlock(
 		depth: Float32Array;
 	},
 	sr: number,
+	bypass = false,
 ): void {
 	const blockSize = output[0]?.length ?? 0;
 	if (blockSize === 0) return;
 
 	const numChannels = Math.min(mainInput.length, output.length);
+
+	// Bypass: copy main input straight to output
+	if (bypass) {
+		for (let ch = 0; ch < numChannels; ch++) {
+			output[ch]!.set(mainInput[ch]!);
+		}
+		for (let ch = numChannels; ch < output.length; ch++) {
+			output[ch]!.fill(0);
+		}
+		// Reset state so ducking starts clean when re-enabled
+		state.envelope = 0;
+		state.smoothedGain = 1;
+		return;
+	}
+
 	const hasSidechain = sidechain.length > 0 && (sidechain[0]?.length ?? 0) > 0;
 
 	let { envelope, smoothedGain } = state;

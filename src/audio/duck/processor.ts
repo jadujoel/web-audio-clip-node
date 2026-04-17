@@ -1,6 +1,13 @@
 // AudioWorklet processor for sidechain ducking — runs in AudioWorkletGlobalScope
 // Bundled separately and served alongside the main processor.
 // DSP logic lives in duck-processor-kernel.ts
+import { createDuckProcessorState, processDuckBlock } from "./kernel";
+
+export type DuckNodeParameterNames =
+	| "threshold"
+	| "attack"
+	| "release"
+	| "depth";
 
 declare const sampleRate: number;
 declare class AudioWorkletProcessor {
@@ -9,7 +16,7 @@ declare class AudioWorkletProcessor {
 	process(
 		inputs: Float32Array[][],
 		outputs: Float32Array[][],
-		parameters: Record<string, Float32Array>,
+		parameters: Record<DuckNodeParameterNames, Float32Array>,
 	): boolean;
 }
 
@@ -17,8 +24,6 @@ declare function registerProcessor(
 	name: string,
 	ctor: new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor,
 ): void;
-
-import { createDuckProcessorState, processDuckBlock } from "./kernel";
 
 class DuckProcessor extends AudioWorkletProcessor {
 	static get parameterDescriptors() {
@@ -51,11 +56,12 @@ class DuckProcessor extends AudioWorkletProcessor {
 				minValue: 0,
 				maxValue: 1,
 			},
-		];
+		] as const;
 	}
 
 	private state = createDuckProcessorState();
 	private disposed = false;
+	private bypassed = false;
 
 	constructor(options?: AudioWorkletNodeOptions) {
 		super(options);
@@ -63,6 +69,8 @@ class DuckProcessor extends AudioWorkletProcessor {
 			if (ev.data?.type === "dispose") {
 				this.disposed = true;
 				this.port.close();
+			} else if (ev.data?.type === "bypass") {
+				this.bypassed = ev.data.value;
 			}
 		};
 	}
@@ -70,7 +78,7 @@ class DuckProcessor extends AudioWorkletProcessor {
 	override process(
 		inputs: Float32Array[][],
 		outputs: Float32Array[][],
-		parameters: Record<string, Float32Array>,
+		parameters: Readonly<Record<DuckNodeParameterNames, Float32Array>>,
 	): boolean {
 		if (this.disposed) return false;
 
@@ -84,12 +92,13 @@ class DuckProcessor extends AudioWorkletProcessor {
 			sidechain,
 			output,
 			{
-				threshold: parameters.threshold!,
-				attack: parameters.attack!,
-				release: parameters.release!,
-				depth: parameters.depth!,
+				threshold: parameters.threshold,
+				attack: parameters.attack,
+				release: parameters.release,
+				depth: parameters.depth,
 			},
 			sampleRate,
+			this.bypassed,
 		);
 
 		return true;

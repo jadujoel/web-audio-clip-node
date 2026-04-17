@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoopMode } from "./audio/clip/types";
+import type { DuckNodeOptions } from "./audio/duck/node";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
 import { ControlSection } from "./components/ControlSection";
 import { DetuneControl } from "./components/DetuneControl";
 import { DisplayPanel } from "./components/DisplayPanel";
+import { DuckControl } from "./components/DuckControl";
 import { FilterControl } from "./components/FilterControl";
 import { GainControl } from "./components/GainControl";
 import { PanControl } from "./components/PanControl";
@@ -20,6 +22,11 @@ import {
 	transportLinkedControlPairs,
 } from "./controls/linkedControlPairs";
 import { useClipNode } from "./hooks/useClipNode";
+import {
+	type DuckParams,
+	defaultDuckParams,
+	useDuckNode,
+} from "./hooks/useDuckNode";
 import { useClipControls } from "./store/clipStore";
 
 interface AppProps {
@@ -39,13 +46,159 @@ export function App({
 	useClipNodeImpl = useClipNode,
 }: AppProps = {}): React.JSX.Element {
 	const controls = useClipControls();
+	const duck = useDuckNode();
+	const [duckParams, setDuckParams] = useState<DuckParams>(defaultDuckParams);
+	const [kickPlaying, setKickPlaying] = useState(false);
+	const [kickAudible, setKickAudible] = useState(true);
+	const kickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const kickGainRef = useRef<GainNode | null>(null);
+
 	const node = useClipNodeImpl({
 		values: controls.values,
 		enabled: controls.enabled,
 		loop: controls.loop,
 		loopMode: controls.loopMode,
 		setValue: controls.setValue,
+		destination: duck.node ?? undefined,
 	});
+
+	// When duck node is created, connect it to destination
+	useEffect(() => {
+		const ctx = node.audioContext;
+		if (!ctx || !duck.node) return;
+		duck.node.connect(ctx.destination);
+		return () => {
+			try {
+				duck.node?.disconnect(ctx.destination);
+			} catch {
+				// already disconnected
+			}
+		};
+	}, [duck.node, node.audioContext]);
+
+	// Always create duck node when audio context becomes available
+	useEffect(() => {
+		const ctx = node.audioContext;
+		if (!ctx) return;
+		duck.ensureNode(ctx);
+	}, [node.audioContext, duck.ensureNode]);
+
+	// Sync bypass state whenever the node is created or enabled changes
+	useEffect(() => {
+		if (!duck.node) return;
+		duck.setEnabled(duckParams.enabled);
+	}, [duck.node, duckParams.enabled, duck.setEnabled]);
+
+	const handleDuckParamChange = useCallback(
+		(key: keyof DuckNodeOptions, value: number) => {
+			setDuckParams((prev) => ({ ...prev, [key]: value }));
+			// Convert display units to node units
+			let nodeValue = value;
+			if (key === "threshold") {
+				// dBFS → linear amplitude
+				nodeValue = 10 ** (value / 20);
+			} else if (key === "depth") {
+				// percent → 0-1
+				nodeValue = value / 100;
+			}
+			duck.setParam(key, nodeValue);
+		},
+		[duck.setParam],
+	);
+
+	const handleDuckToggle = useCallback(
+		(enabled: boolean) => {
+			setDuckParams((prev) => ({ ...prev, enabled }));
+			duck.setEnabled(enabled);
+		},
+		[duck.setEnabled],
+	);
+
+	// Kick drum synthesizer
+	const playKick = useCallback(
+		(ctx: AudioContext) => {
+			const osc = new OscillatorNode(ctx, { type: "sine", frequency: 150 });
+			const oscGain = new GainNode(ctx, { gain: 1 });
+			const now = ctx.currentTime;
+
+			// Pitch sweep down for punch
+			osc.frequency.setValueAtTime(150, now);
+			osc.frequency.exponentialRampToValueAtTime(40, now + 0.07);
+
+			// Amplitude envelope
+			oscGain.gain.setValueAtTime(1, now);
+			oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+			osc.connect(oscGain);
+
+			// Route to sidechain input
+			if (duck.node) {
+				oscGain.connect(duck.node.sidechain);
+			}
+
+			// Route to audible output if enabled
+			if (kickAudible && kickGainRef.current) {
+				oscGain.connect(kickGainRef.current);
+			}
+
+			osc.start(now);
+			osc.stop(now + 0.15);
+		},
+		[duck.node, kickAudible],
+	);
+
+	const startKick = useCallback(() => {
+		const ctx = node.audioContext;
+		if (!ctx) return;
+
+		// Create a gain node for audible kick output
+		if (!kickGainRef.current) {
+			kickGainRef.current = new GainNode(ctx, { gain: 0.6 });
+			kickGainRef.current.connect(ctx.destination);
+		}
+
+		const bpm = controls.tempo || 120;
+		const intervalMs = (60 / bpm) * 1000;
+
+		playKick(ctx);
+		kickIntervalRef.current = setInterval(() => playKick(ctx), intervalMs);
+		setKickPlaying(true);
+	}, [node.audioContext, controls.tempo, playKick]);
+
+	const stopKick = useCallback(() => {
+		if (kickIntervalRef.current) {
+			clearInterval(kickIntervalRef.current);
+			kickIntervalRef.current = null;
+		}
+		setKickPlaying(false);
+	}, []);
+
+	// Update kick interval when tempo changes
+	useEffect(() => {
+		if (!kickPlaying || !node.audioContext) return;
+		stopKick();
+		startKick();
+	}, [kickPlaying, node.audioContext, stopKick, startKick]);
+
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (kickIntervalRef.current) {
+				clearInterval(kickIntervalRef.current);
+			}
+		};
+	}, []);
+
+	const toggleKickAudible = useCallback(() => {
+		setKickAudible((prev) => {
+			const next = !prev;
+			if (kickGainRef.current) {
+				kickGainRef.current.gain.value = next ? 0.6 : 0;
+			}
+			return next;
+		});
+	}, []);
+
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
 
@@ -469,6 +622,55 @@ export function App({
 						onToggle={handleHighpassToggle}
 					/>
 				</fieldset>
+				<DuckControl
+					threshold={duckParams.threshold}
+					attack={duckParams.attack}
+					release={duckParams.release}
+					depth={duckParams.depth}
+					enabled={duckParams.enabled}
+					onThresholdChange={(v) => handleDuckParamChange("threshold", v)}
+					onAttackChange={(v) => handleDuckParamChange("attack", v)}
+					onReleaseChange={(v) => handleDuckParamChange("release", v)}
+					onDepthChange={(v) => handleDuckParamChange("depth", v)}
+					onToggle={handleDuckToggle}
+				/>
+				{duckParams.enabled && (
+					<fieldset className="control-group">
+						<legend>Sidechain Kick</legend>
+						<div
+							style={{
+								display: "flex",
+								gap: 8,
+								alignItems: "center",
+								padding: "8px 4px",
+							}}
+						>
+							<button
+								type="button"
+								onClick={kickPlaying ? stopKick : startKick}
+								disabled={!node.audioContext}
+							>
+								{kickPlaying ? "Stop Kick" : "Start Kick"}
+							</button>
+							<label
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 4,
+									fontSize: "0.85rem",
+									color: "#bbb",
+								}}
+							>
+								<input
+									type="checkbox"
+									checked={kickAudible}
+									onChange={toggleKickAudible}
+								/>
+								Hear Kick
+							</label>
+						</div>
+					</fieldset>
+				)}
 			</section>
 		</main>
 	);

@@ -20,6 +20,8 @@ interface UseClipNodeParams {
 	setValue: (key: ControlKey, val: number) => void;
 	/** URL to a default sound file to load when no previously uploaded file exists in IndexedDB. */
 	defaultSoundUrl?: string;
+	/** Custom destination node. Defaults to ctx.destination. */
+	destination?: AudioNode | null | undefined;
 }
 
 export interface UseClipNodeReturn {
@@ -39,6 +41,7 @@ export interface UseClipNodeReturn {
 	dispose: () => void;
 	logState: () => void;
 	loadSound: () => void;
+	audioContext: AudioContext | null;
 	applyValue: (key: ControlKey, val: number) => void;
 	applyValues: (valuesToApply: Partial<Record<ControlKey, number>>) => void;
 	applyToggle: (key: ControlKey, on: boolean) => void;
@@ -53,6 +56,7 @@ export function useClipNode({
 	loopMode,
 	setValue,
 	defaultSoundUrl,
+	destination,
 }: UseClipNodeParams): UseClipNodeReturn {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -140,7 +144,7 @@ export function useClipNode({
 				},
 			});
 
-			node.connect(ctx.destination);
+			node.connect(destination ?? ctx.destination);
 
 			node.onstatechange = (e) => setNodeState(e.state);
 			node.onlooped = () => setInfoTimesLooped(node.timesLooped.toString());
@@ -169,7 +173,7 @@ export function useClipNode({
 
 			return node;
 		},
-		[loop, values, enabled, loopMode],
+		[loop, values, enabled, loopMode, destination],
 	);
 
 	const start = useCallback(async () => {
@@ -225,6 +229,21 @@ export function useClipNode({
 		const delay = enabled.startDelay ? values.startDelay : 0;
 		node.resume(ctx.currentTime + delay);
 	}, [values.startDelay, enabled.startDelay]);
+
+	// Reconnect when destination changes (e.g. duck node inserted/removed)
+	useEffect(() => {
+		const node = nodeRef.current;
+		const ctx = ctxRef.current;
+		if (!node || !ctx) return;
+
+		const target = destination ?? ctx.destination;
+		try {
+			node.disconnect();
+		} catch {
+			// already disconnected
+		}
+		node.connect(target);
+	}, [destination]);
 
 	const dispose = useCallback(() => {
 		nodeRef.current?.dispose();
@@ -342,6 +361,7 @@ export function useClipNode({
 		dispose,
 		logState,
 		loadSound,
+		audioContext: ctxRef.current,
 		applyValue: applyValueToNode,
 		applyValues: applyValuesToNode,
 		applyToggle: applyToggleToNode,

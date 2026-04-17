@@ -277,6 +277,132 @@ describe("duck-processor-kernel", () => {
 			// Envelope should continue increasing
 			expect(state.envelope).toBeGreaterThan(envelopeAfterBlock1);
 		});
+
+		it("passes signal through unchanged when bypass is enabled", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(2);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			sidechain[0]!.fill(0.8); // loud sidechain that would normally duck
+			const output = makeChannels(2);
+			const params = makeParams();
+
+			processDuckBlock(
+				state,
+				mainInput,
+				sidechain,
+				output,
+				params,
+				SAMPLE_RATE,
+				true,
+			);
+
+			// Output should equal input exactly (bypassed)
+			for (let i = 0; i < BLOCK_SIZE; i++) {
+				expect(output[0]![i]).toBe(0.5);
+				expect(output[1]![i]).toBe(0.5);
+			}
+		});
+
+		it("resets state when bypass is enabled", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(1);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			sidechain[0]!.fill(0.8);
+			const output = makeChannels(1);
+
+			// First, duck the signal to build up envelope
+			const params = makeParams();
+			for (let block = 0; block < 200; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+			expect(state.envelope).toBeGreaterThan(0);
+
+			// Now bypass — state should reset
+			processDuckBlock(
+				state,
+				mainInput,
+				sidechain,
+				output,
+				params,
+				SAMPLE_RATE,
+				true,
+			);
+			expect(state.envelope).toBe(0);
+			expect(state.smoothedGain).toBe(1);
+		});
+
+		it("lowers volume on sidechain onset then recovers when sidechain stops", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(2);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			const output = makeChannels(2);
+			const params = makeParams({
+				attack: 0.005,
+				release: 0.01,
+				depth: 0.8,
+				threshold: 0.01,
+			});
+
+			// Phase 1: no sidechain — output should stay near input level
+			sidechain[0]!.fill(0);
+			for (let block = 0; block < 50; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+			const levelBeforeDuck = output[0]![BLOCK_SIZE - 1]!;
+			expect(levelBeforeDuck).toBeCloseTo(0.5, 1);
+
+			// Phase 2: sidechain kicks in — output should drop significantly
+			sidechain[0]!.fill(0.8);
+			for (let block = 0; block < 300; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+			const levelDucked = output[0]![BLOCK_SIZE - 1]!;
+			expect(levelDucked).toBeLessThan(levelBeforeDuck * 0.5);
+			expect(levelDucked).toBeGreaterThan(0);
+
+			// Phase 3: sidechain stops — volume should recover toward original
+			sidechain[0]!.fill(0);
+			for (let block = 0; block < 300; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+			const levelRecovered = output[0]![BLOCK_SIZE - 1]!;
+			expect(levelRecovered).toBeGreaterThan(levelDucked);
+			expect(levelRecovered).toBeCloseTo(0.5, 1);
+
+			// Both stereo channels should match
+			expect(output[1]![BLOCK_SIZE - 1]!).toBeCloseTo(levelRecovered, 5);
+		});
 	});
 
 	describe("createDuckProcessorState", () => {

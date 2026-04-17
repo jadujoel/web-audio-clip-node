@@ -56,6 +56,7 @@ const useClipNodeStub: UseClipNodeImpl = () => {
 		applyToggle: applyToggleMock,
 		setLoopOnNode: setLoopOnNodeMock,
 		setLoopModeOnNode: setLoopModeOnNodeMock,
+		audioContext: null,
 	};
 };
 

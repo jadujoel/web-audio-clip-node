@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ControlKey,
+	type DuckNodeOptions,
 	type LoopMode,
 	controlDefs,
 	getActiveLinkedControls,
@@ -16,14 +17,18 @@ import {
 	ControlSection,
 	DetuneControl,
 	DisplayPanel,
+	DuckControl,
 	FilterControl,
 	GainControl,
 	PanControl,
 	PlaybackRateControl,
 	PlayheadSlider,
 	TransportButtons,
+	defaultDuckParams,
+	type DuckParams,
 	useClipControls,
 	useClipNode,
+	useDuckNode,
 } from "@jadujoel/web-audio-clip-node/react";
 import "@jadujoel/web-audio-clip-node/styles.css";
 
@@ -38,6 +43,13 @@ function buildControlUpdates<T>(
 
 export function App() {
 	const controls = useClipControls();
+	const duck = useDuckNode();
+	const [duckParams, setDuckParams] = useState<DuckParams>(defaultDuckParams);
+	const [kickPlaying, setKickPlaying] = useState(false);
+	const [kickAudible, setKickAudible] = useState(true);
+	const kickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const kickGainRef = useRef<GainNode | null>(null);
+
 	const node = useClipNode({
 		values: controls.values,
 		enabled: controls.enabled,
@@ -45,7 +57,124 @@ export function App() {
 		loopMode: controls.loopMode,
 		setValue: controls.setValue,
 		defaultSoundUrl: "../sounds/example.opus",
+		destination: duck.node ?? undefined,
 	});
+
+	useEffect(() => {
+		const ctx = node.audioContext;
+		if (!ctx || !duck.node) return;
+		duck.node.connect(ctx.destination);
+		return () => {
+			try {
+				duck.node?.disconnect(ctx.destination);
+			} catch {
+				// already disconnected
+			}
+		};
+	}, [duck.node, node.audioContext]);
+
+	useEffect(() => {
+		const ctx = node.audioContext;
+		if (!ctx) return;
+		duck.ensureNode(ctx);
+	}, [node.audioContext, duck.ensureNode]);
+
+	// Sync bypass state whenever the node is created or enabled changes
+	useEffect(() => {
+		if (!duck.node) return;
+		duck.setEnabled(duckParams.enabled);
+	}, [duck.node, duckParams.enabled, duck.setEnabled]);
+
+	const handleDuckParamChange = useCallback(
+		(key: keyof DuckNodeOptions, value: number) => {
+			setDuckParams((prev) => ({ ...prev, [key]: value }));
+			let nodeValue = value;
+			if (key === "threshold") {
+				nodeValue = 10 ** (value / 20);
+			} else if (key === "depth") {
+				nodeValue = value / 100;
+			}
+			duck.setParam(key, nodeValue);
+		},
+		[duck.setParam],
+	);
+
+	const handleDuckToggle = useCallback(
+		(enabled: boolean) => {
+			setDuckParams((prev) => ({ ...prev, enabled }));
+			duck.setEnabled(enabled);
+		},
+		[duck.setEnabled],
+	);
+
+	const playKick = useCallback(
+		(ctx: AudioContext) => {
+			const osc = new OscillatorNode(ctx, { type: "sine", frequency: 150 });
+			const oscGain = new GainNode(ctx, { gain: 1 });
+			const now = ctx.currentTime;
+			osc.frequency.setValueAtTime(150, now);
+			osc.frequency.exponentialRampToValueAtTime(40, now + 0.07);
+			oscGain.gain.setValueAtTime(1, now);
+			oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+			osc.connect(oscGain);
+			if (duck.node) {
+				oscGain.connect(duck.node.sidechain);
+			}
+			if (kickAudible && kickGainRef.current) {
+				oscGain.connect(kickGainRef.current);
+			}
+			osc.start(now);
+			osc.stop(now + 0.15);
+		},
+		[duck.node, kickAudible],
+	);
+
+	const startKick = useCallback(() => {
+		const ctx = node.audioContext;
+		if (!ctx) return;
+		if (!kickGainRef.current) {
+			kickGainRef.current = new GainNode(ctx, { gain: 0.6 });
+			kickGainRef.current.connect(ctx.destination);
+		}
+		const bpm = controls.tempo || 120;
+		const intervalMs = (60 / bpm) * 1000;
+		playKick(ctx);
+		kickIntervalRef.current = setInterval(() => playKick(ctx), intervalMs);
+		setKickPlaying(true);
+	}, [node.audioContext, controls.tempo, playKick]);
+
+	const stopKick = useCallback(() => {
+		if (kickIntervalRef.current) {
+			clearInterval(kickIntervalRef.current);
+			kickIntervalRef.current = null;
+		}
+		setKickPlaying(false);
+	}, []);
+
+	useEffect(() => {
+		if (!kickPlaying || !node.audioContext) return;
+		stopKick();
+		startKick();
+	}, [kickPlaying, node.audioContext, stopKick, startKick]);
+
+	useEffect(() => {
+		return () => {
+			if (kickIntervalRef.current) {
+				clearInterval(kickIntervalRef.current);
+			}
+		};
+	}, []);
+
+	const toggleKickAudible = useCallback(() => {
+		setKickAudible((prev) => {
+			const next = !prev;
+			if (kickGainRef.current) {
+				kickGainRef.current.gain.value = next ? 0.6 : 0;
+			}
+			return next;
+		});
+	}, []);
+
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
 
@@ -468,6 +597,40 @@ export function App() {
 						onToggle={handleHighpassToggle}
 					/>
 				</fieldset>
+				<DuckControl
+					threshold={duckParams.threshold}
+					attack={duckParams.attack}
+					release={duckParams.release}
+					depth={duckParams.depth}
+					enabled={duckParams.enabled}
+					onThresholdChange={(v) => handleDuckParamChange("threshold", v)}
+					onAttackChange={(v) => handleDuckParamChange("attack", v)}
+					onReleaseChange={(v) => handleDuckParamChange("release", v)}
+					onDepthChange={(v) => handleDuckParamChange("depth", v)}
+					onToggle={handleDuckToggle}
+				/>
+				{duckParams.enabled && (
+					<fieldset className="control-group">
+						<legend>Sidechain Kick</legend>
+						<div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 4px" }}>
+							<button
+								type="button"
+								onClick={kickPlaying ? stopKick : startKick}
+								disabled={!node.audioContext}
+							>
+								{kickPlaying ? "Stop Kick" : "Start Kick"}
+							</button>
+							<label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.85rem", color: "#bbb" }}>
+								<input
+									type="checkbox"
+									checked={kickAudible}
+									onChange={toggleKickAudible}
+								/>
+								Hear Kick
+							</label>
+						</div>
+					</fieldset>
+				)}
 			</section>
 		</main>
 	);
