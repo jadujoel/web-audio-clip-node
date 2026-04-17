@@ -21,6 +21,7 @@ export { applyToggleToClip, applyValueToClip } from "./hooks/clipHelpers";
 export { useClipNode } from "./hooks/useClipNode";
 export type { DuckParams, UseDuckNodeReturn } from "./hooks/useDuckNode";
 export { defaultDuckParams, useDuckNode } from "./hooks/useDuckNode";
+export { useKickScheduler } from "./hooks/useKickScheduler";
 export { useStreamingClipNode } from "./hooks/useStreamingClipNode";
 export type { ClipControlsState } from "./store/clipStore";
 export { useClipControls } from "./store/clipStore";

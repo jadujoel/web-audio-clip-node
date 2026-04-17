@@ -13,10 +13,27 @@ export interface DuckProcessorState {
 	rmsAccumulator: number;
 	/** Hold counter in samples — keeps ducking active between trigger events. */
 	holdCounter: number;
+	/** Per-channel circular delay buffers for lookahead. */
+	delayBuffers: Float32Array[];
+	/** Write position in the delay buffer. */
+	delayWritePos: number;
+	/** Allocated delay buffer size in samples. */
+	delayBufferSize: number;
+	/** Most recent gain reduction in dB (0 = no reduction, negative = ducking). */
+	currentReductionDb: number;
 }
 
 export function createDuckProcessorState(): DuckProcessorState {
-	return { envelope: 0, smoothedGain: 1, rmsAccumulator: 0, holdCounter: 0 };
+	return {
+		envelope: 0,
+		smoothedGain: 1,
+		rmsAccumulator: 0,
+		holdCounter: 0,
+		delayBuffers: [],
+		delayWritePos: 0,
+		delayBufferSize: 0,
+		currentReductionDb: 0,
+	};
 }
 
 /**
@@ -39,6 +56,7 @@ export function processDuckBlock(
 		attack: Float32Array;
 		release: Float32Array;
 		depth: Float32Array;
+		lookAhead: Float32Array;
 	},
 	sr: number,
 	bypass = false,
@@ -61,12 +79,50 @@ export function processDuckBlock(
 		state.smoothedGain = 1;
 		state.rmsAccumulator = 0;
 		state.holdCounter = 0;
+		state.currentReductionDb = 0;
+		for (const buf of state.delayBuffers) buf.fill(0);
+		state.delayWritePos = 0;
 		return;
 	}
 
 	const hasSidechain = sidechain.length > 0 && (sidechain[0]?.length ?? 0) > 0;
 
 	let { envelope, smoothedGain, rmsAccumulator, holdCounter } = state;
+
+	// --- Lookahead delay buffer setup (k-rate: read once per block) ---
+	const lookAheadSec = params.lookAhead[0] ?? 0;
+	const delaySamples = Math.ceil(lookAheadSec * sr);
+	const useLookahead = delaySamples > 0;
+
+	if (useLookahead) {
+		// Max buffer size for 50ms at current sample rate
+		const maxBufSize = Math.ceil(0.05 * sr);
+		const neededSize = Math.min(delaySamples, maxBufSize);
+		// Allocate or grow delay buffers if needed
+		if (state.delayBufferSize < neededSize) {
+			const newSize = maxBufSize; // Allocate max to avoid re-allocation
+			const newBuffers: Float32Array[] = [];
+			for (let ch = 0; ch < numChannels; ch++) {
+				const newBuf = new Float32Array(newSize);
+				// Copy old data if present
+				const oldBuf = state.delayBuffers[ch];
+				if (oldBuf) {
+					const copyLen = Math.min(oldBuf.length, newSize);
+					newBuf.set(oldBuf.subarray(0, copyLen));
+				}
+				newBuffers.push(newBuf);
+			}
+			state.delayBuffers = newBuffers;
+			state.delayBufferSize = newSize;
+		}
+		// Ensure enough channels
+		while (state.delayBuffers.length < numChannels) {
+			state.delayBuffers.push(new Float32Array(state.delayBufferSize));
+		}
+	}
+
+	let delayWritePos = state.delayWritePos;
+	const delayBufSize = state.delayBufferSize;
 
 	// RMS window: ~15ms — balances responsiveness with stability
 	const rmsWindowSamples = Math.max(1, Math.round(sr * 0.015));
@@ -153,9 +209,22 @@ export function processDuckBlock(
 		// --- 5. Sample-rate-aware gain smoothing ---
 		smoothedGain += smoothCoeff * (targetGain - smoothedGain);
 
-		// --- 6. Apply gain to all main input channels ---
-		for (let ch = 0; ch < numChannels; ch++) {
-			output[ch]![i] = mainInput[ch]![i]! * smoothedGain;
+		// --- 6. Apply gain to all main input channels (with optional delay) ---
+		if (useLookahead) {
+			for (let ch = 0; ch < numChannels; ch++) {
+				const buf = state.delayBuffers[ch]!;
+				// Write current sample into delay buffer
+				buf[delayWritePos % delayBufSize] = mainInput[ch]![i]!;
+				// Read delayed sample
+				const readPos =
+					(delayWritePos - delaySamples + delayBufSize) % delayBufSize;
+				output[ch]![i] = buf[readPos]! * smoothedGain;
+			}
+			delayWritePos = (delayWritePos + 1) % delayBufSize;
+		} else {
+			for (let ch = 0; ch < numChannels; ch++) {
+				output[ch]![i] = mainInput[ch]![i]! * smoothedGain;
+			}
 		}
 		// Zero any extra output channels
 		for (let ch = numChannels; ch < output.length; ch++) {
@@ -163,8 +232,13 @@ export function processDuckBlock(
 		}
 	}
 
+	// Track the most recent gain reduction in dB
+	state.currentReductionDb =
+		smoothedGain >= 1 ? 0 : 20 * Math.log10(smoothedGain);
+
 	state.envelope = envelope;
 	state.smoothedGain = smoothedGain;
 	state.rmsAccumulator = rmsAccumulator;
 	state.holdCounter = holdCounter;
+	state.delayWritePos = delayWritePos;
 }

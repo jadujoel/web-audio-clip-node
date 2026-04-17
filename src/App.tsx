@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LoopMode } from "./audio/clip/types";
 import type { DuckNodeOptions } from "./audio/duck/node";
 import { isTempoRelativeSnap, remapTempoRelativeValue } from "./audio/utils";
@@ -27,6 +27,7 @@ import {
 	defaultDuckParams,
 	useDuckNode,
 } from "./hooks/useDuckNode";
+import { useKickScheduler } from "./hooks/useKickScheduler";
 import { useClipControls } from "./store/clipStore";
 
 interface AppProps {
@@ -48,10 +49,7 @@ export function App({
 	const controls = useClipControls();
 	const duck = useDuckNode();
 	const [duckParams, setDuckParams] = useState<DuckParams>(defaultDuckParams);
-	const [kickPlaying, setKickPlaying] = useState(false);
 	const [kickAudible, setKickAudible] = useState(true);
-	const kickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-	const kickGainRef = useRef<GainNode | null>(null);
 
 	const node = useClipNodeImpl({
 		values: controls.values,
@@ -129,90 +127,46 @@ export function App({
 		[duck.setEnabled],
 	);
 
-	// Kick drum synthesizer
-	const playKick = useCallback(
-		(ctx: AudioContext) => {
-			const osc = new OscillatorNode(ctx, { type: "sine", frequency: 150 });
-			const oscGain = new GainNode(ctx, { gain: 1 });
-			const now = ctx.currentTime;
+	const kick = useKickScheduler({
+		audioContext: node.audioContext,
+		sidechain: duck.node?.sidechain ?? null,
+		tempo: controls.tempo,
+		audible: kickAudible,
+	});
 
-			// Pitch sweep down for punch
-			osc.frequency.setValueAtTime(150, now);
-			osc.frequency.exponentialRampToValueAtTime(40, now + 0.07);
-
-			// Amplitude envelope
-			oscGain.gain.setValueAtTime(1, now);
-			oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
-			osc.connect(oscGain);
-
-			// Route to sidechain input
-			if (duck.node) {
-				oscGain.connect(duck.node.sidechain);
-			}
-
-			// Route to audible output if enabled
-			if (kickAudible && kickGainRef.current) {
-				oscGain.connect(kickGainRef.current);
-			}
-
-			osc.start(now);
-			osc.stop(now + 0.15);
-		},
-		[duck.node, kickAudible],
-	);
-
-	const startKick = useCallback(() => {
-		const ctx = node.audioContext;
-		if (!ctx) return;
-
-		// Create a gain node for audible kick output
-		if (!kickGainRef.current) {
-			kickGainRef.current = new GainNode(ctx, { gain: 0.6 });
-			kickGainRef.current.connect(ctx.destination);
-		}
-
-		const bpm = controls.tempo || 120;
-		const intervalMs = (60 / bpm) * 1000;
-
-		playKick(ctx);
-		kickIntervalRef.current = setInterval(() => playKick(ctx), intervalMs);
-		setKickPlaying(true);
-	}, [node.audioContext, controls.tempo, playKick]);
-
-	const stopKick = useCallback(() => {
-		if (kickIntervalRef.current) {
-			clearInterval(kickIntervalRef.current);
-			kickIntervalRef.current = null;
-		}
-		setKickPlaying(false);
-	}, []);
-
-	// Update kick interval when tempo changes
+	// Stop kick when clip ends (non-looping)
 	useEffect(() => {
-		if (!kickPlaying || !node.audioContext) return;
-		stopKick();
-		startKick();
-	}, [kickPlaying, node.audioContext, stopKick, startKick]);
+		if (node.nodeState === "stopped" || node.nodeState === "ended") {
+			kick.stop();
+		}
+	}, [node.nodeState, kick.stop]);
 
-	// Cleanup on unmount
-	useEffect(() => {
-		return () => {
-			if (kickIntervalRef.current) {
-				clearInterval(kickIntervalRef.current);
-			}
-		};
-	}, []);
+	const handleStart = useCallback(async () => {
+		const startTime = await node.start();
+		if (startTime != null && duckParams.enabled) {
+			kick.start(startTime);
+		}
+	}, [node.start, duckParams.enabled, kick.start]);
 
-	const toggleKickAudible = useCallback(() => {
-		setKickAudible((prev) => {
-			const next = !prev;
-			if (kickGainRef.current) {
-				kickGainRef.current.gain.value = next ? 0.6 : 0;
-			}
-			return next;
-		});
-	}, []);
+	const handleStop = useCallback(() => {
+		node.stop();
+		kick.stop();
+	}, [node.stop, kick.stop]);
+
+	const handlePause = useCallback(() => {
+		node.pause();
+		kick.pause();
+	}, [node.pause, kick.pause]);
+
+	const handleResume = useCallback(() => {
+		node.resume();
+		kick.resume();
+	}, [node.resume, kick.resume]);
+
+	const handleDispose = useCallback(() => {
+		node.dispose();
+		kick.stop();
+	}, [node.dispose, kick.stop]);
 
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
@@ -474,11 +428,11 @@ export function App({
 			/>
 			<TransportButtons
 				nodeState={node.nodeState}
-				onStart={node.start}
-				onStop={node.stop}
-				onPause={node.pause}
-				onResume={node.resume}
-				onDispose={node.dispose}
+				onStart={handleStart}
+				onStop={handleStop}
+				onPause={handlePause}
+				onResume={handleResume}
+				onDispose={handleDispose}
 				onLog={node.logState}
 				onLoadSound={node.loadSound}
 			/>
@@ -642,15 +596,21 @@ export function App({
 					attack={duckParams.attack}
 					release={duckParams.release}
 					depth={duckParams.depth}
+					lookAhead={duckParams.lookAhead}
+					reductionDb={duck.node?.reduction ?? 0}
 					enabled={duckParams.enabled}
 					onThresholdChange={(v) => handleDuckParamChange("threshold", v)}
 					onAttackChange={(v) => handleDuckParamChange("attack", v)}
 					onReleaseChange={(v) => handleDuckParamChange("release", v)}
 					onDepthChange={(v) => handleDuckParamChange("depth", v)}
+					onLookAheadChange={(v) => handleDuckParamChange("lookAhead", v)}
 					onToggle={handleDuckToggle}
 				/>
 				{duckParams.enabled && (
-					<fieldset className="control-group">
+					<fieldset
+						className="control-group"
+						data-kick-playing={kick.isPlaying}
+					>
 						<legend>Sidechain Kick</legend>
 						<div
 							style={{
@@ -662,19 +622,26 @@ export function App({
 						>
 							<button
 								type="button"
-								onClick={kickPlaying ? stopKick : startKick}
+								onClick={kick.isPlaying ? kick.stop : () => kick.start()}
 								disabled={!node.audioContext}
 							>
-								{kickPlaying ? "Stop Kick" : "Start Kick"}
+								{kick.isPlaying ? "Stop Kick" : "Start Kick"}
 							</button>
-							<label className="control-row">
+							<label
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 4,
+									fontSize: "0.85rem",
+									color: "#bbb",
+								}}
+							>
 								<input
 									type="checkbox"
-									className="control-toggle"
 									checked={kickAudible}
-									onChange={toggleKickAudible}
+									onChange={(e) => setKickAudible(e.target.checked)}
 								/>
-								<span className="control-label">Hear Kick</span>
+								Hear Kick
 							</label>
 						</div>
 					</fieldset>

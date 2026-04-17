@@ -9,6 +9,8 @@ export interface DuckParams {
 	release: number;
 	/** Depth in percent (0–100). */
 	depth: number;
+	/** Lookahead in milliseconds (0–50). */
+	lookAhead: number;
 	enabled: boolean;
 }
 
@@ -17,6 +19,7 @@ export const defaultDuckParams: DuckParams = {
 	attack: 0.02,
 	release: 0.6,
 	depth: 80,
+	lookAhead: 0,
 	enabled: false,
 };
 

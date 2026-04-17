@@ -14,6 +14,7 @@ function makeParams(overrides: Partial<Record<string, number>> = {}) {
 		attack: new Float32Array([overrides.attack ?? 0.02]),
 		release: new Float32Array([overrides.release ?? 0.6]),
 		depth: new Float32Array([overrides.depth ?? 0.8]),
+		lookAhead: new Float32Array([overrides.lookAhead ?? 0]),
 	};
 }
 
@@ -340,6 +341,7 @@ describe("duck-processor-kernel", () => {
 			expect(state.smoothedGain).toBe(1);
 			expect(state.rmsAccumulator).toBe(0);
 			expect(state.holdCounter).toBe(0);
+			expect(state.currentReductionDb).toBe(0);
 		});
 
 		it("lowers volume on sidechain onset then recovers when sidechain stops", () => {
@@ -405,6 +407,159 @@ describe("duck-processor-kernel", () => {
 			// Both stereo channels should match
 			expect(output[1]![BLOCK_SIZE - 1]!).toBeCloseTo(levelRecovered, 5);
 		});
+
+		it("lookAhead=0 produces identical output to baseline (no delay)", () => {
+			const stateA = createDuckProcessorState();
+			const stateB = createDuckProcessorState();
+			const mainInput = makeChannels(2);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			sidechain[0]!.fill(0.3);
+			const outputA = makeChannels(2);
+			const outputB = makeChannels(2);
+			const paramsA = makeParams({ lookAhead: 0 });
+			const paramsB = makeParams({ lookAhead: 0 });
+
+			for (let block = 0; block < 50; block++) {
+				processDuckBlock(
+					stateA,
+					mainInput,
+					sidechain,
+					outputA,
+					paramsA,
+					SAMPLE_RATE,
+				);
+				processDuckBlock(
+					stateB,
+					mainInput,
+					sidechain,
+					outputB,
+					paramsB,
+					SAMPLE_RATE,
+				);
+			}
+
+			for (let i = 0; i < BLOCK_SIZE; i++) {
+				expect(outputA[0]![i]).toBe(outputB[0]![i]);
+				expect(outputA[1]![i]).toBe(outputB[1]![i]);
+			}
+		});
+
+		it("lookAhead > 0 delays main signal by the correct number of samples", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(1);
+			// Put an impulse at sample 0
+			mainInput[0]![0] = 1.0;
+			const sidechain = makeChannels(1); // silent sidechain, no ducking
+			// 10ms lookahead at 48kHz = 480 samples
+			const lookAheadSec = 0.01;
+			const params = makeParams({ lookAhead: lookAheadSec, depth: 0 });
+			const delaySamples = Math.ceil(lookAheadSec * SAMPLE_RATE);
+
+			// Need to process enough blocks for the impulse to come through
+			const totalBlocks = Math.ceil((delaySamples + 1) / BLOCK_SIZE) + 1;
+			const allOutputSamples: number[] = [];
+
+			for (let block = 0; block < totalBlocks; block++) {
+				// Only first block has the impulse
+				const input = makeChannels(1);
+				if (block === 0) input[0]![0] = 1.0;
+				const out = makeChannels(1);
+				processDuckBlock(state, input, sidechain, out, params, SAMPLE_RATE);
+				for (let i = 0; i < BLOCK_SIZE; i++) {
+					allOutputSamples.push(out[0]![i]!);
+				}
+			}
+
+			// The impulse should appear at sample index = delaySamples
+			// Samples before that should be 0
+			for (let i = 0; i < delaySamples; i++) {
+				expect(allOutputSamples[i]).toBeCloseTo(0, 5);
+			}
+			// The delayed impulse should be at delaySamples
+			expect(allOutputSamples[delaySamples]).toBeCloseTo(1.0, 1);
+		});
+
+		it("lookAhead > 0 + sidechain trigger: ducking is engaged before delayed main signal arrives", () => {
+			// With lookahead, the sidechain is analyzed in real-time while the main
+			// signal is delayed. So the gain envelope is already engaged when the
+			// main signal arrives at the output.
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(1);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			sidechain[0]!.fill(0.8); // loud sidechain
+			const output = makeChannels(1);
+			// 10ms lookahead
+			const params = makeParams({
+				lookAhead: 0.01,
+				depth: 0.8,
+				threshold: 0.01,
+				attack: 0.002,
+			});
+
+			// Run enough blocks to fill the delay buffer and let envelope settle
+			for (let block = 0; block < 200; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+
+			// After settling, output should be ducked (significantly below input)
+			const lastSample = output[0]![BLOCK_SIZE - 1]!;
+			expect(lastSample).toBeLessThan(0.2);
+			expect(lastSample).toBeGreaterThan(0);
+		});
+
+		it("currentReductionDb is 0 when sidechain is silent", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(1);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1); // silent
+			const output = makeChannels(1);
+			const params = makeParams();
+
+			for (let block = 0; block < 50; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+
+			expect(state.currentReductionDb).toBe(0);
+		});
+
+		it("currentReductionDb is negative when sidechain is loud", () => {
+			const state = createDuckProcessorState();
+			const mainInput = makeChannels(1);
+			fillChannels(mainInput, 0.5);
+			const sidechain = makeChannels(1);
+			sidechain[0]!.fill(0.8);
+			const output = makeChannels(1);
+			const params = makeParams({ depth: 0.8, threshold: 0.01 });
+
+			for (let block = 0; block < 200; block++) {
+				processDuckBlock(
+					state,
+					mainInput,
+					sidechain,
+					output,
+					params,
+					SAMPLE_RATE,
+				);
+			}
+
+			expect(state.currentReductionDb).toBeLessThan(-1);
+		});
 	});
 
 	describe("createDuckProcessorState", () => {
@@ -414,6 +569,10 @@ describe("duck-processor-kernel", () => {
 			expect(state.smoothedGain).toBe(1);
 			expect(state.rmsAccumulator).toBe(0);
 			expect(state.holdCounter).toBe(0);
+			expect(state.delayBuffers).toEqual([]);
+			expect(state.delayWritePos).toBe(0);
+			expect(state.delayBufferSize).toBe(0);
+			expect(state.currentReductionDb).toBe(0);
 		});
 	});
 });

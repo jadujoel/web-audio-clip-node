@@ -32,7 +32,7 @@ export interface UseClipNodeReturn {
 	infoTimesLooped: string;
 	infoLatency: string;
 	infoTimeTaken: string;
-	start: () => Promise<void>;
+	start: () => Promise<number | undefined>;
 	stop: () => void;
 	pause: () => void;
 	resume: () => void;
@@ -175,12 +175,12 @@ export function useClipNode({
 		[loop, values, enabled, loopMode],
 	);
 
-	const start = useCallback(async () => {
+	const start = useCallback(async (): Promise<number | undefined> => {
 		const ctx = await ensureContext();
 		const buffer = bufferRef.current;
 		if (!buffer) {
 			setStatusMessage("Load a sound file first.");
-			return;
+			return undefined;
 		}
 		setStatusMessage(null);
 
@@ -193,7 +193,9 @@ export function useClipNode({
 		const delay = enabled.startDelay ? values.startDelay : 0;
 		const offset = enabled.offset ? values.offset : 0;
 		const duration = enabled.duration ? values.duration : -1;
-		node.start(ctx.currentTime + delay, offset, duration);
+		const startTime = ctx.currentTime + delay;
+		node.start(startTime, offset, duration);
+		return startTime;
 	}, [
 		ensureContext,
 		createNode,

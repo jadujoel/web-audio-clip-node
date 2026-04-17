@@ -15,11 +15,16 @@ export interface DuckControlProps {
 	release: number;
 	/** Depth in percent (0–100). */
 	depth: number;
+	/** Lookahead in milliseconds (0–50). */
+	lookAhead: number;
+	/** Current gain reduction in dB (0 or negative). */
+	reductionDb: number;
 	enabled: boolean;
 	onThresholdChange: (value: number) => void;
 	onAttackChange: (value: number) => void;
 	onReleaseChange: (value: number) => void;
 	onDepthChange: (value: number) => void;
+	onLookAheadChange: (value: number) => void;
 	onToggle: (enabled: boolean) => void;
 }
 
@@ -134,11 +139,14 @@ function DuckControlInner({
 	attack,
 	release,
 	depth,
+	lookAhead,
+	reductionDb,
 	enabled,
 	onThresholdChange,
 	onAttackChange,
 	onReleaseChange,
 	onDepthChange,
+	onLookAheadChange,
 	onToggle,
 }: DuckControlProps): React.JSX.Element {
 	const disabled = !enabled;
@@ -205,6 +213,55 @@ function DuckControlInner({
 				disabled={disabled}
 				onChange={onDepthChange}
 			/>
+			<ParamRow
+				label="Lookahead"
+				min={0}
+				max={50}
+				value={lookAhead}
+				step={1}
+				defaultValue={0}
+				unit="ms"
+				decimals={0}
+				disabled={disabled}
+				onChange={onLookAheadChange}
+			/>
+			{enabled && (
+				<div className="audio-control">
+					<span className="control-toggle-placeholder" />
+					<span className="control-label">Reduction</span>
+					<div
+						style={{
+							gridColumn: "span 2",
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+						}}
+					>
+						<div
+							style={{
+								flex: 1,
+								height: 8,
+								background: "#333",
+								borderRadius: 4,
+								overflow: "hidden",
+							}}
+						>
+							<div
+								style={{
+									width: `${Math.min(100, Math.abs(reductionDb) * (100 / 24))}%`,
+									height: "100%",
+									background: "#e74c3c",
+									borderRadius: 4,
+									transition: "width 50ms",
+								}}
+							/>
+						</div>
+						<span style={{ fontSize: 12, minWidth: 52, textAlign: "right" }}>
+							{reductionDb.toFixed(1)} dB
+						</span>
+					</div>
+				</div>
+			)}
 		</fieldset>
 	);
 }

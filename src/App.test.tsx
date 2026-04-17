@@ -44,7 +44,7 @@ const useClipNodeStub: UseClipNodeImpl = () => {
 		infoTimesLooped: "0",
 		infoLatency: "unknown",
 		infoTimeTaken: "unknown",
-		start: vi.fn(async () => {}),
+		start: vi.fn(async () => undefined),
 		stop: vi.fn(() => {}),
 		pause: vi.fn(() => {}),
 		resume: vi.fn(() => {}),

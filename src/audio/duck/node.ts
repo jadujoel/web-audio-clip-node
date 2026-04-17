@@ -9,6 +9,8 @@ export interface DuckNodeOptions {
 	release?: number;
 	/** Maximum gain reduction (0 = no duck, 1 = full silence). Default 0.8. */
 	depth?: number;
+	/** Lookahead in seconds (0–0.05). Delays the main signal so ducking engages before the transient arrives. Default 0. */
+	lookAhead?: number;
 }
 
 /**
@@ -30,6 +32,7 @@ export class DuckNode extends AudioWorkletNode {
 		AudioParam
 	> = super.parameters as ReadonlyMap<DuckNodeParameterNames, AudioParam>;
 	private _bypass = false;
+	private _reduction = 0;
 
 	constructor(context: BaseAudioContext, options: DuckNodeOptions = {}) {
 		super(context, "DuckProcessor", {
@@ -45,6 +48,12 @@ export class DuckNode extends AudioWorkletNode {
 		// Users connect their sidechain signal to this node.
 		this.sidechain = new GainNode(context);
 		this.sidechain.connect(this, 0, 1);
+
+		this.port.onmessage = (ev: MessageEvent) => {
+			if (ev.data?.type === "reduction") {
+				this._reduction = ev.data.value;
+			}
+		};
 	}
 
 	get threshold(): AudioParam {
@@ -65,6 +74,31 @@ export class DuckNode extends AudioWorkletNode {
 	get depth(): AudioParam {
 		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
 		return this.parameters.get("depth")!;
+	}
+
+	get lookAhead(): AudioParam {
+		// biome-ignore lint/style/noNonNullAssertion: guaranteed by processor definition
+		return this.parameters.get("lookAhead")!;
+	}
+
+	/** Last-reported gain reduction in dB (0 = no reduction, negative = ducking). */
+	get reduction(): number {
+		return this._reduction;
+	}
+
+	/** Query the current gain reduction from the processor. Resolves with dB value. */
+	requestReduction(): Promise<number> {
+		return new Promise((resolve) => {
+			const handler = (ev: MessageEvent) => {
+				if (ev.data?.type === "reduction") {
+					this._reduction = ev.data.value;
+					this.port.removeEventListener("message", handler);
+					resolve(ev.data.value);
+				}
+			};
+			this.port.addEventListener("message", handler);
+			this.port.postMessage({ type: "getReduction" });
+		});
 	}
 
 	get bypass() {

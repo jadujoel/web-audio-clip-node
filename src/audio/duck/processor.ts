@@ -7,7 +7,8 @@ export type DuckNodeParameterNames =
 	| "threshold"
 	| "attack"
 	| "release"
-	| "depth";
+	| "depth"
+	| "lookAhead";
 
 declare const sampleRate: number;
 declare class AudioWorkletProcessor {
@@ -56,6 +57,13 @@ class DuckProcessor extends AudioWorkletProcessor {
 				minValue: 0,
 				maxValue: 1,
 			},
+			{
+				name: "lookAhead",
+				automationRate: "k-rate" as const,
+				defaultValue: 0,
+				minValue: 0,
+				maxValue: 0.05,
+			},
 		] as const;
 	}
 
@@ -71,6 +79,11 @@ class DuckProcessor extends AudioWorkletProcessor {
 				this.port.close();
 			} else if (ev.data?.type === "bypass") {
 				this.bypassed = ev.data.value;
+			} else if (ev.data?.type === "getReduction") {
+				this.port.postMessage({
+					type: "reduction",
+					value: this.state.currentReductionDb,
+				});
 			}
 		};
 	}
@@ -96,6 +109,7 @@ class DuckProcessor extends AudioWorkletProcessor {
 				attack: parameters.attack,
 				release: parameters.release,
 				depth: parameters.depth,
+				lookAhead: parameters.lookAhead,
 			},
 			sampleRate,
 			this.bypassed,
