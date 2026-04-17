@@ -9,10 +9,14 @@ export interface DuckProcessorState {
 	envelope: number;
 	/** Current smoothed gain applied to the main signal. */
 	smoothedGain: number;
+	/** Running RMS accumulator for the sidechain. */
+	rmsAccumulator: number;
+	/** Hold counter in samples — keeps ducking active between trigger events. */
+	holdCounter: number;
 }
 
 export function createDuckProcessorState(): DuckProcessorState {
-	return { envelope: 0, smoothedGain: 1 };
+	return { envelope: 0, smoothedGain: 1, rmsAccumulator: 0, holdCounter: 0 };
 }
 
 /**
@@ -55,55 +59,101 @@ export function processDuckBlock(
 		// Reset state so ducking starts clean when re-enabled
 		state.envelope = 0;
 		state.smoothedGain = 1;
+		state.rmsAccumulator = 0;
+		state.holdCounter = 0;
 		return;
 	}
 
 	const hasSidechain = sidechain.length > 0 && (sidechain[0]?.length ?? 0) > 0;
 
-	let { envelope, smoothedGain } = state;
+	let { envelope, smoothedGain, rmsAccumulator, holdCounter } = state;
+
+	// RMS window: ~15ms — balances responsiveness with stability
+	const rmsWindowSamples = Math.max(1, Math.round(sr * 0.015));
+	const rmsDecayCoeff = 1 / rmsWindowSamples;
+
+	// Hold time: 150ms — bridges gaps between syllables/hits
+	const holdSamples = Math.round(sr * 0.15);
+
+	// Soft knee width in dB
+	const kneeDb = 6;
+	const halfKnee = kneeDb / 2;
+
+	// Sample-rate-aware gain smoothing: 5ms time constant
+	const smoothCoeff = 1 - Math.exp(-1 / (sr * 0.005));
 
 	for (let i = 0; i < blockSize; i++) {
 		// --- Read per-sample parameters (a-rate) or use first value (k-rate) ---
-		const threshold = params.threshold[i] ?? params.threshold[0] ?? 0.01;
-		const attackTime = params.attack[i] ?? params.attack[0] ?? 0.01;
-		const releaseTime = params.release[i] ?? params.release[0] ?? 0.5;
+		const threshold = params.threshold[i] ?? params.threshold[0] ?? 0.02;
+		const attackTime = params.attack[i] ?? params.attack[0] ?? 0.02;
+		const releaseTime = params.release[i] ?? params.release[0] ?? 0.6;
 		const depth = params.depth[i] ?? params.depth[0] ?? 0.8;
 
-		// --- 1. Mono-sum the sidechain and take absolute value ---
-		let triggerLevel = 0;
+		// --- 1. RMS-based level detection (mono-sum sidechain) ---
+		let samplePower = 0;
 		if (hasSidechain) {
+			let monoSum = 0;
 			for (let ch = 0; ch < sidechain.length; ch++) {
-				triggerLevel += Math.abs(sidechain[ch]![i]!);
+				monoSum += sidechain[ch]![i]!;
 			}
-			triggerLevel /= sidechain.length;
+			monoSum /= sidechain.length;
+			samplePower = monoSum * monoSum;
 		}
+		rmsAccumulator += rmsDecayCoeff * (samplePower - rmsAccumulator);
+		const rmsLevel = Math.sqrt(Math.max(0, rmsAccumulator));
 
 		// --- 2. Envelope follower (one-pole IIR, separate attack/release) ---
 		const attackCoeff = 1 - Math.exp(-1 / (sr * Math.max(attackTime, 1e-6)));
 		const releaseCoeff = 1 - Math.exp(-1 / (sr * Math.max(releaseTime, 1e-6)));
 
-		if (triggerLevel > envelope) {
-			envelope += attackCoeff * (triggerLevel - envelope);
+		if (rmsLevel > envelope) {
+			envelope += attackCoeff * (rmsLevel - envelope);
 		} else {
-			envelope += releaseCoeff * (triggerLevel - envelope);
+			envelope += releaseCoeff * (rmsLevel - envelope);
 		}
 
-		// --- 3. Compute target gain ---
-		let targetGain: number;
+		// --- 3. Hold time — keep ducking active briefly after trigger drops ---
 		if (envelope > threshold) {
-			const reduction =
-				depth *
-				Math.min(1, (envelope - threshold) / Math.max(0.001, 1 - threshold));
-			targetGain = 1 - reduction;
+			holdCounter = holdSamples;
+		} else if (holdCounter > 0) {
+			holdCounter--;
+		}
+
+		// --- 4. dB-domain gain computation with soft knee ---
+		let targetGain: number;
+		const isActive = holdCounter > 0 || envelope > threshold;
+		if (isActive && depth > 0) {
+			const envelopeDb = 20 * Math.log10(Math.max(envelope, 1e-6));
+			const thresholdDb = 20 * Math.log10(Math.max(threshold, 1e-6));
+			// Max reduction in dB (depth 0–1 maps to 0 to -24 dB)
+			const maxReductionDb = depth * 24;
+			// How far above threshold the range extends (from threshold to 0 dBFS)
+			const rangeDb = Math.max(0.1, -thresholdDb);
+			const overDb = envelopeDb - thresholdDb;
+
+			let reductionDb: number;
+			if (overDb < -halfKnee) {
+				// Below the knee: no reduction
+				reductionDb = 0;
+			} else if (overDb > halfKnee) {
+				// Above the knee: full ratio reduction
+				reductionDb =
+					maxReductionDb * Math.min(1, (overDb - halfKnee) / rangeDb);
+			} else {
+				// Inside the knee: quadratic interpolation for smooth onset
+				const x = overDb + halfKnee;
+				reductionDb = maxReductionDb * ((x * x) / (2 * kneeDb * rangeDb));
+			}
+			// Convert dB reduction to linear gain
+			targetGain = 10 ** (-reductionDb / 20);
 		} else {
 			targetGain = 1;
 		}
 
-		// --- 4. Smooth gain to avoid zipper noise ---
-		const smoothCoeff = 0.005;
+		// --- 5. Sample-rate-aware gain smoothing ---
 		smoothedGain += smoothCoeff * (targetGain - smoothedGain);
 
-		// --- 5. Apply gain to all main input channels ---
+		// --- 6. Apply gain to all main input channels ---
 		for (let ch = 0; ch < numChannels; ch++) {
 			output[ch]![i] = mainInput[ch]![i]! * smoothedGain;
 		}
@@ -115,4 +165,6 @@ export function processDuckBlock(
 
 	state.envelope = envelope;
 	state.smoothedGain = smoothedGain;
+	state.rmsAccumulator = rmsAccumulator;
+	state.holdCounter = holdCounter;
 }

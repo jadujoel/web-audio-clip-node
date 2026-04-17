@@ -19,9 +19,9 @@ import {
 	processBlock,
 	SAMPLE_BLOCK_SIZE,
 	setOffset,
-} from "./processor-kernel";
-import type { BlockParameters, ClipProcessorOptions } from "./types";
-import { State } from "./types";
+} from "./clip/kernel";
+import type { BlockParameters, ClipProcessorOptions } from "./clip/types";
+import { State } from "./clip/types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -4113,7 +4113,7 @@ describe("Loop: edge cases", () => {
 		expect(props.playhead).toBe(128);
 		expect(
 			secondResult.messages.some(
-				(message) => message.type === "bufferUnderrun",
+				(message: OutboundMessage) => message.type === "bufferUnderrun",
 			),
 		).toBe(false);
 	});
@@ -5481,7 +5481,9 @@ describe("Boomerang looping", () => {
 		// Playhead should have reversed: went up to 999, then started going back
 		expect(r.playhead).toBeLessThan(1000);
 		// Indexes should first increase then decrease
-		const turnIdx = r.indexes.findIndex((v, i, arr) => i > 0 && v < arr[i - 1]);
+		const turnIdx = r.indexes.findIndex(
+			(v: number, i: number, arr: number[]) => i > 0 && v < arr[i - 1],
+		);
 		expect(turnIdx).toBeGreaterThan(0);
 		expect(turnIdx).toBeLessThan(128);
 	});
@@ -5524,7 +5526,7 @@ describe("Boomerang looping", () => {
 		expect(r.playbackDirection).toBe(-1);
 		// Indexes should first increase then decrease
 		const afterTurn = r.indexes.findIndex(
-			(v, i, arr) => i > 0 && v < arr[i - 1],
+			(v: number, i: number, arr: number[]) => i > 0 && v < arr[i - 1],
 		);
 		expect(afterTurn).toBeGreaterThan(0);
 	});

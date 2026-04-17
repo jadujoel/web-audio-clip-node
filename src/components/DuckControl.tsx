@@ -161,7 +161,7 @@ function DuckControlInner({
 				max={0}
 				value={threshold}
 				step={0.5}
-				defaultValue={-40}
+				defaultValue={-34}
 				unit="dBFS"
 				decimals={1}
 				disabled={disabled}
@@ -173,7 +173,7 @@ function DuckControlInner({
 				max={1}
 				value={attack}
 				step={0.001}
-				defaultValue={0.01}
+				defaultValue={0.02}
 				skew={0.3}
 				unit="s"
 				decimals={3}
@@ -186,7 +186,7 @@ function DuckControlInner({
 				max={5}
 				value={release}
 				step={0.01}
-				defaultValue={0.5}
+				defaultValue={0.6}
 				skew={0.3}
 				unit="s"
 				decimals={2}

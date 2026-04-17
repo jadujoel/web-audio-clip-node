@@ -52,9 +52,7 @@ describe("DuckControl", () => {
 		const rows = container.querySelectorAll(".audio-control");
 		expect(rows.length).toBe(4);
 		for (const row of rows) {
-			expect(
-				row.querySelector(".control-toggle-placeholder"),
-			).not.toBeNull();
+			expect(row.querySelector(".control-toggle-placeholder")).not.toBeNull();
 		}
 	});
 

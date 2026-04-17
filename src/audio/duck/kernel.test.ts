@@ -10,9 +10,9 @@ function makeChannels(channels: number, length = BLOCK_SIZE): Float32Array[] {
 
 function makeParams(overrides: Partial<Record<string, number>> = {}) {
 	return {
-		threshold: new Float32Array([overrides.threshold ?? 0.01]),
-		attack: new Float32Array([overrides.attack ?? 0.01]),
-		release: new Float32Array([overrides.release ?? 0.5]),
+		threshold: new Float32Array([overrides.threshold ?? 0.02]),
+		attack: new Float32Array([overrides.attack ?? 0.02]),
+		release: new Float32Array([overrides.release ?? 0.6]),
 		depth: new Float32Array([overrides.depth ?? 0.8]),
 	};
 }
@@ -338,6 +338,8 @@ describe("duck-processor-kernel", () => {
 			);
 			expect(state.envelope).toBe(0);
 			expect(state.smoothedGain).toBe(1);
+			expect(state.rmsAccumulator).toBe(0);
+			expect(state.holdCounter).toBe(0);
 		});
 
 		it("lowers volume on sidechain onset then recovers when sidechain stops", () => {
@@ -410,6 +412,8 @@ describe("duck-processor-kernel", () => {
 			const state = createDuckProcessorState();
 			expect(state.envelope).toBe(0);
 			expect(state.smoothedGain).toBe(1);
+			expect(state.rmsAccumulator).toBe(0);
+			expect(state.holdCounter).toBe(0);
 		});
 	});
 });

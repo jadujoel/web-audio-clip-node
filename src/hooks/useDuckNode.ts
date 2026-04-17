@@ -13,9 +13,9 @@ export interface DuckParams {
 }
 
 export const defaultDuckParams: DuckParams = {
-	threshold: -40,
-	attack: 0.01,
-	release: 0.5,
+	threshold: -34,
+	attack: 0.02,
+	release: 0.6,
 	depth: 80,
 	enabled: false,
 };

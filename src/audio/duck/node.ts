@@ -1,11 +1,11 @@
 import type { DuckNodeParameterNames } from "./processor";
 
 export interface DuckNodeOptions {
-	/** Trigger level above which ducking activates (0–1). Default 0.01. */
+	/** Trigger level above which ducking activates (0–1). Default 0.02. */
 	threshold?: number;
-	/** How fast ducking kicks in, in seconds. Default 0.01. */
+	/** How fast ducking kicks in, in seconds. Default 0.02. */
 	attack?: number;
-	/** How fast volume restores after trigger disappears, in seconds. Default 0.5. */
+	/** How fast volume restores after trigger disappears, in seconds. Default 0.6. */
 	release?: number;
 	/** Maximum gain reduction (0 = no duck, 1 = full silence). Default 0.8. */
 	depth?: number;
