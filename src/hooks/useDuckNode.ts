@@ -3,7 +3,7 @@ import { DuckNode, type DuckNodeOptions } from "../audio/duck/node";
 import { getDuckProcessorBlobUrl } from "../audio/duck/url";
 
 export interface DuckParams {
-	/** Threshold in dBFS (-60 to 0). */
+	/** Threshold in dBFS (-100 to 0). */
 	threshold: number;
 	attack: number;
 	release: number;

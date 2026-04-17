@@ -157,7 +157,7 @@ function DuckControlInner({
 			</legend>
 			<ParamRow
 				label="Threshold"
-				min={-60}
+				min={-100}
 				max={0}
 				value={threshold}
 				step={0.5}

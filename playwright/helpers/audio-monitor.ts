@@ -22,17 +22,18 @@ export async function injectAudioMonitor(page: Page): Promise<void> {
 			destination: AudioNode | AudioParam,
 			...rest: number[]
 		) {
-			// Detect connection to destination
-			if (destination instanceof AudioDestinationNode && !win.__audioAnalyser) {
+			// Detect connection to destination — route ALL such connections
+			// through the shared analyser so the monitor survives graph rewiring.
+			if (destination instanceof AudioDestinationNode) {
 				const ctx = this.context as AudioContext;
-				const analyser = ctx.createAnalyser();
-				analyser.fftSize = 2048;
-				analyser.smoothingTimeConstant = 0;
-				win.__audioAnalyser = analyser;
-
-				// Route: source → analyser → destination
-				originalConnect.call(this, analyser);
-				originalConnect.call(analyser, destination);
+				if (!win.__audioAnalyser) {
+					const analyser = ctx.createAnalyser();
+					analyser.fftSize = 2048;
+					analyser.smoothingTimeConstant = 0;
+					win.__audioAnalyser = analyser;
+					originalConnect.call(analyser, destination);
+				}
+				originalConnect.call(this, win.__audioAnalyser);
 				return destination;
 			}
 

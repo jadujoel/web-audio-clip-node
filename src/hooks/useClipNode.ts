@@ -20,8 +20,6 @@ interface UseClipNodeParams {
 	setValue: (key: ControlKey, val: number) => void;
 	/** URL to a default sound file to load when no previously uploaded file exists in IndexedDB. */
 	defaultSoundUrl?: string;
-	/** Custom destination node. Defaults to ctx.destination. */
-	destination?: AudioNode | null | undefined;
 }
 
 export interface UseClipNodeReturn {
@@ -47,6 +45,8 @@ export interface UseClipNodeReturn {
 	applyToggle: (key: ControlKey, on: boolean) => void;
 	setLoopOnNode: (checked: boolean) => void;
 	setLoopModeOnNode: (mode: LoopMode) => void;
+	/** The underlying AudioWorkletNode, available after start(). Use for custom audio graph wiring. */
+	outputNode: AudioNode | null;
 }
 
 export function useClipNode({
@@ -56,7 +56,6 @@ export function useClipNode({
 	loopMode,
 	setValue,
 	defaultSoundUrl,
-	destination,
 }: UseClipNodeParams): UseClipNodeReturn {
 	const [nodeState, setNodeState] = useState<ClipNodeState>("initial");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -144,7 +143,7 @@ export function useClipNode({
 				},
 			});
 
-			node.connect(destination ?? ctx.destination);
+			node.connect(ctx.destination);
 
 			node.onstatechange = (e) => setNodeState(e.state);
 			node.onlooped = () => setInfoTimesLooped(node.timesLooped.toString());
@@ -173,7 +172,7 @@ export function useClipNode({
 
 			return node;
 		},
-		[loop, values, enabled, loopMode, destination],
+		[loop, values, enabled, loopMode],
 	);
 
 	const start = useCallback(async () => {
@@ -229,21 +228,6 @@ export function useClipNode({
 		const delay = enabled.startDelay ? values.startDelay : 0;
 		node.resume(ctx.currentTime + delay);
 	}, [values.startDelay, enabled.startDelay]);
-
-	// Reconnect when destination changes (e.g. duck node inserted/removed)
-	useEffect(() => {
-		const node = nodeRef.current;
-		const ctx = ctxRef.current;
-		if (!node || !ctx) return;
-
-		const target = destination ?? ctx.destination;
-		try {
-			node.disconnect();
-		} catch {
-			// already disconnected
-		}
-		node.connect(target);
-	}, [destination]);
 
 	const dispose = useCallback(() => {
 		nodeRef.current?.dispose();
@@ -367,5 +351,6 @@ export function useClipNode({
 		applyToggle: applyToggleToNode,
 		setLoopOnNode,
 		setLoopModeOnNode,
+		outputNode: nodeRef.current,
 	} satisfies UseClipNodeReturn;
 }

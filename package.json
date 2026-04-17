@@ -110,6 +110,7 @@
 	},
 	"dependencies": {
 		"@jadujoel/typed-event-target": "0.0.6",
-		"neverthrow": "8.2.0"
+		"neverthrow": "8.2.0",
+		"web-audio-beat-detector": "8.2.36"
 	}
 }

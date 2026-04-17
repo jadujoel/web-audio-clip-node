@@ -59,22 +59,37 @@ export function App({
 		loop: controls.loop,
 		loopMode: controls.loopMode,
 		setValue: controls.setValue,
-		destination: duck.node ?? undefined,
 	});
 
-	// When duck node is created, connect it to destination
+	// Insert duck node into the audio graph when both clip output and duck node are available
 	useEffect(() => {
+		const output = node.outputNode;
 		const ctx = node.audioContext;
-		if (!ctx || !duck.node) return;
-		duck.node.connect(ctx.destination);
+		const duckNode = duck.node;
+		if (!output || !ctx || !duckNode) return;
+
+		try {
+			output.disconnect();
+		} catch {
+			/* already disconnected */
+		}
+		output.connect(duckNode);
+		duckNode.connect(ctx.destination);
+
 		return () => {
 			try {
-				duck.node?.disconnect(ctx.destination);
+				output.disconnect();
 			} catch {
-				// already disconnected
+				/* already disconnected */
 			}
+			try {
+				duckNode.disconnect();
+			} catch {
+				/* already disconnected */
+			}
+			output.connect(ctx.destination);
 		};
-	}, [duck.node, node.audioContext]);
+	}, [node.outputNode, node.audioContext, duck.node]);
 
 	// Always create duck node when audio context becomes available
 	useEffect(() => {

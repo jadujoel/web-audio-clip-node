@@ -57,21 +57,37 @@ export function App() {
 		loopMode: controls.loopMode,
 		setValue: controls.setValue,
 		defaultSoundUrl: "../sounds/example.opus",
-		destination: duck.node ?? undefined,
 	});
 
+	// Insert duck node into the audio graph when both clip output and duck node are available
 	useEffect(() => {
+		const output = node.outputNode;
 		const ctx = node.audioContext;
-		if (!ctx || !duck.node) return;
-		duck.node.connect(ctx.destination);
+		const duckNode = duck.node;
+		if (!output || !ctx || !duckNode) return;
+
+		try {
+			output.disconnect();
+		} catch {
+			/* already disconnected */
+		}
+		output.connect(duckNode);
+		duckNode.connect(ctx.destination);
+
 		return () => {
 			try {
-				duck.node?.disconnect(ctx.destination);
+				output.disconnect();
 			} catch {
-				// already disconnected
+				/* already disconnected */
 			}
+			try {
+				duckNode.disconnect();
+			} catch {
+				/* already disconnected */
+			}
+			output.connect(ctx.destination);
 		};
-	}, [duck.node, node.audioContext]);
+	}, [node.outputNode, node.audioContext, duck.node]);
 
 	useEffect(() => {
 		const ctx = node.audioContext;
