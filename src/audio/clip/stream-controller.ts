@@ -5,6 +5,7 @@ import type {
 import {
 	createStreamingWorker,
 	detectStreamFormatFromResponse,
+	formatFromContentType,
 } from "../../streaming";
 import { estimateByteOffsetFromSample } from "../../streamTimeline";
 import type {
@@ -157,6 +158,10 @@ interface ClipStreamControllerHost {
 	onWorkerMessage?(message: StreamControllerWorkerMessage): void;
 }
 
+export interface LoadOptions {
+	decode?: boolean;
+}
+
 export class ClipStreamController {
 	private _url: string | undefined;
 	private _worker: Worker | null = null;
@@ -173,6 +178,10 @@ export class ClipStreamController {
 	private _totalBytesExpected: number | null = null;
 	private _fetchPaused = false;
 	private _streamStarting = false;
+	private _fetchOnlyController: AbortController | null = null;
+	private _prefetchedBytes: Uint8Array | null = null;
+	private _prefetchBlobUrl: string | null = null;
+	private _fetchOnlyInProgress = false;
 	private _streamDoneAcked = false;
 	private _metadata: AudioMetadata | null = null;
 	private _writtenSpans: StreamBufferSpan[] = [];
@@ -661,6 +670,137 @@ export class ClipStreamController {
 		});
 	}
 
+	load(options?: LoadOptions): void {
+		const decode = options?.decode ?? true;
+
+		if (!this._url) return;
+
+		if (decode) {
+			if (this._worker || this._streamStarting || this._streamDone) return;
+			// If we have prefetched bytes, start decoding from them
+			if (this._prefetchedBytes) {
+				void this.startStreamFromPrefetch();
+			} else {
+				void this.startStream(this._url);
+			}
+		} else {
+			if (
+				this._fetchOnlyController ||
+				this._fetchOnlyInProgress ||
+				this._prefetchedBytes ||
+				this._worker ||
+				this._streamStarting ||
+				this._streamDone
+			)
+				return;
+			void this.startFetchOnly(this._url);
+		}
+	}
+
+	private async startFetchOnly(url: string): Promise<void> {
+		this._fetchOnlyInProgress = true;
+		this.setReadyState("loading");
+		this.host.onLoadStart?.();
+
+		const controller = new AbortController();
+		this._fetchOnlyController = controller;
+
+		try {
+			// Detect format before fetching body
+			const format =
+				this.options.defaultFormat ??
+				this._detectedFormat ??
+				(await detectStreamFormatFromResponse(url, controller.signal));
+			this._detectedFormat = format;
+
+			const resp = await fetch(url, { signal: controller.signal });
+			if (!resp.ok) {
+				throw new Error(`Fetch failed: ${resp.status} ${resp.statusText}`);
+			}
+
+			const contentType = resp.headers.get("Content-Type");
+			if (contentType && !this._detectedFormat) {
+				const mapped = formatFromContentType(contentType);
+				if (mapped) this._detectedFormat = mapped;
+			}
+
+			const totalStr = resp.headers.get("Content-Length");
+			if (totalStr) {
+				this._totalBytesExpected = Number.parseInt(totalStr, 10);
+			}
+
+			const reader = resp.body?.getReader();
+			if (!reader) {
+				throw new Error("Response body is not readable");
+			}
+
+			const chunks: Uint8Array[] = [];
+			let received = 0;
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				chunks.push(value);
+				received += value.byteLength;
+				this._totalBytesReceived = received;
+				this.host.onProgress?.(received, this._totalBytesExpected ?? undefined);
+			}
+
+			// Combine chunks into a single buffer
+			const total = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+			const combined = new Uint8Array(total);
+			let offset = 0;
+			for (const chunk of chunks) {
+				combined.set(chunk, offset);
+				offset += chunk.byteLength;
+			}
+
+			this._prefetchedBytes = combined;
+			this._fetchOnlyController = null;
+			this._fetchOnlyInProgress = false;
+		} catch (e) {
+			this._fetchOnlyController = null;
+			this._fetchOnlyInProgress = false;
+			if (controller.signal.aborted) return;
+
+			const errorMsg = e instanceof Error ? e.message : "Unknown fetch error";
+			const error: StreamError = {
+				code: "NETWORK",
+				message: errorMsg,
+			};
+			this._lastError = error;
+			this.host.onError?.(error);
+		}
+	}
+
+	private async startStreamFromPrefetch(): Promise<void> {
+		const bytes = this._prefetchedBytes;
+		if (!bytes || !this._url) return;
+
+		// Create a blob URL from prefetched bytes
+		const blob = new Blob([bytes.buffer as ArrayBuffer]);
+		const blobUrl = URL.createObjectURL(blob);
+		this._prefetchBlobUrl = blobUrl;
+		this._prefetchedBytes = null;
+
+		try {
+			await this.startStream(blobUrl);
+		} finally {
+			// Revoke the blob URL after the worker has consumed it
+			// The worker copies the URL on init, so revocation is safe
+			// after startStream returns (worker has started fetching).
+			URL.revokeObjectURL(blobUrl);
+			this._prefetchBlobUrl = null;
+		}
+	}
+
+	get hasPrefetchedBytes(): boolean {
+		return this._prefetchedBytes !== null;
+	}
+
+	get isFetchingOnly(): boolean {
+		return this._fetchOnlyInProgress;
+	}
+
 	start(when?: number, offset?: number, duration?: number): void {
 		if (
 			this._url &&
@@ -668,7 +808,12 @@ export class ClipStreamController {
 			!this._streamStarting &&
 			!this._streamDone
 		) {
-			void this.startStream(this._url);
+			// If we have prefetched bytes, decode from them instead of re-fetching
+			if (this._prefetchedBytes) {
+				void this.startStreamFromPrefetch();
+			} else {
+				void this.startStream(this._url);
+			}
 		}
 		if (this._readyToPlay || this._url === "") {
 			this.host.startPlayback(when, offset, duration);
@@ -683,6 +828,14 @@ export class ClipStreamController {
 
 	dispose(): void {
 		this.terminateWorker();
+		this._fetchOnlyController?.abort();
+		this._fetchOnlyController = null;
+		this._fetchOnlyInProgress = false;
+		this._prefetchedBytes = null;
+		if (this._prefetchBlobUrl) {
+			URL.revokeObjectURL(this._prefetchBlobUrl);
+			this._prefetchBlobUrl = null;
+		}
 		this._pendingStart = null;
 		this._readyToPlay = false;
 		this._streamDone = true;

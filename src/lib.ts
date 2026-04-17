@@ -14,6 +14,10 @@ export {
 } from "./audio/clip/kernel";
 // Core audio
 export { ClipNode } from "./audio/clip/node";
+export type {
+	LoadOptions,
+	StreamingClipNodeOptions,
+} from "./audio/clip/streaming-node";
 export { StreamingClipNode } from "./audio/clip/streaming-node";
 // Types
 export type {

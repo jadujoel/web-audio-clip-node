@@ -3343,3 +3343,182 @@ describe("TypedEventTarget.setCallback / getCallback", () => {
 		expect(node.onseeked).toBeNull();
 	});
 });
+
+describe("StreamingClipNode.load()", () => {
+	test("load() starts fetch+decode without playback", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		node.url = "https://example.com/audio.opus";
+		expect(node.readyState).toBe("empty");
+
+		node.load();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		// A worker was created (stream started)
+		expect(lastWorker).toBeDefined();
+		expect(node.readyState).toBe("loading");
+
+		// Simulate decode progress reaching threshold
+		const worker = lastWorker;
+		worker.receive({ type: "decoded", samplesDecoded: 48_000 });
+
+		expect(node.readyState).toBe("canplay");
+	});
+
+	test("load() then start() plays immediately when ready", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+
+		let workerCount = 0;
+		const trackingFactory = (_format: StreamFormat): Worker => {
+			workerCount++;
+			lastWorker = new FakeWorker();
+			return lastWorker as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		node.url = "https://example.com/audio.opus";
+		node.load();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		// Simulate decode reaching canplay
+		const worker = lastWorker;
+		worker.receive({ type: "decoded", samplesDecoded: 48_000 });
+		expect(node.readyState).toBe("canplay");
+
+		// Now start — should not create a second worker
+		node.start();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+	});
+
+	test("load() is no-op without URL set", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		// No URL set — load() should be a no-op
+		node.load();
+		await Promise.resolve();
+
+		expect(node.readyState).toBe("empty");
+	});
+
+	test("load() is no-op if already loading via preload auto", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+
+		let workerCount = 0;
+		const trackingFactory = (_format: StreamFormat): Worker => {
+			workerCount++;
+			lastWorker = new FakeWorker();
+			return lastWorker as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			// preload: "auto" is default
+		});
+
+		node.url = "https://example.com/audio.opus";
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+
+		// Calling load() again should not create another worker
+		node.load();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+	});
+
+	test("load() is no-op on disposed node", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: fakeWorkerFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		node.url = "https://example.com/audio.opus";
+		node.dispose();
+
+		node.load();
+		await Promise.resolve();
+
+		expect(node.readyState).toBe("empty");
+	});
+
+	test("load() called twice only creates one worker", async () => {
+		const ctx = createContext({ sampleRate: 48_000 });
+		await ctx.audioWorklet.addModule("/dist/clip-processor.bundle.js");
+
+		let workerCount = 0;
+		const trackingFactory = (_format: StreamFormat): Worker => {
+			workerCount++;
+			lastWorker = new FakeWorker();
+			return lastWorker as unknown as Worker;
+		};
+
+		const coordinator = Coordinator.fromContext(ctx, {
+			workerFactory: trackingFactory,
+			processorUrl: "/dist/clip-processor.bundle.js",
+		});
+
+		const node = coordinator.createStreamingClipNode(undefined, {
+			format: "OggOpus",
+			preload: "none",
+		});
+
+		node.url = "https://example.com/audio.opus";
+		node.load();
+		node.load(); // second call should be ignored
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(workerCount).toBe(1);
+	});
+});

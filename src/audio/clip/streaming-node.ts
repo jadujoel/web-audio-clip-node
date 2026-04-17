@@ -5,7 +5,10 @@ import type {
 import { TypedEventTarget } from "@jadujoel/typed-event-target";
 import { err, ok, type Result } from "neverthrow";
 import { ClipNode } from "./node";
-import type { StreamingClipNodeOptions } from "./stream-controller";
+import type {
+	LoadOptions,
+	StreamingClipNodeOptions,
+} from "./stream-controller";
 import { ClipStreamController } from "./stream-controller";
 import type {
 	AudioMetadata,
@@ -20,6 +23,7 @@ import type {
 } from "./types";
 
 export type {
+	LoadOptions,
 	PendingStart,
 	StreamingClipNodeOptions,
 } from "./stream-controller";
@@ -279,6 +283,11 @@ export class StreamingClipNode extends ClipNode {
 	set url(value: string) {
 		if (this.isDisposed) return;
 		this._controller.setUrl(value);
+	}
+
+	load(options?: LoadOptions): void {
+		if (this.isDisposed) return;
+		this._controller.load(options);
 	}
 
 	override start(

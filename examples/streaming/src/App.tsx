@@ -619,6 +619,14 @@ export function App() {
 			<div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
 				<button
 					type="button"
+					onClick={() => node.load(url, throttle, format, gapStrategy)}
+					disabled={isStreaming}
+					title="Fetch and decode without playing (StreamingClipNode.load)"
+				>
+					Load
+				</button>
+				<button
+					type="button"
 					onClick={() => node.stream(url, throttle, format, gapStrategy)}
 					style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
 				>

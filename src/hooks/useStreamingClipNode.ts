@@ -44,12 +44,18 @@ export interface UseStreamingClipNodeReturn {
 	timesLoopedRef: RefObject<string>;
 	infoLatency: string;
 	playbackGeneration: number;
+	load: (
+		url: string,
+		throttle: number,
+		format?: StreamFormat,
+		gapStrategy?: GapPlaybackStrategy,
+	) => void;
 	stream: (
 		url: string,
 		throttle: number,
 		format?: StreamFormat,
 		gapStrategy?: GapPlaybackStrategy,
-	) => Promise<void>;
+	) => void;
 	play: () => void;
 	pause: () => void;
 	stop: () => void;
@@ -151,10 +157,13 @@ export function useStreamingClipNode({
 		clip.loopMode = loopMode;
 	}, [loop, loopMode]);
 
-	const stream = useCallback(
+	const autoPlayRef = useRef(false);
+
+	const setupStream = useCallback(
 		async (
 			url: string,
 			throttle: number,
+			autoPlay: boolean,
 			format?: StreamFormat,
 			gapStrategy?: GapPlaybackStrategy,
 		) => {
@@ -162,6 +171,8 @@ export function useStreamingClipNode({
 				setStatus("Enter a URL first.");
 				return;
 			}
+
+			autoPlayRef.current = autoPlay;
 
 			// Increment generation so playhead effect resets its display value
 			setPlaybackGeneration((g) => g + 1);
@@ -278,7 +289,19 @@ export function useStreamingClipNode({
 								}
 							}
 							if (samplesDecoded >= ctx.sampleRate) {
-								setStatus("Ready to play.");
+								// Auto-play when enough data is buffered (stream mode)
+								if (autoPlayRef.current) {
+									const c = clipRef.current;
+									if (c && c.state === "initial") {
+										setPlaybackGeneration((g) => g + 1);
+										frameRef.current = null;
+										c.start();
+										setStatus("Playing…");
+									}
+									autoPlayRef.current = false;
+								} else {
+									setStatus("Ready to play.");
+								}
 							}
 							break;
 						}
@@ -352,6 +375,30 @@ export function useStreamingClipNode({
 			}
 		},
 		[configureClip, ensureContext, polyfillOptions, setStatus],
+	);
+
+	const load = useCallback(
+		(
+			url: string,
+			throttle: number,
+			format?: StreamFormat,
+			gapStrategy?: GapPlaybackStrategy,
+		) => {
+			void setupStream(url, throttle, false, format, gapStrategy);
+		},
+		[setupStream],
+	);
+
+	const stream = useCallback(
+		(
+			url: string,
+			throttle: number,
+			format?: StreamFormat,
+			gapStrategy?: GapPlaybackStrategy,
+		) => {
+			void setupStream(url, throttle, true, format, gapStrategy);
+		},
+		[setupStream],
 	);
 
 	const play = useCallback(() => {
@@ -508,6 +555,7 @@ export function useStreamingClipNode({
 		timesLoopedRef: timesLoopedRef as RefObject<string>,
 		infoLatency,
 		playbackGeneration,
+		load,
 		stream,
 		play,
 		pause,
