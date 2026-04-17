@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ControlKey,
+	ClipNode,
 	type DuckNodeOptions,
 	type LoopMode,
 	controlDefs,
@@ -31,6 +32,7 @@ import {
 	useDuckNode,
 } from "@jadujoel/web-audio-clip-node/react";
 import "@jadujoel/web-audio-clip-node/styles.css";
+import { guess } from "web-audio-beat-detector";
 
 function buildControlUpdates<T>(
 	keys: readonly ControlKey[],
@@ -193,6 +195,7 @@ export function App() {
 
 	const [tempoDraft, setTempoDraft] = useState(() => String(controls.tempo));
 	const [isEditingTempo, setIsEditingTempo] = useState(false);
+	const [isDetectingTempo, setIsDetectingTempo] = useState(false);
 
 	useEffect(() => {
 		if (node.audioDuration == null) return;
@@ -306,6 +309,24 @@ export function App() {
 		handleTempoChange(nextTempo);
 		setTempoDraft(String(nextTempo));
 	}, [controls.tempo, handleTempoChange, tempoDraft]);
+
+	const handleDetectTempo = useCallback(async () => {
+		const clipNode = node.outputNode;
+		if (!(clipNode instanceof ClipNode)) return;
+		const audioBuffer = clipNode.buffer;
+		if (!audioBuffer) return;
+
+		setIsDetectingTempo(true);
+		try {
+			const result = await guess(audioBuffer);
+			handleTempoChange(result.bpm);
+			setTempoDraft(String(result.bpm));
+		} catch {
+			// detection failed — leave tempo unchanged
+		} finally {
+			setIsDetectingTempo(false);
+		}
+	}, [node.outputNode, handleTempoChange]);
 
 	const handleSnapChange = useCallback(
 		(key: ControlKey, snap: string) => {
@@ -486,6 +507,13 @@ export function App() {
 					}}
 					style={{ width: 70 }}
 				/>
+				<button
+					type="button"
+					disabled={isDetectingTempo || !(node.outputNode instanceof ClipNode && node.outputNode.buffer)}
+					onClick={handleDetectTempo}
+				>
+					{isDetectingTempo ? "Detecting…" : "Detect"}
+				</button>
 			</fieldset>
 			<PlayheadSlider
 				value={controls.values.playhead}
@@ -636,13 +664,14 @@ export function App() {
 							>
 								{kickPlaying ? "Stop Kick" : "Start Kick"}
 							</button>
-							<label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.85rem", color: "#bbb" }}>
+							<label className="control-row">
 								<input
 									type="checkbox"
+									className="control-toggle"
 									checked={kickAudible}
 									onChange={toggleKickAudible}
 								/>
-								Hear Kick
+								<span className="control-label">Hear Kick</span>
 							</label>
 						</div>
 					</fieldset>

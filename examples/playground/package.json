@@ -9,6 +9,7 @@
 		"@jadujoel/web-audio-clip-node": "latest",
 		"react": "^19",
 		"react-dom": "^19",
+		"web-audio-beat-detector": "8.2.36",
 		"zustand": "^5"
 	},
 	"devDependencies": {

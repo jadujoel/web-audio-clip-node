@@ -667,21 +667,14 @@ export function App({
 							>
 								{kickPlaying ? "Stop Kick" : "Start Kick"}
 							</button>
-							<label
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 4,
-									fontSize: "0.85rem",
-									color: "#bbb",
-								}}
-							>
+							<label className="control-row">
 								<input
 									type="checkbox"
+									className="control-toggle"
 									checked={kickAudible}
 									onChange={toggleKickAudible}
 								/>
-								Hear Kick
+								<span className="control-label">Hear Kick</span>
 							</label>
 						</div>
 					</fieldset>
